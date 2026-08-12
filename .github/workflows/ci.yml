@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    # Windows is in the matrix deliberately. Two real bugs shipped that only
+    # appear there: `text=True` decodes subprocess output with the local code
+    # page (cp1254 on a Turkish install) and crashes on git's UTF-8 output,
+    # and a test called `rm -rf`, which does not exist on Windows. A
+    # Linux-only matrix is structurally blind to both.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,  python-version: "3.11" }
+          - { os: ubuntu-latest,  python-version: "3.12" }
+          - { os: ubuntu-latest,  python-version: "3.13" }
+          - { os: ubuntu-latest,  python-version: "3.14" }
+          - { os: windows-latest, python-version: "3.12" }
+          - { os: windows-latest, python-version: "3.14" }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Tests
+        # No live SEC calls: the HTTP layer is mocked, so CI never touches
+        # sec.gov and never spends the 10 req/s budget.
+        run: python -m pytest -q -W error::DeprecationWarning
+        env:
+          SEC_RATE_LIMIT_PER_SEC: "1000"
+
+      - name: Lint
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: python -m ruff check .
+
+      - name: Types
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: python -m mypy src
+
+  fault-injection:
+    # Standard section 2: a test that has never been seen to fail is not a
+    # guarantee. Every protection is deliberately broken and the matching test
+    # must turn red. Run on both OSes: the harness shells out to pytest, so it
+    # is exposed to the same platform differences as the code it checks.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: python arac/enjeksiyon.py
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history. The default shallow clone would make the history
+          # scan incomplete; the scanner detects that and fails rather than
+          # reporting a false "clean".
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python arac/sir_tarama.py --gecmis
