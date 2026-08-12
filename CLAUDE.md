@@ -250,3 +250,28 @@ gorunmezdi:
 **Karar:** `test` ve `fault-injection` isleri hem ubuntu hem windows uzerinde
 kosar. Lint/tip kontrolu tek kombinasyonda (ubuntu + 3.12) yeter - platformdan
 bagimsizlar. Python 3.14 matriste, cunku gelistirme makinesi onu kullaniyor.
+
+### KK-15: Sir tarayicinin sinirlari (ve kabul edilen bir risk)
+**Tarih:** 12 Agustos 2026 · **Durum:** yururlukte · **Standart:** §11, §12
+
+Tarayici iki seyi YAPAMAZ. Ikisi de olculdu, varsayilmadi:
+
+**1. Uzaktaki geçmişi göremez.** `git log --all` yalnizca yerel referanslari
+tarar. GitHub web arayuzunde yapilan ve hic `pull` edilmemis bir commit yerel
+taramada gorunmez. Bu proje tam olarak boyle bir kacak yasadi: `5198c97`
+commit'i web'de olusturuldu, yerelde hic bulunmadi, yerel tarama "temiz" dedi
+ve dedigi dogruydu. CI'daki tarama (uzaktan klonladigi icin) gorurdu.
+**Sonuc: yetkili kontrol CI'daki taramadir, yereldeki degil.**
+
+**2. Sahipsiz (unreachable) commit'leri goremez.** Force push sonrasi eski
+commit'ler hicbir dala bagli kalmaz, dolayisiyla `--all` kapsamina girmez -
+ama GitHub'da SHA ile erisilebilir durumda kalirlar; cop toplama belirsiz
+zamanda calisir, cogu zaman hic calismaz. **"Gecmisi temizledim" demek, o
+commit'in gittigi anlamina gelmez.** Kesin yol: GitHub destegine purge talebi
+ya da depoyu silip yeniden olusturmak.
+
+**Kabul edilen risk:** `5198c97` commit'inde bir kisisel Gmail adresi duruyor
+ve SHA ile okunabilir. Kimlik bilgisi degil; maruziyet yalnizca adresin
+toplanabilmesi. Depoyu yeniden olusturma secenegi degerlendirildi ve maliyeti
+faydasina degmedigi icin risk BILINCLI OLARAK kabul edildi. Yeni commit'ler
+`@users.noreply.github.com` adresiyle atiliyor, yani tekrari yok.
