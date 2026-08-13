@@ -170,6 +170,20 @@ Tarayıcı, geçmişin tamamını göremediğinde temiz demeyi reddeder: sığ k
 exit code 0 değil 2 döner. CI bu yüzden `fetch-depth: 0` ile klonluyor.
 Sessizce hiçbir şey yapmayan bir kontrol, kontrol olmamasından kötüdür.
 
+### Taşıma katmanı doğrulaması
+
+README'nin kendi talimatları test paketinde gerçekten çalıştırılıyor. Bir test
+streamable-HTTP taşımasını boş bir portta ayağa kaldırıp `tools/list`'i gerçek
+HTTP üzerinden, el sıkışmasız soruyor — 2026-07-28 durumsuz çekirdeğinin
+gerektirdiği davranış da bu. Bir diğeri `python -m edgar_mcp.server`'ı stdio
+üzerinden, SDK'nın kendi istemcisiyle başlatıyor: masaüstü MCP istemcilerinin
+kullandığı yolun aynısı. CI'daki `docker` işi imajı kurup konteyneri
+**dışarıdan** sorguluyor.
+
+Bu iş gerçek bir kusur yüzünden var: SDK varsayılan olarak `127.0.0.1`'e
+bağlanıyor ve bu, konteyner içinde yayınlanan portu ölü bırakıyor. İmaj hiç
+çalıştırılmamıştı, dolayısıyla kimse fark etmemişti.
+
 ### Canlı doğrulama
 
 Mock'lar gerçek sisteme karşı davranışı kanıtlayamaz. `dogrula.py`, mali yıl
@@ -209,6 +223,7 @@ src/edgar_mcp/server.py   MCP araçları ve şemalar
 src/edgar_mcp/client.py   SEC HTTP istemcisi, hız sınırlayıcı, önbellek
 tests/                    mock'lu birim testleri
 tests/dil.py              dışa bakan yüzey için dil kontrolü
+tests/test_http_tasima.py belgelenen HTTP ve stdio taşımalarını çalıştırır
 evaluation/questions.xml  ölçülmüş on soru ve hangi çağrılarla ölçüldükleri
 arac/enjeksiyon.py        hata enjeksiyonu harness'ı
 arac/sir_tarama.py        sır tarayıcı

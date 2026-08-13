@@ -19,6 +19,7 @@ DOSYALAR = [
     "src/edgar_mcp/server.py",
     "src/edgar_mcp/client.py",
     "arac/sir_tarama.py",
+    "Dockerfile",
 ]
 
 ORTAM = {**os.environ, "SEC_RATE_LIMIT_PER_SEC": "1000"}
@@ -235,6 +236,12 @@ ENJEKSIYONLAR = [
   '        has_more=len(tumu) > len(ordered),',
   '        has_more=False,',
   'test_seri_sayfalama_bilgisi_verir'),
+
+ ("Dockerfile: acik host'u kaldir (konteynerde loopback'e baglanir)",
+  "Dockerfile",
+  "mcp.run(transport='streamable-http', host='0.0.0.0', stateless_http=True)",
+  "mcp.run(transport='streamable-http')",
+  "test_dockerfile_loopback_disina_baglaniyor"),
 
  ("KO olayi: bos companyconcept yanitinda yedek uca dusme",
   "src/edgar_mcp/server.py",

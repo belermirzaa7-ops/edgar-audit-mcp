@@ -424,3 +424,24 @@ Uc enjeksiyon dogruluyor: yedege dusmeyi kaldir, yedegi her cagride calistir,
 bos durumda hata yerine bos basari don.
 
 Bkz. PATTERNS.md P-19.
+### KK-24: Belgelenen dagitim yolu CI'da gercekten calistirilir
+**Tarih:** 13 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §3, §9
+
+README Docker + streamable-HTTP kullanimini vaat ediyordu; o yol hic
+calistirilmamisti. SDK'nin `run_streamable_http_async` varsayilani
+`host="127.0.0.1"` (imzadan olculdu, belgeden degil) - konteyner icinde bu,
+yayinlanan portu olu birakir. Testler de yardim etmiyordu: arac fonksiyonlarini
+dogrudan cagiriyorlar, HTTP tasimasina hic dokunmuyorlardi.
+
+**Karar:**
+- `Dockerfile` host'u ACIKCA verir: `host='0.0.0.0', stateless_http=True`.
+- `tests/test_http_tasima.py` tasimayi bos bir portta ayaga kaldirir ve
+  `tools/list`'i gercek HTTP uzerinden, el sikismasiz sorar. Bu ayni zamanda
+  2026-07-28 spesifikasyonunun durumsuz cekirdegini kanitlar.
+- CI'da `docker` isi imaji kurar ve konteyneri DISARIDAN sorgular.
+- `test_sdk_varsayilani_hala_loopback` varsayimin kendisini sabitler: SDK
+  varsayilani degisirse test kirmiziya doner ve Dockerfile yorumu gozden
+  gecirilir.
+- Enjeksiyon: Dockerfile'dan acik host kaldirilir, ilgili test kirmiziya doner.
+
+Bkz. PATTERNS.md P-20.

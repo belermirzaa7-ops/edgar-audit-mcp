@@ -168,6 +168,20 @@ The scanner refuses to report clean when it cannot see full history — a shallo
 clone returns exit code 2, not 0. CI therefore checks out with `fetch-depth: 0`.
 A check that silently does nothing is worse than no check.
 
+### Transport verification
+
+The README's own instructions are executed by the suite, not just written down.
+One test boots the streamable-HTTP transport on a free port and asks for
+`tools/list` over real HTTP with no handshake, which is also what the
+2026-07-28 stateless core requires. Another launches `python -m
+edgar_mcp.server` over stdio through the SDK's own client — the exact path a
+desktop MCP client uses. A CI job builds the Docker image and queries the
+running container from outside it.
+
+That job exists because of a real defect: the SDK binds `127.0.0.1` by default,
+which inside a container leaves the published port dead. The image had never
+been run, so nothing had noticed.
+
 ### Live verification
 
 Mocks cannot prove behaviour against the real system. `dogrula.py` checks the
@@ -207,6 +221,7 @@ src/edgar_mcp/server.py   MCP tools and schemas
 src/edgar_mcp/client.py   SEC HTTP client, rate limiter, caching
 tests/                    mocked unit tests
 tests/dil.py              language gate for the outward-facing surface
+tests/test_http_tasima.py runs the documented HTTP and stdio transports
 evaluation/questions.xml  ten measured questions with their tool calls
 arac/enjeksiyon.py        fault-injection harness
 arac/sir_tarama.py        secret scanner

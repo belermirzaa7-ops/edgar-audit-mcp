@@ -32,6 +32,7 @@ can verify rather than remember.
 | [P-17](#p-17) | Did I inspect the whole outward surface, and can my detector see words I did not think of? | `test_arac_tanimlari_ingilizce`, `test_hata_mesajlari_ingilizce`, `test_dil_kontrolu_bilinen_ornekleri_ayirt_ediyor` |
 | [P-18](#p-18) | Is the live client running the code I just changed? | **none — manual step** |
 | [P-19](#p-19) | Does a 200 from upstream actually carry rows, and did I check the second endpoint? | `test_bos_companyconcept_yanitinda_companyfacts_e_dusulur`, `test_iki_uc_da_bossa_sessiz_basari_yerine_hata` |
+| [P-20](#p-20) | Have I actually run the deployment path the README promises? | `test_http_tasimasi_araclari_el_sikismasiz_listeler`, `test_stdio_tasimasi_resmi_istemciyle_araclari_listeliyor`, `test_dockerfile_loopback_disina_baglaniyor`, CI job `docker` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -468,6 +469,37 @@ must not be fetched on every call.
 `sec_edgar_list_available_concepts` reported 144 data points for `Assets` on the
 same server. Isolated with `arac/tani.py --matris`, which requests the same data
 under varied conditions and names the variable that changed the outcome.
+
+---
+
+<a id="p-20"></a>
+### P-20 · A documented deployment path that was never executed
+
+**Symptom.** The README shows `docker build` and `docker run -p 8000:8000`. The
+image builds, the container starts, the log says the server is running — and
+nothing outside the container can reach it.
+
+**Root cause.** The SDK's `run_streamable_http_async` defaults to
+`host="127.0.0.1"`. Inside a container that binds the loopback interface only,
+so the published port has nothing behind it. The `CMD` had never been executed
+in any environment, so the default was never observed. Nothing in the test
+suite touched the HTTP transport either: the tests exercise the tool functions
+directly, which is a different code path from the one the README advertises.
+
+**Detection.** Run the documented path, do not read it. A test starts the HTTP
+transport on a free port and asks for `tools/list` over real HTTP with no
+handshake, which also proves the stateless behaviour the 2026-07-28 spec
+requires. A CI job builds the image and queries the running container from
+outside it. A third test pins the SDK default itself, so if upstream ever
+changes it, the explicit host in the `Dockerfile` is re-examined rather than
+cargo-culted. The stdio path — the one Claude Desktop actually uses — is
+covered the same way, through the SDK's own client rather than a hand-built
+JSON-RPC frame: a hand-built frame omits the `params`/`_meta` the 2026-07-28
+wire requires, so it fails the test rather than the server.
+
+**Incident.** 13 Aug 2026. Found while auditing what in this repository is
+claimed but unverified — not by a failure, because nobody had ever run it. The
+`Dockerfile` now passes `host='0.0.0.0', stateless_http=True` explicitly.
 
 ---
 

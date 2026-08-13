@@ -67,6 +67,35 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: python arac/enjeksiyon.py
 
+  docker:
+    # The README advertises running this server over streamable HTTP in a
+    # container. That path had never been executed: the SDK binds 127.0.0.1 by
+    # default, which inside a container leaves the published port dead. This
+    # job builds the image and asks the running container for its tool list
+    # from OUTSIDE the container, so the promise is verified, not assumed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t sec-edgar-mcp .
+      - name: Answer tools/list from outside the container
+        run: |
+          docker run -d --name mcp -p 8000:8000 \
+            -e SEC_USER_AGENT="CI Runner ci@example.com" sec-edgar-mcp
+          for i in $(seq 1 30); do
+            if curl -sf -X POST http://127.0.0.1:8000/mcp \
+                 -H 'Content-Type: application/json' \
+                 -H 'Accept: application/json, text/event-stream' \
+                 -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+                 | grep -q sec_edgar_get_concept_series; then
+              echo "container answered"; exit 0
+            fi
+            sleep 2
+          done
+          echo "container never answered on the published port"
+          docker logs mcp
+          exit 1
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:

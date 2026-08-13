@@ -7,6 +7,12 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 
-# Streamable HTTP transport (2026-07-28 spesifikasyonu, stateless)
+# Streamable HTTP transport (2026-07-28 spesifikasyonu, stateless).
+#
+# host="0.0.0.0" ZORUNLU: SDK varsayilani 127.0.0.1'dir ve konteyner icinde
+# yalnizca loopback'e baglanir - `docker run -p 8000:8000` disaridan hicbir
+# sey goremez. Olculdu, varsayilmadi (bkz. PATTERNS.md P-20).
+# stateless_http=True: 2026-07-28 spesifikasyonunun durumsuz cekirdegi;
+# initialize/Mcp-Session-Id el sikismasi olmadan tools/list cevaplanir.
 EXPOSE 8000
-CMD ["python", "-c", "from edgar_mcp.server import mcp; mcp.run(transport='streamable-http')"]
+CMD ["python", "-c", "from edgar_mcp.server import mcp; mcp.run(transport='streamable-http', host='0.0.0.0', stateless_http=True)"]
