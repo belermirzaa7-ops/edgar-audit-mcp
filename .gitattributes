@@ -1,0 +1,16 @@
+# Satir sonlarini deponun icinde LF olarak sabitle. Bunsuz her katkida
+# bulunanin core.autocrlf ayari diff uretir ve gercek degisiklikler gurultuye
+# gomulur.
+* text=auto eol=lf
+
+# Windows'ta calisan kabuk dosyalari CRLF olmali
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Ikili dosyalar hic dokunulmasin
+*.png  binary
+*.jpg  binary
+*.gif  binary
+*.zip  binary
+*.pdf  binary

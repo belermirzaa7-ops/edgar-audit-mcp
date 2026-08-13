@@ -39,14 +39,19 @@ async def main():
     print(f"\n--- SIRKET ---\n  {p.name}\n  CIK: {p.cik}\n  Sektor: {p.sic_description}")
 
     print("\n--- SON YILLIK RAPORLAR ---")
-    for f in await list_recent_filings(ticker=TICKER, form_type="10-K", limit=3):
+    sayfa = await list_recent_filings(ticker=TICKER, form_type="10-K", limit=3)
+    print(f"  toplam eslesen: {sayfa.total_matching}, gosterilen: {sayfa.returned}, "
+          f"devami var mi: {sayfa.has_more}")
+    for f in sayfa.filings:
         print(f"  {f.filing_date}  ->  {f.primary_document_url}")
 
     # Artik ham XBRL etiketi degil, takma ad veriyoruz. Dogru etiketi sunucu buluyor.
     for takma in ("revenue", "net_income"):
         s = await get_concept_series(ticker=TICKER, concept=takma, limit=5)
         print(f"\n--- {takma.upper()} ---")
-        print(f"  cozulen etiket: {s.resolved_concept}")
+        print(f"  cozulen etiket: {', '.join(s.resolved_concepts)}")
+        print(f"  toplam donem: {s.total_periods}, gosterilen: {s.returned}, "
+              f"daha eskisi var mi: {s.has_more}")
         onceki = None
         for pt in s.points:
             art = f"   ({(pt.value/onceki-1)*100:+.1f}%)" if onceki else ""

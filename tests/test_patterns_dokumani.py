@@ -30,8 +30,10 @@ def test_atif_yapilan_testler_gercekten_var():
     assert not eksik, f"PATTERNS.md var olmayan teste atif yapiyor: {sorted(eksik)}"
 
 
-def test_atif_yapilan_araclar_gercekten_var():
-    for yol in set(re.findall(r"`(arac/\w+\.py)`", PATTERNS)):
+def test_atif_yapilan_dosyalar_gercekten_var():
+    yollar = set(re.findall(r"`((?:arac|tests|src)/[\w/]+\.py)`", PATTERNS))
+    assert yollar, "PATTERNS.md hicbir dosyaya atif yapmiyor"
+    for yol in yollar:
         assert (KOK / yol).exists(), f"PATTERNS.md var olmayan dosyaya atif yapiyor: {yol}"
 
 

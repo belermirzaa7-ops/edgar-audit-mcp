@@ -33,7 +33,13 @@ answers. The interesting part of this project is handling them.
 | `sec_edgar_list_available_concepts` | Which US-GAAP tags a company actually reports |
 
 Every tool returns a Pydantic model, so MCP `outputSchema` is generated
-automatically and clients consume the results type-safely.
+automatically and clients consume the results type-safely. List-returning tools
+report `total_matching` / `returned` / `has_more` so the model can tell a
+complete answer from a truncated one.
+
+All four tools are annotated `readOnlyHint: true`. That annotation is a hint,
+not a guarantee — the guarantee is that the package contains no write path at
+all, which a test enforces.
 
 ## Three traps this server handles
 

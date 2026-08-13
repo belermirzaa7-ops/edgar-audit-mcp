@@ -1,6 +1,6 @@
 # CLAUDE.md — sec-edgar-mcp
 
-> **Ise baslamadan once `PATTERNS.md` oku.** Bu depoda gercekten yasanmis 14
+> **Ise baslamadan once `PATTERNS.md` oku.** Bu depoda gercekten yasanmis her
 > hata ve her birinin hangi testle korundugu orada. Bitirmeden once de oradaki
 > kontrol listesinden gec. Bu dosya KARARLARI (neden boyle yapildi) tutar;
 > PATTERNS.md HATALARI (neye dikkat et) tutar.
@@ -280,3 +280,71 @@ ve SHA ile okunabilir. Kimlik bilgisi degil; maruziyet yalnizca adresin
 toplanabilmesi. Depoyu yeniden olusturma secenegi degerlendirildi ve maliyeti
 faydasina degmedigi icin risk BILINCLI OLARAK kabul edildi. Yeni commit'ler
 `@users.noreply.github.com` adresiyle atiliyor, yani tekrari yok.
+
+### KK-16: Annotations ipucudur, garanti testle saglanir
+**Tarih:** 13 Agustos 2026 · **Durum:** yururlukte · **Standart:** §19
+
+Dort arac da `read_only_hint=True, destructive_hint=False, idempotent_hint=True,
+open_world_hint=True` ilan ediyor. Standart §19 acikca soyluyor: bunlar
+IPUCUDUR, guvenlik garantisi degil. Istemci bunlara bakip karar vermemeli.
+
+**Karar:** ipucu iki testle kanita cevriliyor.
+- `test_tum_araclar_salt_okunur_ilan_ediyor` — ilan var mi
+- `test_kodda_hicbir_yazma_yolu_yok` — `src/` icinde hicbir `.post/.put/.patch/
+  .delete` cagrisi olmamali. Biri ileride yazma ekleyip hint'i guncellemeyi
+  unutursa bu test kirmiziya doner.
+
+Not: v2 SDK'da alan adlari snake_case (`read_only_hint`), spesifikasyondaki
+camelCase (`readOnlyHint`) degil.
+
+### KK-17: Liste donduren her arac sayfalama bilgisi verir
+**Tarih:** 13 Agustos 2026 · **Durum:** yururlukte · **Standart:** §16
+
+`limit` tek basina yetmiyor: model, gordugu listenin tamami mi yoksa kirpilmis
+mi oldugunu bilemiyor ve "sirketin N dosyalamasi var" diye sonuclandirabiliyor.
+
+**Karar:** `list_filings` artik `FilingPage` donuyor (`total_matching`,
+`returned`, `has_more`, `filings`); `get_concept_series` yanitina
+`total_periods`, `returned`, `has_more` eklendi. Kirici sema degisikligi,
+bagli istemci yoktu.
+
+Iki incelik testle sabit:
+- `total_matching` FILTRE UYGULANDIKTAN sonraki sayidir; filtresiz toplami
+  raporlamak modeli yaniltir (`test_filings_sayfalama_filtreyle_birlikte_dogru`)
+- Seri kirpilirken EN YENI donemler kalir, en eskiler degil - trend analizi
+  yapan model son donemleri gormeli (`test_seri_kirpmada_EN_YENI_donemler_kalir`)
+
+### KK-18: Enjeksiyon hedefleri benzersiz olmali
+**Tarih:** 13 Agustos 2026 · **Durum:** yururlukte · **Standart:** §2, §5
+
+`list_filings` ve `list_available_concepts` ayni yerel degisken adini
+(`eslesen`) kullaniyordu, dolayisiyla `has_more=len(eslesen) > limit,` dizgisi
+iki yerde geciyordu. Enjeksiyon `replace(..., 1)` kullandigi icin yanlis
+fonksiyonu bozuyor ve beklenmeyen test kirmiziya donuyordu - koruma
+dogrulanmis GORUNUYOR ama aslinda baska bir sey sinaniyor.
+
+Bu, standart §5'in ("predicate'leri dar ve kesin kur") kod uzerindeki
+karsiligi: alt dize eslesmesi tahmin ettiginden genis eslesir.
+
+**Karar:** `list_filings` icindeki degisken `dosyalamalar` olarak yeniden
+adlandirildi. Yeni enjeksiyon eklerken hedef dizginin dosyada TEK gectigi
+dogrulanmali.
+
+### KK-19: Yerel scriptler de test kapsaminda
+**Tarih:** 13 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1
+
+`dene.py` test kapsami disindaydi. `ConceptSeries.resolved_concept` alani
+`resolved_concepts` olarak degisince script calisma aninda `AttributeError`
+veriyordu - ama tum testler yesildi. Kullanici calistirsaydi kirik bir demo
+gorurdu.
+
+**Karar:** `tests/test_scriptler.py` scripti sahte veriyle uctan uca calistirir
+ve ciktisinda beklenen basliklarin bulundugunu dogrular. Script ciktisina yeni
+bir alan eklenirse test de guncellenir; alan silinirse test kirmiziya doner.
+
+### KK-20: `.gitattributes` ile satir sonlari sabit
+**Tarih:** 13 Agustos 2026 · **Durum:** yururlukte
+
+Windows'ta her `git add` LF/CRLF uyarisi uretiyordu. Bunsuz satir sonlari her
+katkida bulunanin `core.autocrlf` ayarina baglidir ve sahte diff'ler gercek
+degisiklikleri gurultuye gomer. Depo icinde LF sabit; `.bat/.cmd/.ps1` CRLF.

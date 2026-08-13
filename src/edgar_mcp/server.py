@@ -11,6 +11,7 @@ from typing import Annotated, Literal
 
 import httpx
 from mcp.server import MCPServer
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
 from .client import EdgarClient
@@ -129,6 +130,19 @@ class Filing(BaseModel):
     primary_document_url: str
 
 
+class FilingPage(BaseModel):
+    ticker: str
+    total_matching: int = Field(
+        description="Total filings matching form_type in the recent-filings feed"
+    )
+    returned: int = Field(description="Number of filings in this response")
+    has_more: bool = Field(
+        description="True if more filings matched than were returned; raise limit "
+        "or narrow with form_type"
+    )
+    filings: list[Filing]
+
+
 class FactPoint(BaseModel):
     fiscal_year: int = Field(
         description="The company's own fiscal year label, derived from SEC data rather than guessed"
@@ -156,6 +170,14 @@ class ConceptSeries(BaseModel):
     )
     taxonomy: str
     label: str | None = None
+    total_periods: int = Field(
+        description="Periods available after merging and de-duplication"
+    )
+    returned: int = Field(description="Periods in this response")
+    has_more: bool = Field(
+        description="True if older periods exist beyond this response; the most "
+        "recent are returned first-to-last, so raise limit to reach further back"
+    )
     points: list[FactPoint]
 
 
@@ -177,6 +199,12 @@ class ConceptCatalog(BaseModel):
 # ----------------------------------------------------------------- araclar
 @mcp.tool(
     name="sec_edgar_get_company_profile",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
     description=(
         "Resolves a ticker symbol to the company's SEC identity: CIK, official "
         "registrant name, industry classification and fiscal year end. Usually "
@@ -200,6 +228,12 @@ async def get_company_profile(
 
 @mcp.tool(
     name="sec_edgar_list_filings",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
     description=(
         "Lists a company's most recent SEC filings with links to the primary "
         "document. Pass form_type to restrict to one kind of filing, e.g. '10-K' "
@@ -209,7 +243,9 @@ async def get_company_profile(
 async def list_recent_filings(
     ticker: Annotated[str, Field(description="Stock ticker symbol")],
     form_type: Annotated[
-        str | None, Field(default=None, description="Restrict to one filing type, e.g. 10-K. Omit to return all types.")
+        str | None,
+        Field(default=None,
+              description="Restrict to one filing type, e.g. 10-K. Omit to return all types."),
     ] = None,
     limit: Annotated[
         int,
@@ -218,18 +254,19 @@ async def list_recent_filings(
             description="Maximum number of filings to return, newest first",
         ),
     ] = 10,
-) -> list[Filing]:
+) -> FilingPage:
     c = _c()
     cik = await c.cik_for_ticker(ticker)
     sub = await c.submissions(cik)
     r = sub["filings"]["recent"]
-    out: list[Filing] = []
+
+    dosyalamalar: list[Filing] = []
     for i in range(len(r["accessionNumber"])):
         if form_type and r["form"][i] != form_type:
             continue
         acc = r["accessionNumber"][i]
         acc_nodash = acc.replace("-", "")
-        out.append(
+        dosyalamalar.append(
             Filing(
                 form=r["form"][i],
                 filing_date=r["filingDate"][i],
@@ -241,9 +278,17 @@ async def list_recent_filings(
                 ),
             )
         )
-        if len(out) >= limit:
-            break
-    return out
+
+    # §16: limit tek basina yetmez. Model, gordugu listenin tamami mi yoksa
+    # kirpilmis mi oldugunu bilmeden "sirketin N dosyalamasi var" diye
+    # sonuclandirabilir.
+    return FilingPage(
+        ticker=ticker.upper(),
+        total_matching=len(dosyalamalar),
+        returned=min(limit, len(dosyalamalar)),
+        has_more=len(dosyalamalar) > limit,
+        filings=dosyalamalar[:limit],
+    )
 
 
 async def _ham_kayitlar(cik: str, tag: str) -> dict | None:
@@ -294,6 +339,12 @@ def _noktalar(veri: dict, tag: str, period: str, kayma: int) -> list[FactPoint]:
 
 @mcp.tool(
     name="sec_edgar_get_concept_series",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
     description=(
         "Returns the reported time series for one financial concept (revenue, "
         "net income, total assets, ...). Use this for trend and ratio analysis.\n"
@@ -382,6 +433,11 @@ async def get_concept_series(
         ):
             dedup[k] = pt
 
+    # §16: model, gordugu serinin tamami mi yoksa en yenisi mi oldugunu
+    # bilmeden "sirketin N donemlik gecmisi var" diye sonuclandirabilir.
+    tumu = sorted(dedup.values(), key=lambda p: p.period_end)
+    ordered = tumu[-limit:]
+
     return ConceptSeries(
         cik=cik,
         requested_concept=concept,
@@ -389,12 +445,21 @@ async def get_concept_series(
         fiscal_year_derived=turetildi,
         taxonomy="us-gaap",
         label=veriler[0][1].get("label"),
-        points=sorted(dedup.values(), key=lambda p: p.period_end)[-limit:],
+        total_periods=len(tumu),
+        returned=len(ordered),
+        has_more=len(tumu) > len(ordered),
+        points=ordered,
     )
 
 
 @mcp.tool(
     name="sec_edgar_list_available_concepts",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
     description=(
         "Lists the US-GAAP tags a company actually reports to the SEC. Call this "
         "when sec_edgar_get_concept_series cannot find a concept: the returned "

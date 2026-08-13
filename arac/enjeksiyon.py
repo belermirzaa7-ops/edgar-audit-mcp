@@ -97,10 +97,10 @@ ENJEKSIYONLAR = [
   "if False:",
   "test_filings_filter"),
 
- ("Limit uygulamasini kaldir",
+ ("list_filings: limit kirpmasini kaldir",
   "src/edgar_mcp/server.py",
-  "if len(out) >= limit:",
-  "if False:",
+  "        filings=dosyalamalar[:limit],",
+  "        filings=dosyalamalar,",
   "test_filings_limit_uygulanir"),
 
  ("Takma ad haritasini bosalt (ISS-1 korumasi)",
@@ -204,6 +204,37 @@ ENJEKSIYONLAR = [
   'return not (ad == "email" and any(a in deger for a in YOKSAY_ALAN))',
   'return False',
   'test_eklenip_silinen_sir_gecmiste_yakalanir'),
+
+
+ ("Annotations: read_only_hint'i kaldir (§19 ipucu)",
+  'src/edgar_mcp/server.py',
+  '        read_only_hint=True,',
+  '        read_only_hint=False,',
+  'test_tum_araclar_salt_okunur_ilan_ediyor'),
+
+ ("list_filings: has_more'u sabit False yap",
+  'src/edgar_mcp/server.py',
+  '        has_more=len(dosyalamalar) > limit,',
+  '        has_more=False,',
+  'test_filings_sayfalama_bilgisi_verir'),
+
+ ("list_filings: total_matching'i filtresiz say",
+  'src/edgar_mcp/server.py',
+  '        total_matching=len(dosyalamalar),',
+  '        total_matching=len(r["accessionNumber"]),',
+  'test_filings_sayfalama_filtreyle_birlikte_dogru'),
+
+ ('Seri: en YENI yerine en ESKI donemleri dondur',
+  'src/edgar_mcp/server.py',
+  '    ordered = tumu[-limit:]',
+  '    ordered = tumu[:limit]',
+  'test_seri_kirpmada_EN_YENI_donemler_kalir'),
+
+ ("Seri: has_more'u sabit False yap",
+  'src/edgar_mcp/server.py',
+  '        has_more=len(tumu) > len(ordered),',
+  '        has_more=False,',
+  'test_seri_sayfalama_bilgisi_verir'),
 
  ("CIK sifir dolgusunu kaldir",
   "src/edgar_mcp/client.py",

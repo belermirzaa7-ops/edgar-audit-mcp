@@ -102,23 +102,98 @@ async def test_profile(srv):
 @pytest.mark.anyio
 async def test_filings_filter(srv):
     """Karisik form turleri arasindan SADECE istenen tur donmeli."""
-    f = await srv.list_recent_filings(ticker="AAPL", form_type="10-K", limit=5)
-    assert [x.form for x in f] == ["10-K", "10-K"], "10-K disi form sizdi"
-    assert f[0].primary_document_url.endswith("000032019325000073/aapl-20250927.htm")
+    s = await srv.list_recent_filings(ticker="AAPL", form_type="10-K", limit=5)
+    assert [x.form for x in s.filings] == ["10-K", "10-K"], "10-K disi form sizdi"
+    assert s.filings[0].primary_document_url.endswith(
+        "000032019325000073/aapl-20250927.htm"
+    )
 
 
 @pytest.mark.anyio
 async def test_filings_filtresiz_hepsini_dondurur(srv):
     """Kontrol testi: filtre yokken gercekten baska turler var mi?
     Bu olmadan yukaridaki test bos bir kumeyi 'filtrelenmis' sanabilir."""
-    f = await srv.list_recent_filings(ticker="AAPL", limit=10)
-    assert {x.form for x in f} == {"10-K", "10-Q", "8-K", "4"}
+    s = await srv.list_recent_filings(ticker="AAPL", limit=10)
+    assert {x.form for x in s.filings} == {"10-K", "10-Q", "8-K", "4"}
 
 
 @pytest.mark.anyio
 async def test_filings_limit_uygulanir(srv):
-    f = await srv.list_recent_filings(ticker="AAPL", limit=2)
-    assert len(f) == 2
+    s = await srv.list_recent_filings(ticker="AAPL", limit=2)
+    assert len(s.filings) == 2
+
+
+@pytest.mark.anyio
+async def test_filings_sayfalama_bilgisi_verir(srv):
+    """Standart §16: limit tek basina yetmez. Model, listenin tamami mi yoksa
+    kirpilmis mi oldugunu bilmeden 'sirketin N dosyalamasi var' diyebilir."""
+    kirpik = await srv.list_recent_filings(ticker="AAPL", limit=2)
+    assert kirpik.total_matching == 5
+    assert kirpik.returned == 2
+    assert kirpik.has_more is True
+
+    tam = await srv.list_recent_filings(ticker="AAPL", limit=50)
+    assert tam.total_matching == 5
+    assert tam.returned == 5
+    assert tam.has_more is False
+
+
+@pytest.mark.anyio
+async def test_filings_sayfalama_filtreyle_birlikte_dogru(srv):
+    """total_matching, filtre UYGULANDIKTAN sonraki sayi olmali - filtresiz
+    toplami raporlamak modeli yaniltir."""
+    s = await srv.list_recent_filings(ticker="AAPL", form_type="10-K", limit=1)
+    assert s.total_matching == 2, "filtre disi dosyalamalar sayima girmis"
+    assert s.returned == 1
+    assert s.has_more is True
+
+
+@pytest.mark.anyio
+async def test_seri_sayfalama_bilgisi_verir(srv):
+    az = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=2)
+    assert az.returned == 2
+    assert az.has_more is True
+    assert az.total_periods > 2
+
+    hepsi = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=60)
+    assert hepsi.has_more is False
+    assert hepsi.returned == hepsi.total_periods
+
+
+@pytest.mark.anyio
+async def test_seri_kirpmada_EN_YENI_donemler_kalir(srv):
+    """Kirpma yonu onemli: model trend analizi yapiyorsa en yeni donemleri
+    gormeli, en eskileri degil."""
+    az = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=2)
+    hepsi = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=60)
+    assert [p.period_end for p in az.points] == [p.period_end for p in hepsi.points[-2:]]
+
+
+# ============================================== §19: annotations ipucudur
+@pytest.mark.anyio
+async def test_tum_araclar_salt_okunur_ilan_ediyor():
+    from edgar_mcp.server import mcp
+
+    for t in await mcp.list_tools():
+        a = t.annotations
+        assert a is not None, f"{t.name}: annotations yok"
+        assert a.read_only_hint is True, f"{t.name}: read_only_hint True degil"
+        assert a.destructive_hint is False, f"{t.name}: destructive_hint False degil"
+
+
+def test_kodda_hicbir_yazma_yolu_yok():
+    """Standart §19: annotations bir IPUCUDUR, garanti degil. Gercek garanti,
+    yazma yolunun hic BULUNMAMASI. Bu test ipucunu kanita cevirir - biri
+    ileride bir POST ekler ve read_only_hint'i guncellemeyi unutursa yakalanir."""
+    import pathlib
+    import re
+
+    kok = pathlib.Path(__file__).resolve().parents[1] / "src" / "edgar_mcp"
+    yasak = re.compile(r"\.(post|put|patch|delete)\s*\(", re.I)
+    for f in kok.glob("*.py"):
+        metin = f.read_text(encoding="utf-8")
+        bulunan = yasak.findall(metin)
+        assert not bulunan, f"{f.name} yazma cagrisi iceriyor: {bulunan}"
 
 
 @pytest.mark.anyio

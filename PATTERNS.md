@@ -27,6 +27,8 @@ can verify rather than remember.
 | [P-12](#p-12) | Am I making the model guess an external system's internal names? | `test_takma_ad_gercek_etikete_cozulur` |
 | [P-13](#p-13) | Can the model act on my error message, or only read it? | `test_bilinmeyen_etiket_eyleme_donusturulebilir_hata_verir` |
 | [P-14](#p-14) | Does the documentation describe behaviour the code actually has? | `test_env_example_gercekten_okunan_degiskeni_belgeler` |
+| [P-15](#p-15) | Is my injection target unique in the file? | `arac/enjeksiyon.py` reports the wrong test |
+| [P-16](#p-16) | Are the helper scripts covered, not just the library? | `tests/test_scriptler.py` |
 
 Two of these — **P-1** and **P-9** — have no automated guard and are marked
 `none` in the table and `Guard: none` in the entry. Both are manual steps in a
@@ -318,6 +320,52 @@ document must actually be read by the code. Manual review rots.
 
 **Incident.** 12 Aug 2026. `.env.example` existed while nothing in the package
 read `.env` — only Docker consumed it through `--env-file`.
+
+---
+
+<a id="p-15"></a>
+### P-15 · A substring target matches in more places than you think
+
+**Symptom.** Fault injection reports a protection as verified, but the test that
+went red is not the one you expected. The protection you meant to break was
+never touched.
+
+**Root cause.** Two functions used the same local variable name, so
+`has_more=len(eslesen) > limit,` appeared twice in the file. The harness
+replaces the first occurrence, so it broke the other function.
+
+**Detection.** The harness prints which test caught each injection. Read that
+column — a mismatch between the injection name and the test that fired means
+the target is ambiguous. Before adding an injection, confirm the target string
+occurs exactly once.
+
+**Incident.** 13 Aug 2026. Adding pagination to `sec_edgar_list_filings`
+created a collision with `sec_edgar_list_available_concepts`. The variable in
+the first was renamed to make both targets unique.
+
+This is the code-level form of a general rule: substring predicates match wider
+than intended.
+
+---
+
+<a id="p-16"></a>
+### P-16 · Helper scripts drift out of the test suite
+
+**Symptom.** The whole suite is green and the demo script crashes on the first
+run with an `AttributeError`.
+
+**Root cause.** A response model field was renamed (`resolved_concept` →
+`resolved_concepts`). The library and its tests were updated together; the
+standalone script that consumes the same models was not, because nothing
+imported it during testing.
+
+**Detection.** Run the scripts against the same mocks the library tests use and
+assert on their output. If a field disappears, the script fails in CI rather
+than in front of whoever runs the demo.
+
+**Incident.** 13 Aug 2026. Caught while adding pagination, before the user ran
+the script — but only because the output was being read by hand, not by a test.
+`tests/test_scriptler.py` now covers it.
 
 ---
 

@@ -31,7 +31,13 @@ tuzak barındırıyor. Bu projenin asıl kısmı o tuzakları ele alması.
 | `sec_edgar_list_available_concepts` | Şirketin fiilen raporladığı US-GAAP etiketleri |
 
 Her araç Pydantic modeli döndürür; MCP `outputSchema` otomatik üretilir ve
-istemci sonuçları tip güvenli tüketir.
+istemci sonuçları tip güvenli tüketir. Liste döndüren araçlar
+`total_matching` / `returned` / `has_more` bildirir; böylece model tam bir
+cevapla kırpılmış bir cevabı ayırt edebilir.
+
+Dört araç da `readOnlyHint: true` ilan eder. Bu bir **ipucudur**, garanti
+değil — garanti, pakette hiçbir yazma yolunun bulunmaması ve bunu bir testin
+zorunlu tutmasıdır.
 
 ## Ele alınan üç tuzak
 
