@@ -165,6 +165,18 @@ Mocks cannot prove behaviour against the real system. `dogrula.py` checks the
 fiscal-year derivation and the tag-merging logic against live SEC data for
 companies with calendar-year, ending-year and starting-year fiscal conventions.
 
+## Failure patterns
+
+[`PATTERNS.md`](PATTERNS.md) catalogues every bug that actually shipped in this
+repository — symptom, root cause, how it is detected now, and the incident that
+produced it — together with the specific test that guards each one. Two entries
+are marked as having no automated guard, because claiming otherwise would be
+worse than the gap.
+
+A test suite keeps that document honest: every test, tool and CI job it names
+must exist, every entry must carry all four fields, and every incident must be
+dated. Rename a test and the document fails CI rather than quietly lying.
+
 ## Project layout
 
 ```
@@ -174,7 +186,8 @@ tests/                    mocked unit tests
 arac/enjeksiyon.py        fault-injection harness
 arac/sir_tarama.py        secret scanner
 dogrula.py                live verification against SEC
-CLAUDE.md                 decision records (Turkish)
+CLAUDE.md                 decision records - why things are the way they are (Turkish)
+PATTERNS.md               failure patterns - what to watch out for
 ```
 
 Code comments and decision records are in Turkish; the public interface —

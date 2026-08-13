@@ -167,6 +167,18 @@ Mock'lar gerçek sisteme karşı davranışı kanıtlayamaz. `dogrula.py`, mali 
 türetmesini ve etiket birleştirmeyi canlı SEC verisine karşı sınar — takvim
 yılı, bitiş yılı ve başlangıç yılı geleneklerini kullanan şirketlerle.
 
+## Hata patternleri
+
+[`PATTERNS.md`](PATTERNS.md), bu depoda **gerçekten yaşanmış** her hatayı
+kataloglar — belirti, kök neden, bugün nasıl tespit edildiği ve onu üreten
+olay — ve her birini hangi testin koruduğunu söyler. İki kayıt "otomatik
+koruma yok" diye işaretli; boşluğu gizlemek boşluğun kendisinden kötü olurdu.
+
+Dokümanı dürüst tutan ayrı bir test paketi var: adı geçen her test, araç ve CI
+işi gerçekten var olmalı, her kayıt dört alanı taşımalı, her olay tarihli
+olmalı. Bir test yeniden adlandırılırsa doküman sessizce yalan söylemek yerine
+CI'ı kırmızıya çevirir.
+
 ## Dizin yapısı
 
 ```
@@ -176,7 +188,8 @@ tests/                    mock'lu birim testleri
 arac/enjeksiyon.py        hata enjeksiyonu harness'ı
 arac/sir_tarama.py        sır tarayıcı
 dogrula.py                canlı SEC doğrulaması
-CLAUDE.md                 karar kayıtları
+CLAUDE.md                 karar kayıtları - neden böyle yapıldı
+PATTERNS.md               hata patternleri - neye dikkat edilecek
 ```
 
 Kod yorumları ve karar kayıtları Türkçe; dışarıya bakan yüzey — araç tanımları,

@@ -1,5 +1,10 @@
 # CLAUDE.md — sec-edgar-mcp
 
+> **Ise baslamadan once `PATTERNS.md` oku.** Bu depoda gercekten yasanmis 14
+> hata ve her birinin hangi testle korundugu orada. Bitirmeden once de oradaki
+> kontrol listesinden gec. Bu dosya KARARLARI (neden boyle yapildi) tutar;
+> PATTERNS.md HATALARI (neye dikkat et) tutar.
+
 ## Bu proje ne
 MCP 2026-07-28 spesifikasyonuna uygun, SEC EDGAR XBRL verisini deterministik
 arac cagrilariyla sunan Python MCP sunucusu.
