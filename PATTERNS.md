@@ -13,7 +13,7 @@ can verify rather than remember.
 
 | # | Check | Guard |
 |---|---|---|
-| [P-1](#p-1) | Did I verify one externally-known value end to end? | manual |
+| [P-1](#p-1) | Did I verify one externally-known value end to end? | **none — manual step** |
 | [P-2](#p-2) | Did I write a rule where the data could tell me the answer? | `test_kayma_target_tipi_eksi_bir`, `test_kayma_apple_tipi_sifir` |
 | [P-3](#p-3) | Does stopping at the first match silently truncate anything? | `test_etiket_degisiminde_gecmis_kirpilmaz` |
 | [P-4](#p-4) | Does my mock reproduce the real API's contract, including errors? | `arac/enjeksiyon.py` |
@@ -21,15 +21,18 @@ can verify rather than remember.
 | [P-6](#p-6) | Would this behave differently on another OS? | CI matrix includes `windows-latest` |
 | [P-7](#p-7) | Can this check silently pass while seeing nothing? | `test_sig_klon_temiz_demez` |
 | [P-8](#p-8) | Am I scanning current files when I should scan history? | `test_eklenip_silinen_sir_gecmiste_yakalanir` |
-| [P-9](#p-9) | Did I confirm a rewrite actually removed the data? | **none — discipline only** |
+| [P-9](#p-9) | Did I confirm a rewrite actually removed the data? | **none — manual step** |
 | [P-10](#p-10) | Am I checking locally what only the remote can answer? | CI job `secret-scan` with `fetch-depth: 0` |
 | [P-11](#p-11) | Does every tool and every parameter have a description? | `test_her_arac_ve_parametre_aciklamali` |
 | [P-12](#p-12) | Am I making the model guess an external system's internal names? | `test_takma_ad_gercek_etikete_cozulur` |
 | [P-13](#p-13) | Can the model act on my error message, or only read it? | `test_bilinmeyen_etiket_eyleme_donusturulebilir_hata_verir` |
 | [P-14](#p-14) | Does the documentation describe behaviour the code actually has? | `test_env_example_gercekten_okunan_degiskeni_belgeler` |
 
-Two of these have no automated guard. They are marked so, because pretending
-otherwise is worse than the gap itself.
+Two of these — **P-1** and **P-9** — have no automated guard and are marked
+`none` in the table and `Guard: none` in the entry. Both are manual steps in a
+procedure, not properties of the code, so nothing in the test suite can enforce
+them. Saying so is better than implying coverage that does not exist; a test
+asserts that this marking stays consistent.
 
 ---
 
@@ -52,6 +55,11 @@ figure on the FY2023 row.
 **Incident.** 12 Aug 2026. The revenue series shipped shifted by two years and
 was caught on the first live run, not by the test suite. Periods are now
 derived only from `start`/`end` dates.
+
+**Guard: none.** The specific bug is covered by
+`test_donem_yili_bitis_tarihinden_gelir`, but the practice this pattern asks
+for — checking a value you know independently against a *new* data source —
+cannot be tested from inside the repository. It is a manual step.
 
 ---
 

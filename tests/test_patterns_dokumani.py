@@ -67,12 +67,35 @@ def test_her_pattern_tarihli_bir_olaya_dayaniyor():
         assert re.search(r"\d{1,2} \w{3} \d{4}", olay), f"'{kod}' olayinda tarih yok"
 
 
-def test_korumasiz_patternler_acikca_isaretli():
-    """Otomatik korumasi olmayan pattern 'none' demeli. Sessizce bosluk birakmak,
-    boslugun kendisinden kotudur."""
-    liste = re.findall(r"^\| \[(P-\d+)\][^|]*\|[^|]*\|\s*([^|]+)\|", PATTERNS, re.M)
-    korumasiz = [k for k, g in liste if "none" in g.lower()]
+def _kontrol_listesi() -> list[tuple[str, str]]:
+    return re.findall(r"^\| \[(P-\d+)\][^|]*\|[^|]*\|\s*([^|]+?)\s*\|", PATTERNS, re.M)
+
+
+def test_korumasiz_patternler_iki_yerde_de_isaretli():
+    """Otomatik korumasi olmayan pattern hem tabloda hem govdede 'none' demeli.
+    Sessizce bosluk birakmak, boslugun kendisinden kotudur."""
+    korumasiz = [k for k, g in _kontrol_listesi() if "none" in g.lower()]
     assert korumasiz, "hicbir pattern korumasiz isaretlenmemis - bu supheli"
     for kod in korumasiz:
         blok = re.split(rf"^### {kod} · ", PATTERNS, flags=re.M)[1]
         assert "Guard: none" in blok, f"{kod} listede korumasiz ama govdesinde belirtilmemis"
+
+
+def test_koruma_sutunu_tek_bir_kelime_dagarcigi_kullaniyor():
+    """Ayni durumu iki farkli kelimeyle yazmak ('manual' ve 'none') okuyucuyu
+    yaniltti - disaridan okuyan once 'sadece biri korumasiz' sandi. Koruma
+    sutunu ya bir test/arac/CI isi adlandirir ya da 'none' der."""
+    for kod, guard in _kontrol_listesi():
+        g = guard.lower()
+        tanimli = ("none" in g or "test_" in g or "arac/" in g
+                   or "job `" in g or "matrix" in g)
+        assert tanimli, f"{kod} koruma sutunu taninmayan bir ifade kullaniyor: {guard!r}"
+
+
+def test_govdesinde_guard_none_olan_tabloda_da_none_diyor():
+    """Ters yon: govdede korumasiz denip tabloda test adi yazilmasin."""
+    for kod in re.findall(r"^### (P-\d+) ·", PATTERNS, re.M):
+        blok = re.split(rf"^### {kod} · ", PATTERNS, flags=re.M)[1].split("\n### ")[0]
+        tablo = dict(_kontrol_listesi()).get(kod, "")
+        if "Guard: none" in blok:
+            assert "none" in tablo.lower(), f"{kod} govdede korumasiz, tabloda degil"
