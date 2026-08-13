@@ -652,8 +652,9 @@ def _bos_units_handler(bos_facts: bool = False):
         u = str(request.url)
         if "companyconcept" in u:
             ISTEK_KAYDI.append(u)
+            # Gercek govde (KO, 13 Agu 2026): USD bir dizi degil, BOS SOZLUK.
             return httpx.Response(200, json={"cik": 320193, "taxonomy": "us-gaap",
-                                             "label": "Assets", "units": {"USD": []}})
+                                             "label": "Assets", "units": {"USD": {}}})
         if "companyfacts" in u and bos_facts:
             ISTEK_KAYDI.append(u)
             bos = {"facts": {"us-gaap": {t: {"label": t, "units": {"USD": []}}
@@ -698,3 +699,46 @@ async def test_iki_uc_da_bossa_sessiz_basari_yerine_hata(monkeypatch):
     mesaj = str(e.value)
     assert "companyfacts" in mesaj and "companyconcept" in mesaj
     assert "sec_edgar_list_available_concepts" in mesaj
+
+
+@pytest.mark.anyio
+async def test_liste_olmayan_birim_govdesi_cokertmez(monkeypatch):
+    """SEC'in bos yaniti `units.USD` icin dizi degil SOZLUK veriyor ({}).
+    Bos sozluk zaten sifir satir sayilir; bu test bir adim otesini,
+    BOS OLMAYAN bir sozlugu kapsiyor. Boyle bir yanit gozlenmedi - bu
+    savunma amacli bir koruma: beklenmedik sekil ne cokertmeli ne de
+    sessizce basari gibi gorunmeli."""
+    def h(request: httpx.Request) -> httpx.Response:
+        u = str(request.url)
+        if "companyconcept" in u:
+            return httpx.Response(200, json={
+                "label": "Assets",
+                "units": {"USD": {"0": {"end": "2025-12-31", "val": 1}}},
+            })
+        return handler(request)
+
+    s = _srv_ozel(monkeypatch, h)
+    seri = await s.get_concept_series(ticker="AAPL", concept="revenue")
+    # companyconcept kullanilamaz sekilde geldi -> yedek uc devreye girmeli
+    assert seri.source_endpoint == "companyfacts"
+    assert seri.total_periods > 0
+
+
+@pytest.mark.anyio
+async def test_karisik_birim_sekli_gecerli_satirlari_korur(monkeypatch):
+    """Bir birim kullanilabilir liste, digeri kullanilamaz sekil olabilir.
+    Bu durumda gecerli satirlar KAYBOLMAMALI ve kod cokmemeli - yani
+    kullanilamaz birim atlanir, yedek uca da dusulmez (veri zaten var)."""
+    def h(request: httpx.Request) -> httpx.Response:
+        if "companyconcept" in str(request.url):
+            return httpx.Response(200, json={
+                "label": "Revenues",
+                "units": {"USD": CONCEPT["units"]["USD"], "shares": {"0": {}}},
+            })
+        return handler(request)
+
+    s = _srv_ozel(monkeypatch, h)
+    seri = await s.get_concept_series(ticker="AAPL", concept="revenue")
+    assert seri.source_endpoint == "companyconcept", "gereksiz yere yedege dusuldu"
+    assert seri.total_periods > 0
+    assert all(p.unit == "USD" for p in seri.points)

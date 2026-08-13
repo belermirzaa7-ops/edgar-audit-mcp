@@ -4,7 +4,8 @@ Neden var: 13 Agu 2026'da KO (CIK 0000021344) icin `get_concept_series` her
 kavramda `total_periods: 0` dondu, ama ayni sunucudaki `list_available_concepts`
 (companyfacts) ayni etiket icin 144 veri noktasi bildirdi. Olcum, SEC'in
 `HTTP 200` + dogru `label` + **bos `units.USD`** (346 bayt) dondurdugunu
-gosterdi; ayni adres baska bir agdan 161 kayit dondu.
+gosterdi; ayni adres baska bir agdan dolu geldi. Ham govde:
+`{"cik":21344,...,"units":{"USD":{}}}` - dizi beklenen yerde bos SOZLUK.
 
 Tek istek modu bunu gosterir. `--matris` modu SEBEBI ayirt eder: ayni yaniti
 farkli kosullarda tekrar ister ve hangi degiskenin sonucu degistirdigini

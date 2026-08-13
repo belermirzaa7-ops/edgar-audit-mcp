@@ -448,15 +448,21 @@ different tool on the same server, reading a different endpoint, says the data
 is there.
 
 **Root cause.** SEC's `companyconcept` endpoint served an object with `units.USD`
-present but the array empty — 346 bytes, correct `label`, HTTP 200 — for one
-company, while `companyfacts` carried 144 rows for the same tag. The emptiness
+present but carrying no rows — 346 bytes, correct `label`, HTTP 200 — for one
+company, while `companyfacts` carried 144 rows for the same tag. The raw body
+reads `"units":{"USD":{}}`: an empty **object** where an array belongs, which
+points at the producer rather than at a cache — a stale cache would serve the
+whole previous object, not a differently-typed empty one. The emptiness
 was upstream and location-dependent: five request variants from one network
 (base, repeat, cache-busting query string, different `User-Agent`, no
 compression) were all empty, and the same URL fetched from another network
 returned the full document. No response header explained it; the responses
 carried no `age`, `x-cache` or `etag` at all.
 
-**Detection.** Count rows, do not trust the status code. If a 200 carries none,
+**Detection.** Count rows, do not trust the status code. Filter the unusable
+shape in exactly one place: the first version checked `isinstance` at two call
+sites and missed a third, which crashed with `'str' object has no attribute
+'get'` — iterating an empty-object body yields its keys, not rows. If a 200 carries none,
 read the second endpoint that holds the same facts before concluding anything,
 and report which endpoint answered (`source_endpoint`) so the caller is never
 guessing. If both are empty, raise an actionable error — an empty success is

@@ -401,7 +401,9 @@ Bkz. PATTERNS.md P-17.
 **Tarih:** 13 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §3, §12
 
 KO (CIK 0000021344) icin `companyconcept` ucu HTTP 200 + dogru `label` +
-**bos `units.USD`** donduruyordu (346 bayt). Ayni etiket `companyfacts`
+**bos `units.USD`** donduruyordu (346 bayt). Ham govdede `"units":{"USD":{}}` -
+yani dizi beklenen yerde bos SOZLUK; bu, uretici tarafli bir artiga isaret
+ediyor (bayat onbellek eski nesnenin tamamini dondururdu). Ayni etiket `companyfacts`
 ucunda 144 satir. Arac bunu sessizce basari sayip `total_periods: 0`
 donduruyordu - model bunu "sirket bunu raporlamiyor" diye okur.
 

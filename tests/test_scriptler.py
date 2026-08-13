@@ -110,10 +110,13 @@ def _istemci_ile(ozel_handler):
     return istemci
 
 
-# KO'nun GERCEK yaniti: units.USD var ama icinde satir yok. Ilk sahte veri
-# `units: {}` doneriyordu - gercegin sozlesmesini taklit etmiyordu (P-4).
+# KO'nun GERCEK yaniti (13 Agu 2026, ham govde): units.USD var ama icinde
+# satir yok - ve dizi DEGIL, bos SOZLUK olarak geliyor:
+#   {"cik":21344,...,"units":{"USD":{}}}
+# Ilk sahte veri once `units: {}`, sonra `{"USD": []}` doneriyordu; ikisi de
+# gercegin sozlesmesini taklit etmiyordu (P-4).
 KO_BOS = {"cik": 21344, "taxonomy": "us-gaap", "tag": "Assets",
-          "label": "Assets", "entityName": "COCA COLA CO", "units": {"USD": []}}
+          "label": "Assets", "entityName": "COCA COLA CO", "units": {"USD": {}}}
 
 
 def test_tani_birim_var_satir_yok_durumunu_isaretliyor(monkeypatch, capsys):

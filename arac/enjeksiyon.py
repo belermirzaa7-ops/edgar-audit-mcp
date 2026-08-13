@@ -243,6 +243,12 @@ ENJEKSIYONLAR = [
   "mcp.run(transport='streamable-http')",
   "test_dockerfile_loopback_disina_baglaniyor"),
 
+ ("Kullanilamaz birim govdesini (SEC'in {} yaniti) normal say",
+  "src/edgar_mcp/server.py",
+  "        if isinstance(satirlar, list)",
+  "        if True",
+  "test_liste_olmayan_birim_govdesi_cokertmez"),
+
  ("KO olayi: bos companyconcept yanitinda yedek uca dusme",
   "src/edgar_mcp/server.py",
   'veriler, kaynak_uc = yedek, "companyfacts"',

@@ -308,10 +308,24 @@ async def _ham_kayitlar(cik: str, tag: str) -> dict | None:
         raise
 
 
+def _kullanilabilir_birimler(veri: dict) -> list[tuple[str, list]]:
+    """Yalnizca islenebilir birimler: (birim, satir_listesi).
+
+    SEC'in bos yanitinda `units.USD` bir dizi DEGIL bos bir SOZLUK olarak
+    geliyor (ham govde: {"units":{"USD":{}}}). Bu eleme tek noktada yapilir;
+    sayim, mali yil turetme ve nokta uretimi ayni kaynagi kullansin diye -
+    ayri ayri kontrol koymak, birini unutunca `'str' object has no attribute
+    'get'` seklinde patliyordu (P-19).
+    """
+    return [
+        (birim, satirlar)
+        for birim, satirlar in (veri.get("units") or {}).items()
+        if isinstance(satirlar, list)
+    ]
+
+
 def _satir_sayisi(veriler: list[tuple[str, dict]]) -> int:
-    return sum(
-        len(rows) for _, v in veriler for rows in (v.get("units") or {}).values()
-    )
+    return sum(len(rows) for _, v in veriler for _, rows in _kullanilabilir_birimler(v))
 
 
 def _facts_kayit(facts: dict, tag: str) -> dict | None:
@@ -321,15 +335,14 @@ def _facts_kayit(facts: dict, tag: str) -> dict | None:
     kayit = gaap.get(tag)
     if not kayit:
         return None
-    birimler = kayit.get("units") or {}
-    if not any(birimler.values()):
+    if not any(rows for _, rows in _kullanilabilir_birimler(kayit)):
         return None
-    return {"label": kayit.get("label"), "units": birimler}
+    return {"label": kayit.get("label"), "units": kayit.get("units") or {}}
 
 
 def _noktalar(veri: dict, tag: str, period: str, kayma: int) -> list[FactPoint]:
     out: list[FactPoint] = []
-    for unit, rows in veri.get("units", {}).items():
+    for unit, rows in _kullanilabilir_birimler(veri):
         for row in rows:
             end = row.get("end")
             if not end:
@@ -463,7 +476,7 @@ async def get_concept_series(
 
     # H-1 (KK-7): mali yil adi tum kayitlardan turetilir, tahmin edilmez.
     tum_satirlar = [
-        r for _, v in veriler for rows in v.get("units", {}).values() for r in rows
+        r for _, v in veriler for _, rows in _kullanilabilir_birimler(v) for r in rows
     ]
     kayma, turetildi = _fy_kaymasi(tum_satirlar)
 
