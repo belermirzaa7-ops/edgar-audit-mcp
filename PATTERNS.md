@@ -29,11 +29,14 @@ can verify rather than remember.
 | [P-14](#p-14) | Does the documentation describe behaviour the code actually has? | `test_env_example_gercekten_okunan_degiskeni_belgeler` |
 | [P-15](#p-15) | Is my injection target unique in the file? | `arac/enjeksiyon.py` reports the wrong test |
 | [P-16](#p-16) | Are the helper scripts covered, not just the library? | `tests/test_scriptler.py` |
+| [P-17](#p-17) | Did I inspect the whole outward surface, and can my detector see words I did not think of? | `test_arac_tanimlari_ingilizce`, `test_hata_mesajlari_ingilizce`, `test_dil_kontrolu_bilinen_ornekleri_ayirt_ediyor` |
+| [P-18](#p-18) | Is the live client running the code I just changed? | **none — manual step** |
+| [P-19](#p-19) | Does a 200 from upstream actually carry rows, and did I check the second endpoint? | `test_bos_companyconcept_yanitinda_companyfacts_e_dusulur`, `test_iki_uc_da_bossa_sessiz_basari_yerine_hata` |
 
-Two of these — **P-1** and **P-9** — have no automated guard and are marked
-`none` in the table and `Guard: none` in the entry. Both are manual steps in a
-procedure, not properties of the code, so nothing in the test suite can enforce
-them. Saying so is better than implying coverage that does not exist; a test
+Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
+are marked `none` in the table and `Guard: none` in the entry. All three are
+manual steps in a procedure, not properties of the code, so nothing in the test
+suite can enforce them. Saying so is better than implying coverage that does not exist; a test
 asserts that this marking stays consistent.
 
 ---
@@ -366,6 +369,105 @@ than in front of whoever runs the demo.
 **Incident.** 13 Aug 2026. Caught while adding pagination, before the user ran
 the script — but only because the output was being read by hand, not by a test.
 `tests/test_scriptler.py` now covers it.
+
+---
+
+## F. The outward surface and the live client
+
+<a id="p-17"></a>
+### P-17 · A keyword blacklist only sees the vocabulary it was written with
+
+**Symptom.** Turkish text shipped to a live client in three separate places
+while the test asserting "the outward surface is English" stayed green.
+
+**Root cause.** Two compounding gaps. First, the surface was enumerated by
+hand: the test read `t.description` only, so parameter descriptions, response
+schema descriptions and error messages were never inspected. Second — and this
+is the one that keeps coming back — the detector was a blacklist of Turkish
+substrings (`" ve "`, `"dondurur"`, ...). A blacklist can only reject what its
+author already imagined. Widening the surface did not help by itself: the very
+first injection written to prove the widened test worked came back
+**KORUMASIZ**, because the injected string `"Ticker bulunamadi: ..."` contained
+no listed word and no Turkish-specific letter.
+
+**Detection.** Enumerate the surface from the schema itself (tool description,
+every input property, every `$defs` and top-level output property) plus an AST
+walk over every `raise` in `src/`, since error messages reach the model but
+never appear in a schema. Then check with a **positive** list: every word must
+be in `tests/kelime_dagarcigi.txt`, identifiers excluded. An unknown word turns
+the test red regardless of which language it comes from. The blacklist is kept
+as a cheap first layer, not as the guarantee.
+
+**Incident.** 13 Aug 2026, three times in one session. (1) Reloading the tool
+schemas in Claude Desktop showed `concept` described as "Takma ad ... veya ham
+US-GAAP etiketi (orn. NetIncomeLoss)" — 59 tests green. (2) Widening the
+surface to response schemas found nothing new, but the injection harness proved
+the widened blacklist still could not see `"Ticker bulunamadi"`. (3) That string
+was live in `client.py` and reached the model on every unknown ticker. The
+fixture list in `test_dil_kontrolu_bilinen_ornekleri_ayirt_ediyor` starts with
+the two real strings.
+
+---
+
+<a id="p-18"></a>
+### P-18 · A long-running client keeps an old server process
+
+**Symptom.** A tool answers without the fields a recent change added. The
+source is current, the test suite is green, the client's answer is not.
+
+**Root cause.** An MCP client spawns the stdio server as a subprocess when it
+starts and keeps that process for the whole session. Editing the source has no
+effect until the client is fully quit and relaunched — closing the window is
+not enough while the app stays in the tray or menu bar.
+
+**Detection.** Before treating anything a live client returns as evidence about
+the code, call one tool and look for a field that only exists in the current
+version — `total_periods` after the pagination change. If it is missing, the
+client is stale and its output says nothing about the repository.
+
+**Incident.** 13 Aug 2026. Immediately before building the evaluation set,
+`sec_edgar_get_concept_series` returned no `total_periods`/`returned`/
+`has_more`. Without that check the evaluation set would have been written
+against — and declared verified against — a version that no longer existed.
+
+**Guard: none.** The staleness lives in another process on another machine;
+nothing inside the repository can observe it. It is a step in the procedure:
+check a version-bearing field first, restart the client, then measure.
+
+---
+
+## G. Upstream endpoints
+
+<a id="p-19"></a>
+### P-19 · A 200 response can be well-formed and still contain nothing
+
+**Symptom.** A tool returns a successful, schema-valid, empty result. The model
+reads it as "this company does not report that" and answers confidently. A
+different tool on the same server, reading a different endpoint, says the data
+is there.
+
+**Root cause.** SEC's `companyconcept` endpoint served an object with `units.USD`
+present but the array empty — 346 bytes, correct `label`, HTTP 200 — for one
+company, while `companyfacts` carried 144 rows for the same tag. The emptiness
+was upstream and location-dependent: five request variants from one network
+(base, repeat, cache-busting query string, different `User-Agent`, no
+compression) were all empty, and the same URL fetched from another network
+returned the full document. No response header explained it; the responses
+carried no `age`, `x-cache` or `etag` at all.
+
+**Detection.** Count rows, do not trust the status code. If a 200 carries none,
+read the second endpoint that holds the same facts before concluding anything,
+and report which endpoint answered (`source_endpoint`) so the caller is never
+guessing. If both are empty, raise an actionable error — an empty success is
+indistinguishable from a real "no data" answer, and that is the whole problem.
+The fallback stays behind the zero-row check: `companyfacts` is several MB and
+must not be fetched on every call.
+
+**Incident.** 13 Aug 2026. `sec_edgar_get_concept_series` returned
+`total_periods: 0` for Coca-Cola under every concept, while
+`sec_edgar_list_available_concepts` reported 144 data points for `Assets` on the
+same server. Isolated with `arac/tani.py --matris`, which requests the same data
+under varied conditions and names the variable that changed the outcome.
 
 ---
 

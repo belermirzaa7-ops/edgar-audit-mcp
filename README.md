@@ -141,6 +141,9 @@ pytest -q                  # HTTP layer mocked; never calls sec.gov
 python arac/enjeksiyon.py  # fault injection
 python arac/sir_tarama.py --gecmis   # secret scan, working tree + git history
 python dogrula.py          # live verification against real SEC data
+python arac/tani.py KO Assets           # inspect one raw SEC concept response
+python arac/tani.py KO Assets --matris   # same data under varied conditions, to isolate a cause
+python arac/tani.py --tarama             # how many companies are affected
 ```
 
 ### Fault injection
@@ -171,13 +174,27 @@ Mocks cannot prove behaviour against the real system. `dogrula.py` checks the
 fiscal-year derivation and the tag-merging logic against live SEC data for
 companies with calendar-year, ending-year and starting-year fiscal conventions.
 
+### Evaluation set
+
+[`evaluation/questions.xml`](evaluation/questions.xml) holds ten questions that
+can only be answered by calling the tools: cross-company fiscal year labels,
+tag merges across an accounting standard change, ratios that need two series,
+and the pagination fields. Every answer was produced by running the tools
+against live SEC data and reading the result — none is written from memory —
+and each question records the exact calls used, so the measurement can be
+repeated instead of trusted.
+
+A test keeps the file structurally honest: ten pairs, every pair carrying a
+question, an answer and a verification block, every tool it names actually
+existing on the server, and no question anchored to "the latest" period.
+
 ## Failure patterns
 
 [`PATTERNS.md`](PATTERNS.md) catalogues every bug that actually shipped in this
 repository — symptom, root cause, how it is detected now, and the incident that
-produced it — together with the specific test that guards each one. Two entries
-are marked as having no automated guard, because claiming otherwise would be
-worse than the gap.
+produced it — together with the specific test that guards each one. The entries
+that have no automated guard say so in both the checklist and the entry body,
+because claiming otherwise would be worse than the gap.
 
 A test suite keeps that document honest: every test, tool and CI job it names
 must exist, every entry must carry all four fields, and every incident must be
@@ -189,8 +206,11 @@ dated. Rename a test and the document fails CI rather than quietly lying.
 src/edgar_mcp/server.py   MCP tools and schemas
 src/edgar_mcp/client.py   SEC HTTP client, rate limiter, caching
 tests/                    mocked unit tests
+tests/dil.py              language gate for the outward-facing surface
+evaluation/questions.xml  ten measured questions with their tool calls
 arac/enjeksiyon.py        fault-injection harness
 arac/sir_tarama.py        secret scanner
+arac/tani.py              raw single-response diagnostic for one SEC concept
 dogrula.py                live verification against SEC
 CLAUDE.md                 decision records - why things are the way they are (Turkish)
 PATTERNS.md               failure patterns - what to watch out for

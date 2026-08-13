@@ -236,6 +236,42 @@ ENJEKSIYONLAR = [
   '        has_more=False,',
   'test_seri_sayfalama_bilgisi_verir'),
 
+ ("KO olayi: bos companyconcept yanitinda yedek uca dusme",
+  "src/edgar_mcp/server.py",
+  'veriler, kaynak_uc = yedek, "companyfacts"',
+  'pass',
+  "test_bos_companyconcept_yanitinda_companyfacts_e_dusulur"),
+
+ ("KO olayi: yedek uc her cagride cekilsin (5 MB bosuna)",
+  "src/edgar_mcp/server.py",
+  "if veriler and _satir_sayisi(veriler) == 0:",
+  "if veriler:",
+  "test_normal_durumda_companyfacts_cekilmez"),
+
+ ("KO olayi: iki uc da bossa hata yerine bos basari don",
+  "src/edgar_mcp/server.py",
+  "if son_satir == 0:",
+  "if False:",
+  "test_iki_uc_da_bossa_sessiz_basari_yerine_hata"),
+
+ ("Hata mesajini Turkceye cevir (semada gorunmeyen yuzey)",
+  "src/edgar_mcp/client.py",
+  'f"Ticker \'{ticker}\' is not in SEC\'s company_tickers.json. "',
+  'f"Ticker bulunamadi: {ticker}. "',
+  "test_hata_mesajlari_ingilizce"),
+
+ ("Parametre aciklamasini Turkceye cevir (disa bakan yuzey)",
+  "src/edgar_mcp/server.py",
+  '"An alias (revenue, net_income, total_assets, ...) or a raw "',
+  '"Takma ad (revenue, net_income, total_assets, ...) veya ham "',
+  "test_arac_tanimlari_ingilizce"),
+
+ ("Donus semasi alan aciklamasini Turkceye cevir",
+  "src/edgar_mcp/server.py",
+  '"US-GAAP tag this value was reported under"',
+  '"Bu degerin raporlandigi US-GAAP etiketi"',
+  "test_arac_tanimlari_ingilizce"),
+
  ("CIK sifir dolgusunu kaldir",
   "src/edgar_mcp/client.py",
   'str(row["cik_str"]).zfill(10)',

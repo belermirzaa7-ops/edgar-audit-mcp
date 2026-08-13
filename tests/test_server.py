@@ -41,13 +41,25 @@ NET_INCOME = {"label": "Net Income (Loss)", "units": {"USD": [
     {"start":"2022-09-25","end":"2023-09-30","val":96_995_000_000,"fy":2023,"fp":"FY","form":"10-K","filed":"2023-11-03"},
 ]}}
 
+def _satirlar(n: int) -> list[dict]:
+    """companyfacts satirlari companyconcept ile AYNI sekle sahiptir. Sahte
+    veri bunu taklit etmeli: bos sozlukler koymak, companyfacts'e dusen kodu
+    sinanamaz hale getirir (P-4)."""
+    return [
+        {"start": f"{2016 + i}-09-25", "end": f"{2017 + i}-09-30",
+         "val": 100_000_000_000 + i, "fy": 2017 + i, "fp": "FY",
+         "form": "10-K", "filed": f"{2017 + i}-11-03"}
+        for i in range(n)
+    ]
+
+
 FACTS = {"facts": {"us-gaap": {
     GERCEK_GELIR_ETIKETI: {"label": "Revenue from Contract with Customer",
-                           "units": {"USD": [{}, {}, {}]}},
-    "NetIncomeLoss":      {"label": "Net Income (Loss)", "units": {"USD": [{}, {}]}},
-    "SalesRevenueNet":    {"label": "Sales Revenue, Net", "units": {"USD": [{}, {}, {}, {}]}},
-    "Assets":             {"label": "Assets", "units": {"USD": [{}]}},
-    "DeferredRevenue":    {"label": "Deferred Revenue", "units": {"USD": [{}]}},
+                           "units": {"USD": _satirlar(3)}},
+    "NetIncomeLoss":      {"label": "Net Income (Loss)", "units": {"USD": _satirlar(2)}},
+    "SalesRevenueNet":    {"label": "Sales Revenue, Net", "units": {"USD": _satirlar(4)}},
+    "Assets":             {"label": "Assets", "units": {"USD": _satirlar(1)}},
+    "DeferredRevenue":    {"label": "Deferred Revenue", "units": {"USD": _satirlar(1)}},
 }}}
 
 # Apple 2018 oncesi geliri BASKA bir etiketle raporladi. Gercek dunyada
@@ -463,18 +475,132 @@ async def test_her_arac_ve_parametre_aciklamali():
             assert sema.get("description"), f"{t.name}.{ad}: parametre aciklamasi yok"
 
 
+# --- Dil kontrolu: iki kat, tests/dil.py ------------------------------------
+# Eski surum " ve " gibi bosluk-cevreli alt dizgiler ariyordu ve YALNIZCA
+# t.description'a bakiyordu. Ikisi de yetersizdi; ustelik kara listenin kendisi
+# ayni gun uc kez yetersiz kaldi. Bkz. PATTERNS.md P-17, CLAUDE.md KK-21/KK-22.
+from dil import bilinmeyen_kelimeler, turkce_izleri, yabanci_izler  # noqa: E402
+
+
+def _disa_bakan_yuzey(t) -> list[tuple[str, str]]:
+    """Modelin/musterinin gordugu TUM metinler: arac tanimi, parametre
+    aciklamalari ve donus semasindaki alan aciklamalari."""
+    parcalar = [(f"{t.name}.description", t.description or "")]
+    for ad, sema in (t.input_schema.get("properties") or {}).items():
+        parcalar.append((f"{t.name}.in.{ad}", sema.get("description") or ""))
+    cikti = t.output_schema or {}
+    for model, tanim in (cikti.get("$defs") or {}).items():
+        for ad, sema in (tanim.get("properties") or {}).items():
+            parcalar.append((f"{t.name}.out.{model}.{ad}", sema.get("description") or ""))
+    for ad, sema in (cikti.get("properties") or {}).items():
+        parcalar.append((f"{t.name}.out.{ad}", sema.get("description") or ""))
+    return parcalar
+
+
+def test_dil_kontrolu_bilinen_ornekleri_ayirt_ediyor():
+    """Sezicinin kendisi olculur, varsayilmaz (§2). Ilk iki dizge 13 Agu
+    2026'da canlida bulunan gercek kacaklardir - regresyon capasi. Ikincisi
+    ayni zamanda kara listenin NEDEN yetmedigini gosterir: icinde Turkceye
+    ozgu harf yok ve hicbir kelimesi elle yazilmis listede degildi."""
+    TURKCE = [
+        "Takma ad (revenue, net_income, total_assets, ...) veya ham "
+        "US-GAAP etiketi (orn. NetIncomeLoss)",
+        "Ticker bulunamadi: AAPL",
+        "Sirketin dosyalamalarini dondurur",
+        "Dondurulecek maksimum donem sayisi",
+    ]
+    INGILIZCE = [
+        "Stock ticker symbol, e.g. AAPL",
+        "Maximum number of periods to return, most recent last",
+        "True if more filings matched than were returned; raise limit",
+        "Period end date - the only reliable identifier of a period",
+        "US-GAAP tag this value was reported under",
+    ]
+    for m in TURKCE:
+        assert yabanci_izler(m), f"Turkce dizge temiz sayildi: {m!r}"
+    for m in INGILIZCE:
+        assert not yabanci_izler(m), f"Ingilizce dizge yabanci sanildi: {m!r}"
+
+    # Kara listenin siniri: bu dizgeyi YALNIZCA pozitif liste yakalar.
+    assert not turkce_izleri("Ticker bulunamadi: AAPL".replace("bulunamadi", "yok")), \
+        "kara liste beklenmedik bicimde eslesti - test artik neyi olctugunu bilmiyor"
+    assert bilinmeyen_kelimeler("Ticker yok: AAPL") == ["yok"]
+
+
+def test_kelime_dagarcigi_kullanilmayan_kelime_biriktirmiyor():
+    """Dagarcik disa bakan metinlerden turetildi; olu kelime birikirse liste
+    zamanla her seyi kabul eden bir sunger haline gelir (§11)."""
+    import asyncio
+
+    from dil import DAGARCIK
+
+    from edgar_mcp.server import mcp
+
+    async def metinler():
+        out = []
+        for t in await mcp.list_tools():
+            out += [m for _, m in _disa_bakan_yuzey(t)]
+        return out
+
+    import ast
+    import pathlib
+
+    hepsi = " ".join(asyncio.run(metinler()))
+    kok = pathlib.Path(__file__).resolve().parents[1] / "src" / "edgar_mcp"
+    for f in kok.glob("*.py"):
+        for dugum in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+            if isinstance(dugum, ast.Raise):
+                for alt in ast.walk(dugum):
+                    if isinstance(alt, ast.Constant) and isinstance(alt.value, str):
+                        hepsi += " " + alt.value
+
+    import re as _re
+
+    kullanilan = {
+        w.lower()
+        for w in _re.findall(r"[A-Za-z]+", hepsi)
+        if len(w) >= 2 and not any(c.isupper() for c in w[1:])
+    }
+    olu = sorted(DAGARCIK - kullanilan)
+    assert not olu, f"kelime dagarciginda artik kullanilmayan kelimeler var: {olu}"
+
+
+def test_hata_mesajlari_ingilizce():
+    """Hata mesajlari semada gorunmez ama modele ve musteriye AYNEN gider.
+    Sema taramasi bunlari kacirir; bu yuzden kaynak agacindan `raise`
+    ifadelerinin icindeki dizgiler ayrica taranir. 13 Agu 2026'da bu tarama
+    `client.py` icinde "Ticker bulunamadi: ..." mesajini yakaladi."""
+    import ast
+    import pathlib
+
+    kok = pathlib.Path(__file__).resolve().parents[1] / "src" / "edgar_mcp"
+    bakilan = 0
+    for f in sorted(kok.glob("*.py")):
+        agac = ast.parse(f.read_text(encoding="utf-8"))
+        for dugum in ast.walk(agac):
+            if not isinstance(dugum, ast.Raise):
+                continue
+            for alt in ast.walk(dugum):
+                if isinstance(alt, ast.Constant) and isinstance(alt.value, str):
+                    bakilan += 1
+                    izler = yabanci_izler(alt.value)
+                    assert not izler, (
+                        f"{f.name}: hata mesaji Ingilizce degil {izler} -> "
+                        f"{alt.value!r}"
+                    )
+    assert bakilan >= 5, f"hata mesaji taramasi bos donuyor ({bakilan} dizge)"
+
+
 @pytest.mark.anyio
 async def test_arac_tanimlari_ingilizce():
-    """Disariya bakan yuzey (arac tanimlari) Ingilizce olmali - musteri ABD/AB.
+    """Disariya bakan yuzeyin TAMAMI Ingilizce olmali - musteri ABD/AB.
     Kod yorumlari ve karar kayitlari Turkce kalir, onlar ic belgelendirme."""
     from edgar_mcp.server import mcp
 
-    TR_IPUCU = {" ve ", " icin ", " bir ", " olarak ", "dondurur", "sirket",
-                "etiketleri", "verisi", "kullanilir", "cagir"}
     for t in await mcp.list_tools():
-        metin = " " + (t.description or "").lower() + " "
-        bulunan = [w for w in TR_IPUCU if w in metin]
-        assert not bulunan, f"{t.name} tanimi Turkce gorunuyor: {bulunan}"
+        for etiket, metin in _disa_bakan_yuzey(t):
+            izler = yabanci_izler(metin)
+            assert not izler, f"{etiket} Ingilizce degil: {izler} -> {metin!r}"
 
 
 # ============================================== KK-11: cekirdek .env okumaz
@@ -502,3 +628,73 @@ def test_env_example_gercekten_okunan_degiskeni_belgeler():
     assert belgelenen, ".env.example hicbir degisken belgelemiyor"
     for ad in belgelenen:
         assert ad in istemci, f"{ad} belgelenmis ama kod okumuyor"
+
+
+# ========================= KO olayi (13 Agu 2026): bos companyconcept yaniti
+def _srv_ozel(monkeypatch, ozel_handler):
+    monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@ornek.com")
+    from edgar_mcp import server as s
+    from edgar_mcp.client import EdgarClient
+
+    c = EdgarClient()
+    c._http = httpx.AsyncClient(
+        transport=httpx.MockTransport(ozel_handler),
+        headers={"User-Agent": "Test Runner test@ornek.com"},
+    )
+    s._client = c
+    return s
+
+
+def _bos_units_handler(bos_facts: bool = False):
+    """SEC'in KO icin verdigi gercek yanit: HTTP 200, dogru label, units.USD
+    VAR ama icinde satir YOK. 404 degil, hata degil - bos basari."""
+    def h(request: httpx.Request) -> httpx.Response:
+        u = str(request.url)
+        if "companyconcept" in u:
+            ISTEK_KAYDI.append(u)
+            return httpx.Response(200, json={"cik": 320193, "taxonomy": "us-gaap",
+                                             "label": "Assets", "units": {"USD": []}})
+        if "companyfacts" in u and bos_facts:
+            ISTEK_KAYDI.append(u)
+            bos = {"facts": {"us-gaap": {t: {"label": t, "units": {"USD": []}}
+                                         for t in FACTS["facts"]["us-gaap"]}}}
+            return httpx.Response(200, json=bos)
+        return handler(request)
+    return h
+
+
+@pytest.mark.anyio
+async def test_bos_companyconcept_yanitinda_companyfacts_e_dusulur(monkeypatch):
+    """Olculdu (13 Agu 2026, KO): companyconcept bes farkli kosulda da bos
+    dondu, ayni etiket companyfacts'te 144 satirdi. Bos yanit basari sayilirsa
+    model 'bu sirket bunu raporlamiyor' diye okur - yanlis cevap, hata yok."""
+    ISTEK_KAYDI.clear()
+    s = _srv_ozel(monkeypatch, _bos_units_handler())
+    seri = await s.get_concept_series(ticker="AAPL", concept="revenue")
+
+    assert seri.source_endpoint == "companyfacts", "yedek uca dusulmemis"
+    assert seri.total_periods > 0, "companyfacts'te veri varken bos donuldu"
+    assert any("companyfacts" in u for u in ISTEK_KAYDI)
+
+
+@pytest.mark.anyio
+async def test_normal_durumda_companyfacts_cekilmez(srv):
+    """companyfacts birkac MB. Yedek yol yalnizca gerektiginde acilmali,
+    her cagride degil."""
+    ISTEK_KAYDI.clear()
+    seri = await srv.get_concept_series(ticker="AAPL", concept="revenue")
+    assert seri.source_endpoint == "companyconcept"
+    assert not any("companyfacts" in u for u in ISTEK_KAYDI), \
+        "gerek yokken 5 MB'lik uc cekilmis"
+
+
+@pytest.mark.anyio
+async def test_iki_uc_da_bossa_sessiz_basari_yerine_hata(monkeypatch):
+    """Ikisi de bossa donecek veri yok. O zaman bos bir 'basari' degil,
+    eyleme donusturulebilir hata verilir (P-13)."""
+    s = _srv_ozel(monkeypatch, _bos_units_handler(bos_facts=True))
+    with pytest.raises(ValueError) as e:
+        await s.get_concept_series(ticker="AAPL", concept="revenue")
+    mesaj = str(e.value)
+    assert "companyfacts" in mesaj and "companyconcept" in mesaj
+    assert "sec_edgar_list_available_concepts" in mesaj

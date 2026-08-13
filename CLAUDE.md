@@ -348,3 +348,79 @@ bir alan eklenirse test de guncellenir; alan silinirse test kirmiziya doner.
 Windows'ta her `git add` LF/CRLF uyarisi uretiyordu. Bunsuz satir sonlari her
 katkida bulunanin `core.autocrlf` ayarina baglidir ve sahte diff'ler gercek
 degisiklikleri gurultuye gomer. Depo icinde LF sabit; `.bat/.cmd/.ps1` CRLF.
+
+### KK-21: Disa bakan yuzey semadan sayilir, elle sayilmaz
+**Tarih:** 13 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §2, §15
+
+`test_arac_tanimlari_ingilizce` yalnizca `t.description`'a bakiyordu ve Turkceyi
+elle yazilmis bir alt dize listesiyle ariyordu (" ve ", "dondurur", ...).
+Iki bosluk da ayni anda patladi: `concept` parametresinin aciklamasi Turkce
+kaldi (canli istemcide goruldu), cunku (a) parametre aciklamalari hic
+denetlenmiyordu, (b) dizgedeki hicbir kelime listede yoktu.
+
+**Karar:** yuzey semanin kendisinden sayilir - arac tanimi + tum input
+property'leri + output semasindaki `$defs` ve ust duzey property'ler. Sezici
+kelime siniri (`\b`) ile calisan bir Turkce islev-kelimesi kumesi ARTI Turkceye
+ozgu harfler (ışğçöü). Sezicinin kendisi de olculur:
+`test_turkce_sezici_bilinen_ornekleri_ayirt_ediyor` bilinen Turkce ve bilinen
+Ingilizce dizgilerle sinanir; ilk fixture 13 Agustos'ta bulunan gercek kacagin
+ta kendisidir.
+
+Iki yeni enjeksiyon (input aciklamasi ve donus semasi aciklamasi Turkceye
+cevrilir) korumanin iki yonunu de dogruluyor - 31/31.
+
+Bkz. PATTERNS.md P-17.
+### KK-22: Dil kontrolu kara listeden pozitif listeye tasindi
+**Tarih:** 13 Agustos 2026 · **Durum:** yururlukte · **Standart:** §2, §5, §15
+
+KK-21'de yuzeyi genislettim ama seziciyi kara liste olarak biraktim. Enjeksiyon
+harness'i bunun yetmedigini ayni oturumda kanitladi: `"Ticker bulunamadi:
+{ticker}"` enjeksiyonu **KORUMASIZ** dondu - dizgede ne Turkceye ozgu harf
+vardi ne de listedeki bir kelime. Yani genisletilmis test o kacagi hala
+goremiyordu.
+
+**Karar:** iki katli kontrol, `tests/dil.py`:
+1. Kara liste (Turkce harfler + sik islev kelimeleri) - ucuz on eleme.
+2. **Pozitif liste** - `tests/kelime_dagarcigi.txt`. Disa bakan metindeki her
+   kelime bu dosyada olmali. Tanimlayici gorunumlu tokenlar (ilk harften sonra
+   buyuk harf: `NetIncomeLoss`, `USD`, `CIK`, `AAPL`) atlanir. Tanimadigi
+   kelimede kirmiziya doner; dolayisiyla hangi dil oldugundan bagimsizdir.
+
+Kapsam da genisledi: hata mesajlari semada gorunmedigi icin `src/` agacindaki
+her `raise` ifadesi AST ile geziliyor (`test_hata_mesajlari_ingilizce`).
+
+**Kabul edilen bedel:** yeni bir Ingilizce kelime kullanmak dagarcigi
+guncellemeyi gerektirir. Bu bilincli - kontrolun "yazarin akil ettigi" kumeye
+bagimli olmamasinin bedeli bu. Dagarcigin sunger haline gelmemesi icin
+`test_kelime_dagarcigi_kullanilmayan_kelime_biriktirmiyor` olu kelimeleri
+kirmiziya donduruyor.
+
+Bkz. PATTERNS.md P-17.
+
+### KK-23: Bos ust-kaynak yaniti basari sayilmaz, ikinci uca dusulur
+**Tarih:** 13 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §3, §12
+
+KO (CIK 0000021344) icin `companyconcept` ucu HTTP 200 + dogru `label` +
+**bos `units.USD`** donduruyordu (346 bayt). Ayni etiket `companyfacts`
+ucunda 144 satir. Arac bunu sessizce basari sayip `total_periods: 0`
+donduruyordu - model bunu "sirket bunu raporlamiyor" diye okur.
+
+**Olculdu, varsayilmadi** (`arac/tani.py --matris`): temel istek, tekrar,
+onbellek-bypass (sorgu parametresi), farkli User-Agent, sikistirmasiz - besi de
+bos. Ayni adres baska bir agdan dolu geldi. Yanitlarda `age`/`x-cache`/`etag`
+basliklarinin hicbiri yok, yani mekanizma isimlendirilemiyor; kesin olan sey
+sorunun BIZDE olmadigi ve konuma bagli oldugu.
+
+**Karar:**
+1. `companyconcept` sifir satir dondurdugunde `companyfacts` okunur (satir
+   yapisi ayni: start/end/val/form/filed).
+2. Hangi ucun cevapladigi yanitta yazar: `source_endpoint`. Gizli fallback
+   olmaz - cagirici neyi okudugunu bilir.
+3. Ikisi de bossa **hata firlatilir**. Bos bir basari, gercek "veri yok"
+   cevabindan ayirt edilemez; asil sorun buydu.
+4. Yedek yol yalnizca sifir satirda acilir - `companyfacts` birkac MB.
+
+Uc enjeksiyon dogruluyor: yedege dusmeyi kaldir, yedegi her cagride calistir,
+bos durumda hata yerine bos basari don.
+
+Bkz. PATTERNS.md P-19.

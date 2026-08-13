@@ -64,3 +64,177 @@ def test_scriptler_var_olmayan_alana_erismiyor(monkeypatch, capsys):
     cikti = capsys.readouterr().out
     assert "cozulen etiket:" in cikti
     assert "toplam donem:" in cikti
+
+
+# =============================================== arac/tani.py (KO olayi, 13 Agu)
+sys.path.insert(0, str(KOK))
+
+
+def _tani_modulu():
+    import importlib
+
+    return importlib.import_module("arac.tani")
+
+
+def test_tani_dolu_yaniti_ozetliyor(monkeypatch, capsys):
+    """Tani scripti calisan bir yanitta satir sayisini ve eksik alanlari
+    raporlamali - KO olayinda ihtiyac duyulan olcum tam olarak buydu."""
+    import asyncio
+
+    from test_server import GERCEK_GELIR_ETIKETI
+
+    monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@example.com")
+    mod = _tani_modulu()
+    monkeypatch.setattr(mod, "EdgarClient", _sahte_istemci)
+    monkeypatch.setattr(sys, "argv", ["tani.py", "AAPL", GERCEK_GELIR_ETIKETI])
+
+    kod = asyncio.run(mod.main())
+    cikti = capsys.readouterr().out
+    assert kod == 0, cikti
+    assert "HTTP       : 200" in cikti
+    assert "USD: 5 satir" in cikti
+    assert "'end' eksik: 0" in cikti
+
+
+def _istemci_ile(ozel_handler):
+    def istemci():
+        from edgar_mcp.client import EdgarClient
+
+        c = EdgarClient()
+        c._http = httpx.AsyncClient(
+            transport=httpx.MockTransport(ozel_handler),
+            headers={"User-Agent": "Test Runner test@example.com"},
+        )
+        return c
+
+    return istemci
+
+
+# KO'nun GERCEK yaniti: units.USD var ama icinde satir yok. Ilk sahte veri
+# `units: {}` doneriyordu - gercegin sozlesmesini taklit etmiyordu (P-4).
+KO_BOS = {"cik": 21344, "taxonomy": "us-gaap", "tag": "Assets",
+          "label": "Assets", "entityName": "COCA COLA CO", "units": {"USD": []}}
+
+
+def test_tani_birim_var_satir_yok_durumunu_isaretliyor(monkeypatch, capsys):
+    """KO'nun belirtisi: HTTP 200, dogru label, units.USD VAR, icinde 0 satir.
+    Script bunu sessizce gecerse hicbir ise yaramaz."""
+    import asyncio
+
+    monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@example.com")
+
+    def bos_handler(request: httpx.Request) -> httpx.Response:
+        if "companyconcept" in str(request.url):
+            return httpx.Response(200, json=KO_BOS)
+        return handler(request)
+
+    mod = _tani_modulu()
+    monkeypatch.setattr(mod, "EdgarClient", _istemci_ile(bos_handler))
+    monkeypatch.setattr(sys, "argv", ["tani.py", "AAPL", "Assets"])
+
+    kod = asyncio.run(mod.main())
+    cikti = capsys.readouterr().out
+    assert kod == 1, cikti
+    assert "USD: 0 satir" in cikti
+    assert "SATIR YOK" in cikti
+
+
+def test_tani_tamamen_bos_units_durumunu_da_isaretliyor(monkeypatch, capsys):
+    import asyncio
+
+    monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@example.com")
+
+    def bos_handler(request: httpx.Request) -> httpx.Response:
+        if "companyconcept" in str(request.url):
+            return httpx.Response(200, json={**KO_BOS, "units": {}})
+        return handler(request)
+
+    mod = _tani_modulu()
+    monkeypatch.setattr(mod, "EdgarClient", _istemci_ile(bos_handler))
+    monkeypatch.setattr(sys, "argv", ["tani.py", "AAPL", "Assets"])
+
+    assert asyncio.run(mod.main()) == 1
+    assert "units BOS" in capsys.readouterr().out
+
+
+def test_matris_farki_yaratan_degiskeni_gosteriyor(monkeypatch, capsys):
+    """Matris modunun ISI bu: ayni veriyi farkli kosullarda isteyip hangi
+    kosulun sonucu degistirdigini soylemek. Burada yalnizca sorgu parametresi
+    eklenmis istek dolu donuyor (kenar onbellegi hipotezinin imzasi); test
+    scriptin bunu FARK ETTIGINI dogruluyor, tahmin ettigini degil."""
+    import asyncio
+
+    from test_server import CONCEPT
+
+    monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@example.com")
+
+    def onbellek_handler(request: httpx.Request) -> httpx.Response:
+        u = str(request.url)
+        if "companyconcept" in u:
+            if "tani=" in u:
+                return httpx.Response(200, json=CONCEPT, headers={"x-cache": "MISS"})
+            return httpx.Response(200, json=KO_BOS,
+                                  headers={"x-cache": "HIT", "age": "51231"})
+        return handler(request)
+
+    mod = _tani_modulu()
+    monkeypatch.setattr(mod, "EdgarClient", _istemci_ile(onbellek_handler))
+    monkeypatch.setattr(sys, "argv", ["tani.py", "AAPL", "Assets", "--matris"])
+
+    kod = asyncio.run(mod.main())
+    cikti = capsys.readouterr().out
+    assert kod == 1, cikti
+    assert "temel=0" in cikti and "tekrar=0" in cikti
+    assert "onbellek-bypass=5" in cikti
+    assert "'onbellek-bypass'" in cikti, "farki yaratan kosul adiyla anilmali"
+    assert "age           : 51231" in cikti, "onbellek basliklari yazilmali"
+
+
+def test_matris_iki_ucun_tutarsizligini_ayirt_ediyor(monkeypatch, capsys):
+    """companyconcept her kosulda bos ama companyfacts ayni etiket icin dolu:
+    bu, 'SEC'te veri yok' (H4) ile karistirilmamasi gereken durum."""
+    import asyncio
+
+    monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@example.com")
+
+    def hep_bos(request: httpx.Request) -> httpx.Response:
+        if "companyconcept" in str(request.url):
+            return httpx.Response(200, json=KO_BOS)
+        return handler(request)      # companyfacts: FACTS, Assets -> 1 satir
+
+    mod = _tani_modulu()
+    monkeypatch.setattr(mod, "EdgarClient", _istemci_ile(hep_bos))
+    monkeypatch.setattr(sys, "argv", ["tani.py", "AAPL", "Assets", "--matris"])
+
+    kod = asyncio.run(mod.main())
+    cikti = capsys.readouterr().out
+    assert kod == 1, cikti
+    assert "companyfacts=1" in cikti
+    assert "TUTARSIZ" in cikti
+
+
+def test_tarama_etkilenen_sirketleri_sayiyor(monkeypatch, capsys):
+    """Tarama modu 'kac sirket etkileniyor' sorusunu SAYARAK cevaplamali.
+    Sahte ortamda yalnizca AAPL cozuluyor ve companyconcept'i bos donuyor;
+    beklenen: AAPL 'yedek uc gerekli' diye isaretlensin, cozulemeyen
+    tickerlar ozete etkilenen olarak GIRMESIN."""
+    import asyncio
+
+    monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@example.com")
+
+    def h(request: httpx.Request) -> httpx.Response:
+        if "companyconcept" in str(request.url):
+            return httpx.Response(200, json=KO_BOS)
+        return handler(request)
+
+    mod = _tani_modulu()
+    monkeypatch.setattr(mod, "EdgarClient", _istemci_ile(h))
+    monkeypatch.setattr(mod, "TARAMA_TICKERLARI", ["AAPL", "YOKBOYLE"])
+    monkeypatch.setattr(sys, "argv", ["tani.py", "--tarama"])
+
+    kod = asyncio.run(mod.main())
+    cikti = capsys.readouterr().out
+    assert kod == 1, cikti
+    assert "yedek uc gerekli" in cikti
+    assert "ticker cozulemedi" in cikti
+    assert "1/1 sirkette" in cikti, "cozulemeyen ticker paydaya girmis"

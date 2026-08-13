@@ -101,3 +101,18 @@ def test_govdesinde_guard_none_olan_tabloda_da_none_diyor():
         tablo = dict(_kontrol_listesi()).get(kod, "")
         if "Guard: none" in blok:
             assert "none" in tablo.lower(), f"{kod} govdede korumasiz, tabloda degil"
+
+
+def test_metindeki_korumasiz_listesi_tabloyla_ortusuyor():
+    """Kontrol listesinin altindaki paragraf korumasiz patternleri adiyla
+    aniyor. Yeni bir korumasiz pattern eklenince bu cumle sessizce yalan
+    soylemeye baslar; burada tabloyla karsilastiriliyor (standart §11)."""
+    paragraf = re.search(
+        r"of these — (.+?) — have no automated guard", PATTERNS, re.S
+    )
+    assert paragraf, "korumasiz patternleri anlatan paragraf bulunamadi"
+    anilan = set(re.findall(r"P-\d+", paragraf.group(1)))
+    tabloda = {k for k, g in _kontrol_listesi() if "none" in g.lower()}
+    assert anilan == tabloda, (
+        f"paragraf {sorted(anilan)} diyor, tablo {sorted(tabloda)} diyor"
+    )

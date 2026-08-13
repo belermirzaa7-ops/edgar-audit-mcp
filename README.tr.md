@@ -142,6 +142,9 @@ pytest -q                  # HTTP katmanı mock'lu; sec.gov'a hiç çıkmaz
 python arac/enjeksiyon.py  # hata enjeksiyonu
 python arac/sir_tarama.py --gecmis   # sır taraması, çalışma dizini + git geçmişi
 python dogrula.py          # canlı SEC verisine karşı doğrulama
+python arac/tani.py KO Assets           # tek bir SEC yanıtını ham haliyle incele
+python arac/tani.py KO Assets --matris   # aynı veriyi farklı koşullarda iste, sebebi ayır
+python arac/tani.py --tarama             # kaç şirket etkileniyor
 ```
 
 ### Hata enjeksiyonu
@@ -173,12 +176,26 @@ Mock'lar gerçek sisteme karşı davranışı kanıtlayamaz. `dogrula.py`, mali 
 türetmesini ve etiket birleştirmeyi canlı SEC verisine karşı sınar — takvim
 yılı, bitiş yılı ve başlangıç yılı geleneklerini kullanan şirketlerle.
 
+### Değerlendirme seti
+
+[`evaluation/questions.xml`](evaluation/questions.xml), yalnızca araçlar
+çağrılarak cevaplanabilecek on soru tutuyor: şirketler arası mali yıl
+adlandırması, muhasebe standardı değişiminde etiket birleştirme, iki seri
+gerektiren oranlar ve sayfalama alanları. Her cevap araçlar canlı SEC verisine
+karşı çalıştırılarak üretildi — hiçbiri ezberden yazılmadı — ve her soru hangi
+çağrılarla ölçüldüğünü kaydediyor, böylece ölçüm tekrarlanabilir.
+
+Bir test dosyayı yapısal olarak dürüst tutuyor: on çift, her çiftte soru, cevap
+ve ölçüm bloğu, adı geçen her aracın sunucuda gerçekten var olması ve hiçbir
+sorunun "en son dönem" gibi bayatlayacak bir ifadeye bağlanmaması.
+
 ## Hata patternleri
 
 [`PATTERNS.md`](PATTERNS.md), bu depoda **gerçekten yaşanmış** her hatayı
 kataloglar — belirti, kök neden, bugün nasıl tespit edildiği ve onu üreten
-olay — ve her birini hangi testin koruduğunu söyler. İki kayıt "otomatik
-koruma yok" diye işaretli; boşluğu gizlemek boşluğun kendisinden kötü olurdu.
+olay — ve her birini hangi testin koruduğunu söyler. Otomatik koruması olmayan
+kayıtlar bunu hem kontrol listesinde hem kendi gövdesinde açıkça yazar;
+boşluğu gizlemek boşluğun kendisinden kötü olurdu.
 
 Dokümanı dürüst tutan ayrı bir test paketi var: adı geçen her test, araç ve CI
 işi gerçekten var olmalı, her kayıt dört alanı taşımalı, her olay tarihli
@@ -191,8 +208,11 @@ CI'ı kırmızıya çevirir.
 src/edgar_mcp/server.py   MCP araçları ve şemalar
 src/edgar_mcp/client.py   SEC HTTP istemcisi, hız sınırlayıcı, önbellek
 tests/                    mock'lu birim testleri
+tests/dil.py              dışa bakan yüzey için dil kontrolü
+evaluation/questions.xml  ölçülmüş on soru ve hangi çağrılarla ölçüldükleri
 arac/enjeksiyon.py        hata enjeksiyonu harness'ı
 arac/sir_tarama.py        sır tarayıcı
+arac/tani.py              tek bir SEC yanıtını ham haliyle ölçen tanı aracı
 dogrula.py                canlı SEC doğrulaması
 CLAUDE.md                 karar kayıtları - neden böyle yapıldı
 PATTERNS.md               hata patternleri - neye dikkat edilecek

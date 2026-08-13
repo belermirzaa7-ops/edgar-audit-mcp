@@ -75,7 +75,12 @@ class EdgarClient:
             }
         cik = self._ticker_cache.get(ticker.upper())
         if cik is None:
-            raise ValueError(f"Ticker bulunamadi: {ticker}")
+            raise ValueError(
+                f"Ticker '{ticker}' is not in SEC's company_tickers.json. "
+                "Check the symbol; that file lists only registrants that file "
+                "with the SEC, so foreign private issuers, funds and delisted "
+                "names may be absent."
+            )
         return cik
 
     async def submissions(self, cik: str) -> dict:

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Evaluation set for the sec-edgar-mcp tools.
+
+  How this file was produced: every question below was answered by calling the
+  tools against the live SEC API on 13 Aug 2026 and reading the result. No
+  answer is from memory or from a model's guess. The exact calls are recorded
+  in <verification> so the next person can repeat the measurement instead of
+  trusting this file.
+
+  Design rules applied to each question:
+    - answerable only through the tools, not from general knowledge
+    - needs more than one tool call
+    - one verifiable answer, no judgement call
+    - anchored to a named fiscal year, never to "the latest", so the expected
+      answer does not rot as new filings arrive
+
+  Known instability: SEC values can be revised in later filings, and this
+  server returns the most recently filed value for a period. If a revision
+  lands, the numeric answers move. The <verification> block is what makes that
+  visible rather than silent - re-run the calls before treating a mismatch as
+  a regression.
+-->
+<evaluation>
+
+  <qa_pair>
+    <question>What was Apple's net profit margin for fiscal year 2024, as a percentage of revenue rounded to one decimal?</question>
+    <answer>24.0% (net income 93,736 million USD / revenue 391,035 million USD = 23.97%)</answer>
+    <verification>
+      sec_edgar_get_concept_series(ticker="AAPL", concept="revenue") -> FY2024 = 391035000000
+      sec_edgar_get_concept_series(ticker="AAPL", concept="net_income") -> FY2024 = 93736000000
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Walmart and Target both closed a fiscal year on 31 January 2026. What fiscal year label does each company's own SEC data give that period, and are the two labels the same?</question>
+    <answer>They differ by one year: Walmart labels the year ending 2026-01-31 as fiscal 2026, Target labels the year ending 2026-01-31 as fiscal 2025. Both labels are derived from the companies' own filings (fiscal_year_derived = true), not from the calendar year of the period end.</answer>
+    <verification>
+      sec_edgar_get_concept_series(ticker="WMT", concept="revenue") -> period_end 2026-01-31, fiscal_year 2026
+      sec_edgar_get_concept_series(ticker="TGT", concept="revenue") -> period_end 2026-01-31, fiscal_year 2025
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Apple's annual revenue series covers 19 fiscal years. How many distinct US-GAAP tags are merged to produce it, and which tag supplies the fiscal 2015 figure?</question>
+    <answer>Three tags are merged - RevenueFromContractWithCustomerExcludingAssessedTax, Revenues and SalesRevenueNet. Fiscal 2015 (233,715 million USD) comes from SalesRevenueNet, the pre-ASC 606 tag.</answer>
+    <verification>
+      sec_edgar_get_concept_series(ticker="AAPL", concept="revenue", limit=25)
+        -> resolved_concepts = the three tags above, total_periods = 19 (FY2007-FY2025)
+        -> FY2015 point carries source_tag = "SalesRevenueNet", value 233715000000
+      sec_edgar_list_available_concepts(ticker="AAPL", search="revenue") confirms both tags exist for this company
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>What share of Microsoft's fiscal 2026 revenue went to research and development, to one decimal place?</question>
+    <answer>10.7% (R&amp;D 35,562 million USD / revenue 331,839 million USD = 10.72%)</answer>
+    <verification>
+      sec_edgar_get_concept_series(ticker="MSFT", concept="rnd_expense") -> FY2026 = 35562000000
+      sec_edgar_get_concept_series(ticker="MSFT", concept="revenue") -> FY2026 = 331839000000
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>What was Apple's free cash flow in fiscal 2025, defined as operating cash flow minus capital expenditure?</question>
+    <answer>98,767 million USD (operating cash flow 111,482 million minus capex 12,715 million)</answer>
+    <verification>
+      sec_edgar_get_concept_series(ticker="AAPL", concept="operating_cash_flow") -> FY2025 = 111482000000
+      sec_edgar_get_concept_series(ticker="AAPL", concept="capex") -> FY2025 = 12715000000
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Apple's fiscal 2025 ended on 27 September 2025. What is the accession number of the 10-K covering that year, and on what date was it filed?</question>
+    <answer>Accession number 0000320193-25-000079, filed 2025-10-31 (report_date 2025-09-27).</answer>
+    <verification>
+      sec_edgar_get_company_profile(ticker="AAPL") -> cik 0000320193, fiscal_year_end 0927
+      sec_edgar_list_filings(ticker="AAPL", form_type="10-K", limit=5) -> first entry has report_date 2025-09-27
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>For JPMorgan Chase in fiscal 2025, compare the figure returned by the "revenue" alias with the company's operating interest income. Which is larger, and by how much?</question>
+    <answer>Interest income is larger. The "revenue" alias resolves to the tag Revenues only and returns 182,447 million USD for FY2025, while InterestIncomeOperating returns 193,341 million USD - about 10,894 million USD more. For a bank the generic revenue alias does not capture the whole top line, so the tag has to be discovered rather than assumed.</answer>
+    <verification>
+      sec_edgar_get_concept_series(ticker="JPM", concept="revenue") -> resolved_concepts ["Revenues"], FY2025 = 182447000000
+      sec_edgar_list_available_concepts(ticker="JPM", search="interest income") -> InterestIncomeOperating, 182 data points
+      sec_edgar_get_concept_series(ticker="JPM", concept="InterestIncomeOperating") -> FY2025 = 193341000000
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>By what percentage did NVIDIA's revenue grow from fiscal 2025 to fiscal 2026, to one decimal place?</question>
+    <answer>65.5% (from 130,497 million USD for the year ended 2025-01-26 to 215,938 million USD for the year ended 2026-01-25)</answer>
+    <verification>
+      sec_edgar_get_concept_series(ticker="NVDA", concept="revenue", limit=5)
+        -> FY2025 = 130497000000 (period_end 2025-01-26), FY2026 = 215938000000 (period_end 2026-01-25)
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Nike does not close its books in December. What month and day does its fiscal year end, what fiscal year label does the period ending 31 May 2026 carry, and what revenue was reported for it?</question>
+    <answer>Fiscal year end 0531 (31 May). The year ending 2026-05-31 is labelled fiscal 2026 and reported revenue of 46,398 million USD.</answer>
+    <verification>
+      sec_edgar_get_company_profile(ticker="NKE") -> fiscal_year_end "0531", cik 0000320187
+      sec_edgar_get_concept_series(ticker="NKE", concept="revenue", limit=3) -> period_end 2026-05-31, fiscal_year 2026, value 46398000000
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Apple's annual revenue history holds 19 periods. If only three are requested, which three fiscal years come back and how does the response say that more exist?</question>
+    <answer>The three most recent periods come back - fiscal 2023, 2024 and 2025 - not the three oldest. The response reports total_periods = 19, returned = 3 and has_more = true, so the caller can tell the series was truncated and in which direction.</answer>
+    <verification>
+      sec_edgar_get_concept_series(ticker="AAPL", concept="revenue", limit=25) -> total_periods 19, FY2007-FY2025
+      sec_edgar_get_concept_series(ticker="AAPL", concept="revenue", limit=3)
+        -> returned 3, has_more true, fiscal years 2023 / 2024 / 2025
+    </verification>
+  </qa_pair>
+
+</evaluation>

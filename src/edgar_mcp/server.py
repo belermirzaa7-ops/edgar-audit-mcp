@@ -170,6 +170,13 @@ class ConceptSeries(BaseModel):
     )
     taxonomy: str
     label: str | None = None
+    source_endpoint: str = Field(
+        default="companyconcept",
+        description="Which SEC endpoint supplied these facts. Normally "
+        "companyconcept. It reads companyfacts instead when companyconcept "
+        "answered with no facts at all, which SEC does for some companies in "
+        "some regions.",
+    )
     total_periods: int = Field(
         description="Periods available after merging and de-duplication"
     )
@@ -301,6 +308,25 @@ async def _ham_kayitlar(cik: str, tag: str) -> dict | None:
         raise
 
 
+def _satir_sayisi(veriler: list[tuple[str, dict]]) -> int:
+    return sum(
+        len(rows) for _, v in veriler for rows in (v.get("units") or {}).values()
+    )
+
+
+def _facts_kayit(facts: dict, tag: str) -> dict | None:
+    """companyfacts yanitindan tek etiketi companyconcept sekline cevirir.
+    Ikisinin satir yapisi ayni (end/start/val/form/filed), sarmalayici farkli."""
+    gaap = (facts.get("facts") or {}).get("us-gaap") or {}
+    kayit = gaap.get(tag)
+    if not kayit:
+        return None
+    birimler = kayit.get("units") or {}
+    if not any(birimler.values()):
+        return None
+    return {"label": kayit.get("label"), "units": birimler}
+
+
 def _noktalar(veri: dict, tag: str, period: str, kayma: int) -> list[FactPoint]:
     out: list[FactPoint] = []
     for unit, rows in veri.get("units", {}).items():
@@ -363,8 +389,10 @@ async def get_concept_series(
         str,
         Field(
             description=(
-                "Takma ad (revenue, net_income, total_assets, ...) veya ham "
-                "US-GAAP etiketi (orn. NetIncomeLoss)"
+                "An alias (revenue, net_income, total_assets, ...) or a raw "
+                "US-GAAP tag (e.g. NetIncomeLoss). Call "
+                "sec_edgar_list_available_concepts to discover the tags a "
+                "company actually reports."
             )
         ),
     ],
@@ -392,6 +420,29 @@ async def get_concept_series(
         v = await _ham_kayitlar(cik, tag)
         if v is not None:
             veriler.append((tag, v))
+
+    # KO olayi (13 Agu 2026): SEC bazi sirketler icin companyconcept ucundan
+    # HTTP 200 + dogru label + BOS units donduruyor; ayni veri companyfacts
+    # ucunda duruyor. Olculdu: kullanicinin aginda bes farkli kosulda da bos,
+    # baska bir agdan ayni adres dolu. Bizim tarafta duzeltilebilecek kisim,
+    # bos yaniti basari sayip sessizce donmemek.
+    kaynak_uc = "companyconcept"
+    if veriler and _satir_sayisi(veriler) == 0:
+        facts = await _c().company_facts(cik)
+        yedek = [(t, kyt) for t in adaylar if (kyt := _facts_kayit(facts, t))]
+        if yedek:
+            veriler, kaynak_uc = yedek, "companyfacts"
+
+    son_satir = _satir_sayisi(veriler) if veriler else None
+    if son_satir == 0:
+        raise ValueError(
+            f"SEC returned no facts for {ticker} under "
+            f"{', '.join(t for t, _ in veriler)}. Both the companyconcept and "
+            "the companyfacts endpoint were read and both came back without "
+            "data, so this is not a truncated answer - there is nothing to "
+            "return. Call sec_edgar_list_available_concepts to see which tags "
+            "this company reports."
+        )
 
     if not veriler:
         denenen = ", ".join(adaylar)
@@ -445,6 +496,7 @@ async def get_concept_series(
         fiscal_year_derived=turetildi,
         taxonomy="us-gaap",
         label=veriler[0][1].get("label"),
+        source_endpoint=kaynak_uc,
         total_periods=len(tumu),
         returned=len(ordered),
         has_more=len(tumu) > len(ordered),
