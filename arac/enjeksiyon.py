@@ -400,6 +400,75 @@ ENJEKSIYONLAR = [
   'str(row["cik_str"]).zfill(10)',
   'str(row["cik_str"])',
   "test_profile"),
+
+ # ---- B1: dosyalama icindeki dosya listesi (8-K ekleri)
+ ("Okunamayan uzantilari da dosya listesine koy",
+  "src/edgar_mcp/server.py",
+  "        if not ad.lower().endswith(OKUNABILIR_UZANTILAR):\n            continue\n",
+  "        if False:\n            continue\n",
+  "test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor"),
+
+ ("Gezinme sayfasi (index-*) elemesini kaldir",
+  "src/edgar_mcp/server.py",
+  '        if "index" in ad.lower():',
+  "        if False:",
+  "test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor"),
+
+ ("Dosya siralamasini ters cevir (kucukten buyuge)",
+  "src/edgar_mcp/server.py",
+  "    out.sort(key=lambda b: (b.size_bytes or 0), reverse=True)",
+  "    out.sort(key=lambda b: (b.size_bytes or 0), reverse=False)",
+  "test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor"),
+
+ ("XBRL goruntuleyici ciktilarini (R1.htm) elemeyi kaldir",
+  "src/edgar_mcp/server.py",
+  "        if _URETILEN_RAPOR.match(ad):",
+  "        if False:",
+  "test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor"),
+
+ ("Birincil belge bayragini hep False birak",
+  "src/edgar_mcp/server.py",
+  "            is_primary=(ad == birincil),",
+  "            is_primary=False,",
+  "test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor"),
+
+ ("document parametresini yoksay (hep birincil belgeyi oku)",
+  "src/edgar_mcp/server.py",
+  '    ad = document or kayit["primary_document"]',
+  '    ad = kayit["primary_document"]',
+  "test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor"),
+
+ ("Olmayan belge adini dogrulamadan gec",
+  "src/edgar_mcp/server.py",
+  "    if document and not any(b.name == document for b in belgeler):",
+  "    if False and not any(b.name == document for b in belgeler):",
+  "test_olmayan_belge_adi_eyleme_donusturulebilir_hata_verir"),
+
+ ("Belge hatasi mevcut dosyalari listelemesin",
+  "src/edgar_mcp/server.py",
+  '            f"This filing has no readable file named \'{document}\'. It has: "\n'
+  '            f"{\', \'.join(b.name for b in belgeler) or \'none\'}."',
+  '            f"This filing has no readable file named \'{document}\'."',
+  "test_olmayan_belge_adi_eyleme_donusturulebilir_hata_verir"),
+
+ ("Dizin listesi onbellegini kapat (her cagride yeniden iste)",
+  "src/edgar_mcp/server.py",
+  "    if dizin_url in _DIZIN_LISTESI:",
+  "    if False:",
+  "test_ayni_belge_iki_kez_indirilmiyor"),
+
+ # ---- B2: dosyalama ici arama
+ ("Arama toplam sayacini durdur (kirpilmis liste toplam sanilsin)",
+  "src/edgar_mcp/server.py",
+  "        toplam += 1",
+  "        toplam += 0",
+  "test_arama_vurgu_sayisi_sinirli_ama_toplam_dogru"),
+
+ ("Arama vurgu kirpmasini kaldir (yaniti sisir)",
+  "src/edgar_mcp/server.py",
+  "        if len(vurgular) < ARAMA_VURGU_SINIRI:",
+  "        if True:",
+  "test_arama_vurgu_sayisi_sinirli_ama_toplam_dogru"),
 ]
 
 
@@ -421,10 +490,34 @@ def sozdizimi_gecerli(yol: str, kaynak: str) -> bool:
         return False
 
 
+def secilenler(argv: list[str]) -> list[tuple]:
+    """`--aday <alt dize>`: yalnizca adi eslesen enjeksiyonlari calistir.
+
+    Neden bu bayrak var (14 Agu 2026, olay - P-24): yeni bir enjeksiyon adayini
+    denemek icin dosya ELDE duzenlenmisti; oturum bitmeden geri alinmadi ve iki
+    test bir sonraki oturuma kirmizi girdi. Aday deneme isi de yedegi, kilidi ve
+    `finally` ile geri almayi kullanmali - tek fark, hangi enjeksiyonlarin
+    calistigi. Aday once listeye eklenir, sonra tek basina denenir.
+    """
+    if "--aday" not in argv:
+        return ENJEKSIYONLAR
+    desen = argv[argv.index("--aday") + 1].lower()
+    return [e for e in ENJEKSIYONLAR if desen in e[0].lower()]
+
+
 def main() -> int:
     if not kilitle():
         return 1
     atexit.register(kilidi_birak)
+
+    try:
+        secili = secilenler(sys.argv[1:])
+    except IndexError:
+        print("  KULLANIM: enjeksiyon.py [--aday <ad parcasi>]")
+        return 1
+    if not secili:
+        print("  DURDU: --aday hicbir enjeksiyonla eslesmedi.")
+        return 1
 
     # Onceki cokmeden artik kalmis olabilir: once onu geri yukle.
     if YEDEK_DIZIN.exists():
@@ -438,7 +531,7 @@ def main() -> int:
     if kirmizi:
         print("  DURDU: temiz durumda kirmizi test var ->", kirmizi)
         return 1
-    print(f"  Temiz durum yesil. {len(ENJEKSIYONLAR)} enjeksiyon calistirilacak.\n")
+    print(f"  Temiz durum yesil. {len(secili)} enjeksiyon calistirilacak.\n")
 
     yedekle()
     atexit.register(geri_al)
@@ -449,8 +542,8 @@ def main() -> int:
 
     sonuc = []
     try:
-        for i, (ad, dosya, eski, yeni_metin, beklenen) in enumerate(ENJEKSIYONLAR, 1):
-            print(f"  [{i}/{len(ENJEKSIYONLAR)}] {ad[:60]}", flush=True)
+        for i, (ad, dosya, eski, yeni_metin, beklenen) in enumerate(secili, 1):
+            print(f"  [{i}/{len(secili)}] {ad[:60]}", flush=True)
             metin = (YEDEK_DIZIN / pathlib.Path(dosya).name).read_text()
             if eski not in metin:
                 sonuc.append((ad, "ENJEKSIYON UYGULANAMADI", False))

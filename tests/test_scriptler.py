@@ -316,3 +316,23 @@ def test_enjeksiyon_ayni_anda_iki_kez_calismiyor(tmp_path, monkeypatch):
     assert not kilit.exists()
     assert mod.kilitle() is True, "kilit birakildiktan sonra alinamiyor"
     mod.kilidi_birak()
+
+
+def test_enjeksiyon_aday_secimi_yalnizca_eslesenleri_calistiriyor():
+    """P-24 (14 Agu 2026): bir aday enjeksiyonu denemek icin dosya ELDE
+    duzenlenmisti ve geri alinmadi. Aday deneme isi de harness'in yedek/kilit/
+    finally disiplininden gecmeli; `--aday` bunun icin var."""
+    import importlib
+
+    mod = importlib.import_module("arac.enjeksiyon")
+    assert mod.secilenler([]) == mod.ENJEKSIYONLAR, "bayraksiz calisma daralmis"
+
+    ad = mod.ENJEKSIYONLAR[0][0]
+    secili = mod.secilenler(["--aday", ad[:20]])
+    assert secili and all(ad[:20].lower() in e[0].lower() for e in secili)
+    assert len(secili) < len(mod.ENJEKSIYONLAR), "daraltma etkisiz"
+
+    assert mod.secilenler(["--aday", "boyle bir enjeksiyon yok"]) == []
+
+    # Buyuk/kucuk harf farki adayi kacirmamali
+    assert mod.secilenler(["--aday", ad[:20].upper()]) == secili

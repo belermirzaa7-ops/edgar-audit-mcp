@@ -6,6 +6,7 @@ DIKKAT: v2'de giris noktasi FastMCP degil MCPServer'dir.
 """
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Annotated, Literal
 
@@ -270,11 +271,51 @@ class RevisionReport(BaseModel):
     )
 
 
+class FilingDocument(BaseModel):
+    name: str = Field(description="File name; pass it back as document")
+    size_bytes: int | None = Field(
+        default=None, description="Size on SEC's server. Bigger does not mean "
+        "more content: a cover page carrying inline-XBRL markup can outweigh "
+        "the press release that holds the numbers"
+    )
+    is_primary: bool = Field(
+        default=False,
+        description="True for the document SEC lists as the filing's primary "
+        "one. On an 8-K that is normally the cover page, and the substance is "
+        "in an exhibit — one of the other files here",
+    )
+
+
+class SearchHit(BaseModel):
+    position: int = Field(
+        description="Character offset of the match; pass it as offset to read "
+        "onward from here"
+    )
+    context: str = Field(description="Text around the match")
+
+
 class FilingText(BaseModel):
     accession_number: str
     form: str
     filing_date: str
+    document_name: str = Field(description="File that was read")
     document_url: str = Field(description="The document this text was read from")
+    available_documents: list[FilingDocument] = Field(
+        default_factory=list,
+        description="Readable files in this filing, largest first. A form 8-K "
+        "usually carries its substance in an exhibit rather than in the "
+        "primary document, so check this list before concluding a filing is "
+        "empty. Pass a name as document to read it.",
+    )
+    search_query: str | None = Field(default=None, description="The search that was run")
+    search_total_matches: int = Field(
+        default=0, description="How many times the search text occurs"
+    )
+    search_hits: list[SearchHit] = Field(
+        default_factory=list,
+        description="Where the search text occurs, with surrounding context; "
+        "capped, so read search_total_matches to know if more exist",
+    )
     available_sections: list[str] = Field(
         description="Section headings found in this filing, in document order. "
         "Pass one of these back as section. Table-of-contents entries are "
@@ -683,6 +724,73 @@ async def _belge_metni(url: str) -> str:
     return metin
 
 
+OKUNABILIR_UZANTILAR = (".htm", ".html", ".txt")
+ARAMA_BAGLAM = 220
+ARAMA_VURGU_SINIRI = 8
+
+# EDGAR'in XBRL goruntuleyicisinin urettigi rapor dosyalari: R1.htm, R2.htm...
+# Olculdu (14 Agu 2026, TSLA 8-K 0001628280-26-046717): R1.htm 38.047 bayt ile
+# dosyalamanin EN BUYUK .htm dosyasi - basvuru sahibinin yazdigi hicbir sey
+# degil, dei etiketlerinin tablo halinde yeniden cizimi. Elenmezse "en buyuk
+# dosya" siralamasinin basina o geciyor.
+_URETILEN_RAPOR = re.compile(r"^R\d+\.html?$", re.IGNORECASE)
+
+_DIZIN_LISTESI: dict[str, list[FilingDocument]] = {}
+
+
+async def _okunabilir_belgeler(dizin_url: str, birincil: str) -> list[FilingDocument]:
+    """Dosyalamadaki okunabilir dosyalar, buyukten kucuge.
+
+    Siralama bir IPUCU, kural degil. Ilk tasarimda "en buyuk okunabilir dosya
+    aranan metindir" varsayilmisti; gercek dosyalamada olcup yanlisladim
+    (14 Agu 2026, TSLA 8-K 0001628280-26-046717): kapak sayfasi 26.572 bayt,
+    icerigi tasiyan ek 13.243 bayt. Kapak sayfasi satir ici XBRL isaretlemesi
+    tasidigi icin daha buyuk. Modelin gercekten ihtiyac duydugu sinyal boyut
+    degil, hangi dosyanin BIRINCIL oldugu: 8-K'da birincil belge kapaktir,
+    govde ektedir (bkz. FilingDocument.is_primary).
+    """
+    if dizin_url in _DIZIN_LISTESI:
+        return _DIZIN_LISTESI[dizin_url]
+    veri = await _c().filing_index(dizin_url)
+    out: list[FilingDocument] = []
+    for x in (veri.get("directory") or {}).get("item", []):
+        ad = str(x.get("name", ""))
+        if not ad.lower().endswith(OKUNABILIR_UZANTILAR):
+            continue
+        if "index" in ad.lower():          # index-headers.html vb. gezinme sayfalari
+            continue
+        if _URETILEN_RAPOR.match(ad):      # goruntuleyici ciktisi, dosyalanan belge degil
+            continue
+        boyut = str(x.get("size") or "").strip()
+        out.append(FilingDocument(
+            name=ad,
+            size_bytes=int(boyut) if boyut.isdigit() else None,
+            is_primary=(ad == birincil),
+        ))
+    out.sort(key=lambda b: (b.size_bytes or 0), reverse=True)
+    if len(_DIZIN_LISTESI) >= BELGE_METNI_SINIRI:
+        _DIZIN_LISTESI.pop(next(iter(_DIZIN_LISTESI)))
+    _DIZIN_LISTESI[dizin_url] = out
+    return out
+
+
+def _ara(metin: str, ifade: str) -> tuple[int, list[SearchHit]]:
+    """Ifadenin gectigi yerler ve cevresi. Buyuk/kucuk harf ayrimi yok."""
+    hedef = ifade.lower()
+    govde = metin.lower()
+    vurgular: list[SearchHit] = []
+    toplam = 0
+    i = govde.find(hedef)
+    while i != -1:
+        toplam += 1
+        if len(vurgular) < ARAMA_VURGU_SINIRI:
+            bas = max(0, i - ARAMA_BAGLAM)
+            son = min(len(metin), i + len(ifade) + ARAMA_BAGLAM)
+            vurgular.append(SearchHit(position=i, context=metin[bas:son].strip()))
+        i = govde.find(hedef, i + len(hedef))
+    return toplam, vurgular
+
+
 async def _dosyalama_bul(cik: str, accession: str | None, form_type: str) -> dict:
     """Erisim numarasindan (ya da form turunden) dosyalama kaydini bulur."""
     sub = await _c().submissions(cik)
@@ -748,6 +856,16 @@ async def read_filing_text(
         str,
         Field(default="10-K", description="Form type to read when no accession number is given"),
     ] = "10-K",
+    document: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="File to read, as named in available_documents. Omit "
+            "to read the filing's primary document. A form 8-K normally keeps "
+            "its content in an exhibit, so the primary document alone is a "
+            "cover page.",
+        ),
+    ] = None,
     section: Annotated[
         str | None,
         Field(
@@ -755,6 +873,15 @@ async def read_filing_text(
             description="Heading to cut out, e.g. 'Item 7' or 'income taxes'. "
             "Omit to read the document from the start. Match is on the "
             "headings listed in available_sections.",
+        ),
+    ] = None,
+    search: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="Text to locate. Use it when the right heading is "
+            "unknown: the response reports every position with surrounding "
+            "context, and those positions can be passed back as offset.",
         ),
     ] = None,
     offset: Annotated[
@@ -770,10 +897,20 @@ async def read_filing_text(
     cik = await _c().cik_for_ticker(ticker)
     kayit = await _dosyalama_bul(cik, accession_number, form_type)
 
-    url = (
+    dizin = (
         f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
-        f"{kayit['accession_number'].replace('-', '')}/{kayit['primary_document']}"
+        f"{kayit['accession_number'].replace('-', '')}"
     )
+    belgeler = await _okunabilir_belgeler(dizin, kayit["primary_document"])
+
+    ad = document or kayit["primary_document"]
+    if document and not any(b.name == document for b in belgeler):
+        raise ValueError(
+            f"This filing has no readable file named '{document}'. It has: "
+            f"{', '.join(b.name for b in belgeler) or 'none'}."
+        )
+
+    url = f"{dizin}/{ad}"
     metin = await _belge_metni(url)
 
     bulunanlar = bolumler(metin)
@@ -791,12 +928,22 @@ async def read_filing_text(
         secilen = vurus[0]
         metin = metin[vurus[1]:vurus[2]]
 
+    vurgular: list[SearchHit] = []
+    toplam_vurus = 0
+    if search:
+        toplam_vurus, vurgular = _ara(metin, search)
+
     parca = metin[offset:offset + max_characters]
     return FilingText(
         accession_number=kayit["accession_number"],
         form=kayit["form"],
         filing_date=kayit["filing_date"],
+        document_name=ad,
         document_url=url,
+        available_documents=belgeler,
+        search_query=search,
+        search_total_matches=toplam_vurus,
+        search_hits=vurgular,
         available_sections=basliklar,
         section_matched=secilen,
         total_characters=len(metin),

@@ -104,6 +104,16 @@ class EdgarClient:
         r.raise_for_status()
         return r.text
 
+    async def filing_index(self, dizin_url: str) -> dict:
+        """Bir dosyalamanin dosya listesi (SEC her klasor icin index.json verir).
+
+        Bir 8-K'nin govdesi genellikle BIRINCIL belgede degil, ekindedir:
+        olculdu (14 Agu 2026) - TSLA'nin 2026 Q2 teslimat bulteni 8-K'nin
+        birincil belgesinde degil `exhibit...htm` ekinde, ve arac yalnizca
+        birincil belgeyi okuyordu.
+        """
+        return await self._get(dizin_url.rstrip("/") + "/index.json")
+
     async def company_facts(self, cik: str) -> dict:
         """companyfacts yaniti birkac MB olabilir; CIK basina bir kez cekilir."""
         if cik not in self._facts_cache:

@@ -31,7 +31,7 @@ answers. The interesting part of this project is handling them.
 | `sec_edgar_list_filings` | Recent filings with links, filterable by form type |
 | `sec_edgar_get_concept_series` | Time series for one financial concept |
 | `sec_edgar_get_fact_revisions` | How a reported figure changed across filings — restatements, with the accession number of each change |
-| `sec_edgar_read_filing_text` | The narrative XBRL does not carry: MD&A, risk factors, the tax and segment notes |
+| `sec_edgar_read_filing_text` | The narrative XBRL does not carry: MD&A, risk factors, the tax and segment notes — including 8-K exhibits and in-filing search |
 | `sec_edgar_list_available_concepts` | Which tags a company actually reports, in any taxonomy it uses |
 
 Every tool returns a Pydantic model, so MCP `outputSchema` is generated
@@ -69,9 +69,18 @@ Two things make that harder than it sounds, and both are guarded by tests:
   converting 2.2 MB of HTML measured at 0.61 s, so re-parsing on every page
   turn wasted seconds, and the text is some twenty times smaller than the
   markup it came from.
+- **The document a filing points to is not always the one with the content.**
+  SEC names one primary document per filing; on an 8-K that is the cover page
+  and the substance is in an exhibit. Measured on Tesla's Q2 2026 delivery
+  release (`0001628280-26-046717`): the cover is 26,572 bytes and carries no
+  figures, the exhibit is 13,243 bytes and carries all of them. Every readable
+  file in the filing is listed on every call, with the primary one flagged, and
+  `document` reads any of them.
 
 Calling the tool without a section returns the headings the filing actually
-has, so the next call names one instead of guessing.
+has, so the next call names one instead of guessing. When the right heading is
+not obvious, `search` reports how many times a phrase occurs and where; each
+position can be passed straight back as `offset`.
 
 ## Three traps this server handles
 

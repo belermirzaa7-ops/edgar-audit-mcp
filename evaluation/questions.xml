@@ -3,12 +3,19 @@
   Evaluation set for the sec-edgar-mcp tools.
 
   How this file was produced: every question below was answered by calling the
-  tools against the live SEC API - the first ten on 13 Aug 2026, the last five
+  tools against the live SEC API - the first ten on 13 Aug 2026, the next five
   on 14 Aug 2026 when the revision, taxonomy and filing-text tools were added -
   and reading the result. No
   answer is from memory or from a model's guess. The exact calls are recorded
   in <verification> so the next person can repeat the measurement instead of
   trusting this file.
+
+  One exception, stated rather than hidden: question 16 covers the `document`
+  and `search` parameters, which were added on 14 Aug 2026 and were not yet
+  installed in any client when the answer was written. Its figures were read
+  from the filing's own directory listing and exhibit, fetched directly from
+  sec.gov the same day. The tool calls that reproduce it are recorded in the
+  same form; they have not themselves been executed against the live API.
 
   Design rules applied to each question:
     - answerable only through the tools, not from general knowledge
@@ -172,6 +179,28 @@
       sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-26-003952")
         -> available_sections lists "Note 12 - Income Taxes"
       sec_edgar_get_concept_series(ticker="TSLA", concept="IncomeTaxExpenseBenefit") -> FY2023 = -5001000000
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Tesla published its second-quarter 2026 production and delivery figures in a form 8-K. How many vehicles did it report producing and delivering, and where inside that filing do the numbers live?</question>
+    <answer>451,758 vehicles produced and 480,126 delivered (Model 3/Y: 442,936 produced, 467,762 delivered; other models: 8,822 and 12,364), together with 13.5 GWh of energy storage deployed. The numbers are not in the filing's primary document. The 8-K filed on 2026-07-02, accession 0001628280-26-046717, has tsla-20260702.htm as its primary document, and that file is the cover page: it states only that a press release is attached as Exhibit 99.1 and incorporated by reference. The figures are in exhibit99111111.htm, 13,243 bytes, while the cover page is the larger file at 26,572 bytes.</answer>
+    <verification>
+      sec_edgar_list_filings(ticker="TSLA", form_type="8-K")
+        -> 2026-07-02, accession 0001628280-26-046717
+      sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-26-046717")
+        -> cover page only; available_documents marks tsla-20260702.htm is_primary=true (26572 bytes)
+           and lists exhibit99111111.htm (13243 bytes); the generated R1.htm (38047 bytes, the
+           largest .htm in the directory) is excluded as XBRL-viewer output
+      sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-26-046717",
+                                 document="exhibit99111111.htm", max_characters=40000)
+        -> the production/deliveries table with Total 451,758 / 480,126
+      sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-26-046717",
+                                 document="exhibit99111111.htm", search="480,126")
+        -> at least one hit; its position, passed back as offset, lands in the deliveries table
+      Measured 14 Aug 2026 by fetching
+      https://www.sec.gov/Archives/edgar/data/1318605/000162828026046717/index.json
+      and .../exhibit99111111.htm directly; see the note at the top of this file.
     </verification>
   </qa_pair>
 

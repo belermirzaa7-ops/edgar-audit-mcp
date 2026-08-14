@@ -35,6 +35,8 @@ can verify rather than remember.
 | [P-20](#p-20) | Have I actually run the deployment path the README promises? | `test_http_tasimasi_araclari_el_sikismasiz_listeler`, `test_stdio_tasimasi_resmi_istemciyle_araclari_listeliyor`, `test_dockerfile_loopback_disina_baglaniyor`, CI job `docker` |
 | [P-21](#p-21) | Did my fault injection actually compile, or did it just break the import? | `test_enjeksiyon_bozuk_sozdizimini_koruma_eksigi_sanmiyor` |
 | [P-22](#p-22) | Could two copies of this tool be running at once? | `test_enjeksiyon_ayni_anda_iki_kez_calismiyor` |
+| [P-23](#p-23) | Is the document I am reading the one that carries the content, or the one that announces it? | `test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor` |
+| [P-24](#p-24) | Did I edit the working tree by hand to test an idea, and is that edit still there? | `arac/enjeksiyon.py` refuses to start while any test is red |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -562,6 +564,72 @@ string against the working tree, which found one still applied - the alias map
 had been left emptied. That scan is worth remembering as the recovery
 procedure: for each injection, if the target string is missing and the
 replacement string is present, the file is still sabotaged.
+
+
+<a id="p-23"></a>
+### P-23 · The primary document can be a cover page, and the largest file can be machine-generated
+
+**Symptom.** Reading an 8-K returned the form's cover — state of incorporation,
+address, four unchecked boxes, "the press release attached hereto as Exhibit
+99.1 is incorporated herein by reference" — and none of the numbers the filing
+was published to report. No error: a well-formed filing, read successfully,
+carrying nothing the reader came for.
+
+**Root cause.** EDGAR names exactly one `primaryDocument` per filing in the
+submissions feed. On an 8-K that document is the cover; the substance sits in
+an exhibit that appears only in the filing directory's `index.json`. Two things
+make the directory harder to read than it looks. The `type` field is not a
+document type — it is the name of the icon EDGAR draws in its own file listing,
+`"text.gif"` for every entry, so nothing in the JSON says which file is the
+exhibit. And the directory contains `R1.htm` … `Rn.htm`, renderings generated
+by SEC's XBRL viewer rather than anything the filer wrote; on this filing
+`R1.htm` was the largest `.htm` present.
+
+**Detection.** Every readable file in the directory is listed on every call, so
+an apparently empty filing shows where its content is. Navigation pages and
+viewer output are dropped by name, and the file SEC calls primary is flagged
+`is_primary`, which is the signal the model actually needs — size is not.
+Guard: `test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor`, whose fixture copies
+the real directory listing, sizes included.
+
+**Incident.** 14 Aug 2026, TSLA 8-K `0001628280-26-046717`, the Q2 2026
+delivery release. Primary document `tsla-20260702.htm`, 26,572 bytes, cover
+only. `exhibit99111111.htm`, 13,243 bytes, holds 451,758 produced / 480,126
+delivered / 13.5 GWh. `R1.htm`, 38,047 bytes, generated. The first
+implementation ranked files largest-first, on the assumption that the exhibit
+would be the biggest readable file; the mock had been written to match that
+assumption, so the test agreed with it. Measuring the actual filing refuted it
+twice — the cover outweighs the exhibit because inline-XBRL markup is bulky,
+and the generated rendering outweighs both.
+
+---
+
+<a id="p-24"></a>
+### P-24 · A probe applied by hand is an injection with no restore
+
+**Symptom.** Two tests red at the start of a session, in code that had been
+green when the previous session ended and that nobody had edited since.
+
+**Root cause.** While hunting for a fault-injection target, a candidate edit
+(`toplam += 1` → `toplam += 0`, disabling a search counter) was applied to the
+working tree by hand to see which tests it would turn red. The session ended
+before it was undone. The harness writes a backup to disk, restores in a
+`finally` block, restores again at exit, and holds a lock while it runs; an
+edit made by hand has none of that. The harness's own safety net does not cover
+edits the harness did not make.
+
+**Detection.** Probe candidates with a script that writes the file, runs the
+target tests and restores in a `finally` block — the same discipline as the
+harness, never a bare edit to the tree. Independently, `arac/enjeksiyon.py`
+refuses to start while any test is red, so leftover sabotage stops the next run
+instead of being measured as a missing guard. Guard: `arac/enjeksiyon.py`
+clean-state check; the leftover itself is caught by whichever test it breaks,
+which is why the suite is run before anything is believed.
+
+**Incident.** 14 Aug 2026, this repository, one probe left behind out of eleven
+tried. Cost: two red tests carried into the next session, and a packaged
+release that would have shipped a disabled counter had the suite not been run
+first.
 
 ---
 

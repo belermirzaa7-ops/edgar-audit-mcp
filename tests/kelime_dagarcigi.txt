@@ -22,6 +22,7 @@ against
 alias
 aliases
 all
+alone
 also
 an
 analysis
@@ -32,6 +33,7 @@ answer
 answered
 any
 are
+around
 as
 assets
 at
@@ -42,6 +44,7 @@ been
 before
 behind
 beyond
+bigger
 both
 by
 calendar
@@ -51,8 +54,11 @@ came
 can
 cannot
 capex
+capped
 carried
+carries
 carry
+carrying
 case
 cash
 central
@@ -73,9 +79,12 @@ companyconcept
 companyfacts
 concept
 concepts
+concluding
 contact
 contain
+content
 contents
+context
 counts
 cover
 cut
@@ -95,6 +104,7 @@ discover
 discussion
 distinct
 document
+documents
 doe
 does
 duplication
@@ -115,6 +125,7 @@ exact
 exactly
 example
 excluded
+exhibit
 exist
 expense
 explains
@@ -126,6 +137,7 @@ figure
 figures
 file
 filed
+files
 filing
 filings
 filter
@@ -155,6 +167,7 @@ had
 has
 heading
 headings
+here
 historical
 history
 holds
@@ -169,6 +182,7 @@ income
 index
 industrial
 industry
+inline
 insensitive
 instant
 instead
@@ -178,13 +192,17 @@ issuers
 it
 item
 items
+its
 jane
 json
 keep
+keeps
 key
 kind
+know
 label
 labels
+largest
 last
 later
 latest
@@ -198,14 +216,18 @@ links
 list
 listed
 lists
+locate
 management
 many
 mapped
+markup
 match
 matched
+matches
 matching
 maximum
 may
+mean
 merges
 merging
 message
@@ -215,6 +237,7 @@ most
 much
 must
 name
+named
 names
 narrative
 narrow
@@ -230,6 +253,7 @@ note
 nothing
 number
 numbers
+occurs
 of
 off
 official
@@ -241,6 +265,7 @@ on
 once
 one
 only
+onward
 operating
 or
 order
@@ -249,6 +274,7 @@ original
 other
 out
 outstanding
+outweigh
 over
 own
 padded
@@ -263,6 +289,8 @@ periods
 point
 points
 position
+positions
+press
 primary
 private
 proceed
@@ -288,6 +316,7 @@ recently
 regions
 registrant
 registrants
+release
 reliable
 remains
 replaces
@@ -310,6 +339,7 @@ returns
 revenue
 revised
 revisions
+right
 risk
 rnd
 roughly
@@ -324,11 +354,13 @@ see
 segment
 selected
 series
+server
 set
 shares
 shows
 silently
 since
+size
 so
 some
 sometimes
@@ -342,9 +374,11 @@ stock
 stockholders
 straight
 submitted
+substance
 substring
 such
 supplied
+surrounding
 switches
 symbol
 table
@@ -368,6 +402,7 @@ those
 ticker
 tickers
 time
+times
 to
 tool
 tools
@@ -384,6 +419,7 @@ type
 types
 under
 units
+unknown
 us
 use
 used

@@ -29,7 +29,7 @@ tuzak barındırıyor. Bu projenin asıl kısmı o tuzakları ele alması.
 | `sec_edgar_list_filings` | Son dosyalamalar, form türüne göre filtrelenebilir |
 | `sec_edgar_get_concept_series` | Tek bir finansal kalemin zaman serisi |
 | `sec_edgar_get_fact_revisions` | Bir rakamın dosyalamalar arasında nasıl değiştiği — yeniden düzenlemeler, her değişimin erişim numarasıyla |
-| `sec_edgar_read_filing_text` | XBRL'in taşımadığı anlatı: MD&A, risk faktörleri, vergi ve segment dipnotları |
+| `sec_edgar_read_filing_text` | XBRL'in taşımadığı anlatı: MD&A, risk faktörleri, vergi ve segment dipnotları; 8-K ekleri ve dosyalama içi arama dahil |
 | `sec_edgar_list_available_concepts` | Şirketin fiilen raporladığı etiketler, kullandığı her taksonomide |
 
 Her araç Pydantic modeli döndürür; MCP `outputSchema` otomatik üretilir ve
@@ -66,9 +66,18 @@ Bunu göründüğünden zorlaştıran iki şey var ve ikisi de testle korunuyor:
   durur: 2,2 MB HTML'i çevirmek ölçülen 0,61 saniye, yani her sayfa çevirmede
   yeniden ayrıştırmak saniyeleri harcıyordu; ayrıca metin, geldiği işaretlemeden
   yaklaşık yirmi kat küçük.
+- **Dosyalamanın işaret ettiği belge, içeriği taşıyan belge olmayabilir.** SEC
+  her dosyalama için tek bir birincil belge adlandırır; 8-K'da o belge kapak
+  sayfasıdır, içerik ektedir. Tesla'nın 2026 Q2 teslimat bülteninde ölçüldü
+  (`0001628280-26-046717`): kapak 26.572 bayt ve hiçbir rakam taşımıyor, ek
+  13.243 bayt ve rakamların tamamı orada. Dosyalamadaki okunabilir dosyaların
+  tamamı her çağrıda listeleniyor, birincil olan işaretleniyor ve `document`
+  ile herhangi biri okunabiliyor.
 
 Araç bölümsüz çağrılırsa dosyalamanın gerçekten sahip olduğu başlıkları
-döndürür; ikinci çağrı tahmin etmek yerine birini adıyla ister.
+döndürür; ikinci çağrı tahmin etmek yerine birini adıyla ister. Doğru başlığın
+ne olduğu belli değilse `search` bir ifadenin kaç kez ve nerede geçtiğini
+bildirir; her konum doğrudan `offset` olarak geri verilebilir.
 
 ## Ele alınan üç tuzak
 

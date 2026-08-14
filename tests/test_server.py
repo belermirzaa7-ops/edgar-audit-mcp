@@ -1,5 +1,6 @@
 """SEC'e canli cikmadan sunucuyu dogrular: HTTP katmani mock'lanir."""
 import pathlib
+import re
 import sys
 
 import httpx
@@ -167,6 +168,48 @@ BELGE_IKI_VERGI = """<html><body>
 </body></html>"""
 
 
+# 8-K: govde birincil belgede DEGIL, ekte. Gercek olcum (14 Agu 2026): TSLA'nin
+# 2026 Q2 teslimat bulteni `exhibit...htm` icinde; birincil belge kapak sayfasi.
+EK_ISARET = "total deliveries of 480,126 vehicles"
+BELGE_8K_KAPAK = """<html><body>
+<div>Item 2.02 Results of Operations and Financial Condition</div>
+<p>""" + "On July 2, 2026 the registrant issued a press release. " * 12 + """</p>
+<div>Item 9.01 Financial Statements and Exhibits</div>
+<p>99.1 Press Release dated July 2, 2026. """ + "Exhibit index filler. " * 12 + """</p>
+</body></html>"""
+BELGE_8K_EK = """<html><body>
+<p>Tesla reported production of 451,758 vehicles and """ + EK_ISARET + """
+in the second quarter of 2026, and deployed 13.5 GWh of energy storage.</p>
+<p>""" + "Press release filler. " * 60 + """</p>
+</body></html>"""
+
+# Dosya listesi ve BOYUTLAR gercek bir dosyalamadan kopyalandi (TSLA 8-K
+# 0001628280-26-046717, index.json, 14 Agu 2026) - yalnizca sirket adlari
+# degistirildi. Ilk surumde boyutlari kendim uydurmustum ve ekI en buyuk dosya
+# yapmistim; gercek dosyalamada oyle DEGIL (kapak 26.572 > ek 13.243, ve en
+# buyuk .htm goruntuleyici ciktisi olan R1.htm). Mock'u varsayimima gore
+# yazdigim icin test yanlis bir kurali dogruluyordu (P-4).
+# `type` alani da gercekte oldugu gibi: her dosya icin "text.gif" - yani belge
+# TURU degil, EDGAR'in listede gosterdigi ikonun adi. Belge turunu buradan
+# okumak mumkun degil.
+DIZIN_JSON = {"directory": {"name": "/Archives/edgar/data/320193/000032019325000041",
+                            "parent-dir": "/Archives/edgar/data/320193",
+                            "item": [
+    {"name": "0000320193-25-000041-index-headers.html", "type": "text.gif", "size": ""},
+    {"name": "0000320193-25-000041-index.html", "type": "text.gif", "size": ""},
+    {"name": "0000320193-25-000041-xbrl.zip", "type": "compressed.gif", "size": "10687"},
+    {"name": "exhibit991.htm", "type": "text.gif", "size": "13243"},
+    {"name": "FilingSummary.xml", "type": "text.gif", "size": "1694"},
+    {"name": "MetaLinks.json", "type": "text.gif", "size": "17454"},
+    {"name": "R1.htm", "type": "text.gif", "size": "38047"},
+    {"name": "report.css", "type": "text.gif", "size": "2766"},
+    {"name": "Show.js", "type": "text.gif", "size": "1084"},
+    {"name": "aapl-8k.htm", "type": "text.gif", "size": "26572"},
+    {"name": "aapl-8k.xsd", "type": "text.gif", "size": "1848"},
+    {"name": "aapl-8k_lab.xml", "type": "text.gif", "size": "21885"},
+]}}
+
+
 ISTEK_KAYDI: list[str] = []
 
 
@@ -180,12 +223,20 @@ def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=SUBS)
     if "companyfacts" in u:
         return httpx.Response(200, json=FACTS)
+    if u.endswith("/index.json"):
+        return httpx.Response(200, json=DIZIN_JSON)
     if "/Archives/edgar/data/" in u:
+        if "exhibit991.htm" in u:
+            return httpx.Response(200, text=BELGE_8K_EK,
+                                  headers={"Content-Type": "text/html"})
+        if "aapl-20250628.htm" in u:
+            return httpx.Response(200, text=BELGE_TABLO,
+                                  headers={"Content-Type": "text/html"})
         if "form4.xml" in u:
             return httpx.Response(200, text=BELGE_IKI_VERGI,
                                   headers={"Content-Type": "text/html"})
         if "aapl-8k.htm" in u:
-            return httpx.Response(200, text=BELGE_TABLO,
+            return httpx.Response(200, text=BELGE_8K_KAPAK,
                                   headers={"Content-Type": "text/html"})
         if "aapl-20240928.htm" in u:
             return httpx.Response(200, text=BELGE_UZUN_TOC,
@@ -218,6 +269,7 @@ def srv(monkeypatch):
     # Belge metni onbellegi modul duzeyinde: testler arasi sizarsa bir test
     # otekinin onbellegini kullanir ve "indirildi mi" olcumu anlamsizlasir.
     s._BELGE_METNI.clear()
+    s._DIZIN_LISTESI.clear()
     return s
 
 @pytest.mark.anyio
@@ -1059,8 +1111,12 @@ async def test_ayni_belge_iki_kez_indirilmiyor(srv):
     ISTEK_KAYDI.clear()
     await srv.read_filing_text(ticker="AAPL", max_characters=500)
     await srv.read_filing_text(ticker="AAPL", offset=500, max_characters=500)
-    indirme = [u for u in ISTEK_KAYDI if "/Archives/edgar/data/" in u]
+    indirme = [u for u in ISTEK_KAYDI if u.endswith(".htm")]
     assert len(indirme) == 1, f"belge {len(indirme)} kez indirilmis"
+    # Dosya listesi de her cagride yeniden istenmemeli: kucuk bir JSON ama
+    # SEC hiz siniri istek SAYAR, bayt degil.
+    dizin = [u for u in ISTEK_KAYDI if u.endswith("/index.json")]
+    assert len(dizin) == 1, f"dosya listesi {len(dizin)} kez istenmis"
 
 
 @pytest.mark.anyio
@@ -1097,7 +1153,7 @@ async def test_tablo_icindeki_basliklar_da_bulunuyor(srv):
     Metne cevrilince satir " | " ile basladigi icin satir-basi capasi tutmaz ve
     hicbir bolum bulunamaz - dosyalama "bolumsuz" gorunur."""
     b = await srv.read_filing_text(ticker="AAPL",
-                                   accession_number="0000320193-25-000041",
+                                   accession_number="0000320193-25-000058",
                                    section="Item 7", max_characters=40000)
     assert TABLO_ISARET in b.text
     assert b.section_matched and "item 7" in b.section_matched.lower()
@@ -1164,3 +1220,80 @@ async def test_alt_dize_aramasinda_en_uzun_bolum_kazanir(srv):
                                    section="taxes", max_characters=40000)
     assert VERGI_UZUN_ISARET in b.text
     assert b.section_matched and "note 12" in b.section_matched.lower()
+
+
+# ============ 8-K eki ve dosyalama ici arama (B1 + B2, 14 Agu 2026 olcumu)
+@pytest.mark.anyio
+async def test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor(srv):
+    """Olculdu: TSLA'nin 2026 Q2 teslimat bulteni 8-K'nin BIRINCIL belgesinde
+    degil, ekinde. Arac yalnizca birincil belgeyi okusaydi teslimat adetleri
+    ulasilamaz kalirdi - raporun kapanmayan bosluklarindan biri buydu."""
+    kapak = await srv.read_filing_text(ticker="AAPL",
+                                       accession_number="0000320193-25-000041")
+    assert EK_ISARET not in kapak.text, "kapak sayfasi zaten icerigi tasiyor mu?"
+    adlar = [b.name for b in kapak.available_documents]
+    assert "exhibit991.htm" in adlar
+    assert not any("index" in a for a in adlar), "gezinme sayfasi listeye girmis"
+    assert not any(a.endswith(".xsd") for a in adlar), "okunamaz dosya listede"
+    assert not any(re.fullmatch(r"R\d+\.html?", a, re.I) for a in adlar), (
+        "XBRL goruntuleyicisinin urettigi rapor dosyasi listeye girmis"
+    )
+    # Modelin ihtiyaci olan sinyal boyut degil, hangisinin birincil oldugu:
+    # gercek dosyalamada kapak (26.572) ekten (13.243) BUYUK.
+    birincil = [b.name for b in kapak.available_documents if b.is_primary]
+    assert birincil == ["aapl-8k.htm"], f"birincil belge isaretlenmemis: {birincil}"
+    boyutlu = [b for b in kapak.available_documents if b.size_bytes]
+    assert boyutlu == sorted(boyutlu, key=lambda b: -(b.size_bytes or 0)), \
+        "dosya listesi buyukten kucuge sirali degil"
+
+    ek = await srv.read_filing_text(ticker="AAPL",
+                                    accession_number="0000320193-25-000041",
+                                    document="exhibit991.htm",
+                                    max_characters=40000)
+    assert EK_ISARET in ek.text
+    assert ek.document_name == "exhibit991.htm"
+
+
+@pytest.mark.anyio
+async def test_olmayan_belge_adi_eyleme_donusturulebilir_hata_verir(srv):
+    with pytest.raises(ValueError) as e:
+        await srv.read_filing_text(ticker="AAPL",
+                                   accession_number="0000320193-25-000041",
+                                   document="yok.htm")
+    mesaj = str(e.value)
+    assert "yok.htm" in mesaj and "exhibit991.htm" in mesaj
+
+
+@pytest.mark.anyio
+async def test_arama_bolum_adini_bilmeden_yeri_buluyor(srv):
+    """Vergi dipnotunu bulabilmemin tek sebebi adinin listede gorunmesiydi.
+    Model her zaman dogru basligi bilemez; arama o bagimliligi kaldirir."""
+    b = await srv.read_filing_text(ticker="AAPL", section=None,
+                                   search="valuation allowance release",
+                                   max_characters=500)
+    assert b.search_total_matches >= 1
+    assert b.search_hits, "eslesme bulundu ama konum verilmedi"
+    ilk = b.search_hits[0]
+    assert VERGI_ISARET.split(" of ")[0] in ilk.context or "valuation" in ilk.context
+    # Bildirilen konum gercekten oraya goturmeli
+    devam = await srv.read_filing_text(ticker="AAPL", offset=ilk.position,
+                                       max_characters=200)
+    assert "valuation allowance" in devam.text.lower()
+
+
+@pytest.mark.anyio
+async def test_arama_bulunamayinca_sifir_bildiriyor(srv):
+    b = await srv.read_filing_text(ticker="AAPL", search="olmayan bir ifade xyzzy")
+    assert b.search_total_matches == 0
+    assert b.search_hits == []
+
+
+@pytest.mark.anyio
+async def test_arama_vurgu_sayisi_sinirli_ama_toplam_dogru(srv):
+    """Bir ifade yuzlerce kez gecebilir; hepsini baglamiyla dondurmek yaniti
+    sisirir. Kirpma var ama toplam sayi dogru bildirilmeli (§16)."""
+    from edgar_mcp import server as s
+
+    b = await srv.read_filing_text(ticker="AAPL", search="filler")
+    assert b.search_total_matches > s.ARAMA_VURGU_SINIRI
+    assert len(b.search_hits) == s.ARAMA_VURGU_SINIRI

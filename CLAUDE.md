@@ -552,3 +552,49 @@ testlerle korunuyor.
 genisletmek eval set bir bosluk gosterince acilir" diyordu; tersi de gecerli.
 Set 15 soruya cikti ve `test_her_arac_degerlendirme_setinde_temsil_ediliyor`
 artik kapsanmayan bir arac eklenmesini kirmiziya donduruyor.
+
+### KK-29: 8-K govdesi ekte; ve iki hatam - olculmemis bir siralama kurali, elde birakilan bir prova
+**Tarih:** 14 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §2, §4, §11
+
+Tesla raporunun kapanmayan bosluklarindan biri teslimat adetleriydi: XBRL'de
+yok, 10-K/10-Q metninde yok, **8-K'nin ekinde** var. `read_filing_text` iki
+parametre kazandi:
+
+- `document`: dosyalamadaki baska bir dosyayi oku. Yanit her cagride
+  `available_documents` listesini tasiyor, boylece "bu dosyalama bos" sonucuna
+  varmadan once nerede olduguna bakilabiliyor.
+- `search`: bolum adini bilmeden metin icinde konum bulma. `search_hits[].position`
+  dogrudan `offset` olarak geri verilebiliyor; `search_total_matches` kirpmadan
+  bagimsiz gercek sayiyi bildiriyor.
+
+**Hata 1 - olcmeden kural yazdim.** Ilk tasarim "en buyuk okunabilir dosya
+aranan metindir" diyordu ve mock'u ben bu varsayima gore yazdigim icin test
+kurala katildi. Gercek dosyalamayi (TSLA 8-K `0001628280-26-046717`) okuyunca
+varsayim iki kez cokuyor: kapak sayfasi **26.572** bayt, icerigi tasiyan ek
+**13.243** bayt (kapak satir ici XBRL isaretlemesiyle sisiyor), ve dizindeki en
+buyuk `.htm` dosyasi **38.047** baytlik `R1.htm` - SEC'in XBRL
+goruntuleyicisinin urettigi bir rapor, basvuru sahibinin yazdigi bir belge
+degil. `index.json`'in `type` alani da yardimci olmuyor: her satirda
+`"text.gif"`, yani belge turu degil ikon adi.
+
+**Karar:** boyut siralamasi bir ipucu olarak kaldi ama karar sinyali olmaktan
+cikti. Uretilen rapor dosyalari (`R\d+.htm`) ve gezinme sayfalari eleniyor,
+ve modelin gercekten ihtiyaci olan sinyal ayri bir alan oldu:
+`FilingDocument.is_primary`. Mock artik gercek `index.json`'un kopyasi -
+boyutlar dahil. Ders P-4'un tekrari: mock'u varsayimina gore yazarsan test
+varsayimini dogrular, kaynagi degil.
+
+**Hata 2 - enjeksiyon adayini elde denedim.** Bir aday enjeksiyonu ("arama
+toplam sayacini durdur") dosyaya elle uygulayip birakmisim; oturum bitti, iki
+test bir sonraki oturuma kirmizi girdi. Harness yedek + kilit + `finally` ile
+korunuyor, elle yapilan duzenleme hicbiriyle korunmuyor.
+
+**Karar:** aday deneme isi de harness'tan geciyor - `enjeksiyon.py --aday <ad
+parcasi>` yalnizca eslesen enjeksiyonlari calistirir, ayni yedek/kilit/geri
+alma yolunu kullanir. Aday once listeye eklenir, sonra tek basina denenir.
+Pattern olarak P-24.
+
+Sekiz yeni enjeksiyon dogruluyor: uzanti filtresi, gezinme sayfasi elemesi,
+uretilen rapor elemesi, siralama yonu, `is_primary` bayragi, `document`
+parametresi, belge adi dogrulamasi + hata mesajinin dosya listesi, arama toplam
+sayaci ve vurgu kirpmasi.
