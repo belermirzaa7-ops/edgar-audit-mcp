@@ -349,3 +349,51 @@ def test_enjeksiyon_parametreli_testi_de_taniyor():
     assert mod.yakalandi("test_x", ["test_x[2025Q1]", "test_y"])
     assert not mod.yakalandi("test_x", ["test_xyz"]), "onek eslesmesi cok genis"
     assert not mod.yakalandi("test_x", [])
+
+
+def test_tani_ixbrl_modu_zincirin_kapali_olup_olmadigini_soyluyor(monkeypatch, capsys):
+    """--ixbrl, tasarim sirasinda olculemeyen soruyu bu makinede olcer: SEC'in
+    ayikladigi instance'taki fact id'leri, dosyalayanin kendi inline
+    belgesindeki isaretli parcalarin id'leriyle ayni mi. Script'in kendisi de
+    test kapsaminda (KK-19/P-16): sessizce yanlis yorum yazmamali."""
+    import asyncio
+
+    from test_server import SUBS, TICKERS
+
+    monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@example.com")
+
+    INSTANCE = ('<?xml version="1.0"?><xbrl xmlns="http://www.xbrl.org/2003/instance">'
+                '<us-gaap:Revenues contextRef="c-1" id="f-1">1</us-gaap:Revenues>'
+                '<us-gaap:Assets contextRef="c-1" id="f-2">2</us-gaap:Assets>'
+                "</xbrl>")
+    INLINE_ESLESEN = '<html><body><ix:nonFraction id="f-1">1</ix:nonFraction>' \
+                     '<ix:nonFraction id="f-2">2</ix:nonFraction></body></html>'
+    INLINE_ESLESMEYEN = "<html><body><span>no ids here</span></body></html>"
+    DIZIN = {"directory": {"item": [{"name": "aapl-20250927_htm.xml", "size": "10"}]}}
+
+    def kur(inline_govde):
+        def h(request: httpx.Request) -> httpx.Response:
+            u = str(request.url)
+            if "company_tickers" in u:
+                return httpx.Response(200, json=TICKERS)
+            if "/submissions/" in u:
+                return httpx.Response(200, json=SUBS)
+            if u.endswith("/index.json"):
+                return httpx.Response(200, json=DIZIN)
+            if u.endswith("_htm.xml"):
+                return httpx.Response(200, text=INSTANCE)
+            return httpx.Response(200, text=inline_govde)
+        return h
+
+    mod = _tani_modulu()
+    monkeypatch.setattr(sys, "argv", ["tani.py", "AAPL", "--ixbrl"])
+
+    monkeypatch.setattr(mod, "EdgarClient", _istemci_ile(kur(INLINE_ESLESEN)))
+    assert asyncio.run(mod.main()) == 0
+    cikti = capsys.readouterr().out
+    assert "Zincir KAPALI:" in cikti, cikti
+
+    monkeypatch.setattr(mod, "EdgarClient", _istemci_ile(kur(INLINE_ESLESMEYEN)))
+    assert asyncio.run(mod.main()) == 0
+    cikti = capsys.readouterr().out
+    assert "Zincir KAPALI DEGIL:" in cikti, cikti

@@ -34,6 +34,8 @@ answers. The interesting part of this project is handling them.
 | `sec_edgar_read_filing_text` | The narrative XBRL does not carry: MD&A, risk factors, the tax and segment notes — including 8-K exhibits and in-filing search |
 | `sec_edgar_list_available_concepts` | Which tags a company actually reports, in any taxonomy it uses |
 | `sec_edgar_compare_companies` | One concept across every company that reported it for a period, ranked |
+| `sec_edgar_list_fact_dimensions` | Which breakdowns a filing contains — segments, geographies, product lines |
+| `sec_edgar_get_dimensional_facts` | The numbers behind a consolidated total, with the total shown next to them |
 
 Every tool returns a Pydantic model, so MCP `outputSchema` is generated
 automatically and clients consume the results type-safely. List-returning tools
@@ -107,6 +109,46 @@ says so in data rather than in a footnote:
 
 Rank is always computed against the whole frame, so asking about three companies
 does not make one of them "first".
+
+### Segment data, and why the REST API does not have it
+
+SEC describes `companyconcept`, `companyfacts` and `frames` as aggregating
+facts that "apply to the entire filing entity". A segment figure applies to a
+part of it, so those endpoints do not carry breakdowns. (SEC does not use the
+word "dimensional"; that reading of the sentence is inference, and measurement
+agrees with it — Tesla's segment split is absent from `companyfacts` and
+present in the filing's XBRL.)
+
+`sec_edgar_list_fact_dimensions` reads the filing's XBRL instance and reports
+the axes and members it actually contains, so the next call names them instead
+of guessing. `sec_edgar_get_dimensional_facts` returns the facts, each with its
+context id, unit, period and the axes qualifying it.
+
+**The part worth reading twice.** A breakdown and its total are two separate
+claims, and this tool refuses to turn them into one equation:
+
+- Some filings report no entity-wide total for a concept at all; some tag the
+  total on a parent member, so it is itself dimensional.
+- The members do not always sum to the total. XBRL US publishes a data-quality
+  rule (DQC_0150) specifically to catch filings where they do not — which means
+  filings where they do not exist.
+- A figure carrying two axes at once, say segment *and* geography, is an
+  intersection, not one segment's share. Adding it to a segment sum counts part
+  of the business twice.
+- A total tagged `xsi:nil` is not zero.
+
+So nothing is summed silently. Ask for one axis and the response carries the
+member sum and the entity-wide total side by side, with the difference, and
+says which facts it excluded from the sum. Deciding which number is right is
+left to the reader, who is the only one who can.
+
+A note on provenance: the file being read, `<name>_htm.xml`, is SEC's
+extraction from the filer's inline XBRL document — SEC's own dissemination
+spec lists it among EDGAR-generated outputs. The values and contexts are the
+filer's; the container is SEC's. Filings from before inline XBRL was phased in
+(fiscal periods ending 2019-06-15 for large accelerated filers, 2020 and 2021
+for smaller ones) carry a filer-submitted instance instead, and that is read
+instead.
 
 ## Three traps this server handles
 

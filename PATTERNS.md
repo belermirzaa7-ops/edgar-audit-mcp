@@ -38,6 +38,7 @@ can verify rather than remember.
 | [P-23](#p-23) | Is the document I am reading the one that carries the content, or the one that announces it? | `test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor` |
 | [P-24](#p-24) | Did I edit the working tree by hand to test an idea, and is that edit still there? | `arac/enjeksiyon.py` refuses to start while any test is red |
 | [P-25](#p-25) | Does my tooling recognise the test names pytest actually prints? | `test_enjeksiyon_parametreli_testi_de_taniyor` |
+| [P-26](#p-26) | Am I treating a breakdown and its total as arithmetic that must agree? | `test_tutmayan_toplam_gizlenmiyor`, `test_raporlanmayan_toplam_sifir_sanilmiyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -656,6 +657,42 @@ Guard: `test_enjeksiyon_parametreli_testi_de_taniyor`.
 harness — a period-syntax guard covering six spellings. This is the same failure
 class as P-21: the tool for distinguishing "guard missing" from "measurement
 broken" was itself broken, and it fails toward the more alarming reading.
+
+
+<a id="p-26"></a>
+### P-26 · A breakdown and its total are two claims, not one equation
+
+**Symptom.** A segment breakdown that looks complete and sums to something
+other than the reported total — or sums to exactly the total by accident,
+because a figure qualified by two axes at once was counted as if it were one
+segment's share.
+
+**Root cause.** Three assumptions that all feel obviously true and are not.
+"A fact with no dimension is the total" — filings exist with no such fact at
+all, and filings exist where the total is itself dimensional, tagged on a
+parent member, which is the structure XBRL US actually recommends to prevent
+double counting. "The members sum to the total" — XBRL US's Data Quality
+Committee publishes rule DQC_0150 specifically to catch filings where they do
+not, which means real filings do not. "A dimensional fact belongs to its
+segment" — a fact carrying both a segment axis and a geography axis is the
+intersection of the two, and adding it to a segment sum counts part of the
+business twice. A fourth, smaller one: a total tagged `xsi:nil` is not zero.
+
+**Detection.** Nothing is summed silently and no total is chosen. When one axis
+is requested, the response carries the member sum and the entity-wide total
+side by side with their difference, and multi-axis facts are excluded from the
+sum. A nil total comes back as absent, not as `0`. When no numeric member
+remains to add, no reconciliation row is produced at all — reporting `0` would
+assert that zeros were summed. Guards:
+`test_tutmayan_toplam_gizlenmiyor`, `test_cok_boyutlu_fact_toplamaya_girmiyor`,
+`test_raporlanmayan_toplam_sifir_sanilmiyor`.
+
+**Incident.** 14 Aug 2026, during design rather than after a failure: research
+into DQC_0150 and into two bugs in another XBRL library's changelog — one where
+a concept with only dimensional facts returned nothing, one where dimensional
+rows overwrote the total — surfaced the failure class before any of it was
+written. Recorded here because the assumption is the natural one to make, and
+the arithmetic looks right often enough to be trusted.
 
 ---
 

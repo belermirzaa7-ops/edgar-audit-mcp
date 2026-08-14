@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from .belge import bolum_sec, bolumler, metne_cevir
 from .client import SEC_WWW, EdgarClient
+from .xbrl import BOS_BAGLAM, Baglam, Boyut, Instance, Olgu, ayristir, sayi_mi
 
 mcp = MCPServer(
     name="sec-edgar",
@@ -1433,6 +1434,455 @@ async def compare_companies(
             ad for cik, ad in istenen.items() if cik not in gorulen
         ),
     )
+
+
+# ------------------------------------------------------- boyutlu XBRL (C)
+# SEC'in XBRL REST API'si boyutlu fact tasimaz; segment kirilimi yalnizca
+# dosyalamanin XBRL instance'inda var. Ayristirma `belge.py`den ayri bir
+# modulde (`xbrl.py`), cunku biri HTML biri XML - ayni yere koymak ikisini de
+# bulanik hale getirirdi.
+_INSTANCE: dict[str, Instance] = {}
+INSTANCE_SINIRI = 2
+
+# SEC'in inline belgeden ayikladigi instance: `tsla-20251231_htm.xml`.
+_AYIKLANAN_INSTANCE = re.compile(r"_htm\.xml$", re.IGNORECASE)
+# 2019-2021 oncesi dosyalamalarda inline XBRL yoktu; instance'i DOSYALAYAN
+# sunardi (EX-101.INS, `tsla-20181231.xml`). Linkbase ve sema dosyalari ayni
+# uzantiyi paylasir, onlar elenmeli.
+_LINKBASE = re.compile(r"_(cal|def|lab|pre)\.xml$", re.IGNORECASE)
+
+
+async def _instance_url(dizin: str, belgeler: list[FilingDocument]) -> str:
+    """Dosyalamanin XBRL instance dosyasinin adresi.
+
+    Once SEC'in ayikladigi `*_htm.xml`; yoksa (inline XBRL zorunluluğundan
+    onceki dosyalamalar - buyuk hizlandirilmis dosyalayanlar icin 15 Haziran
+    2019, digerleri icin 2020/2021 sonrasi biten donemler) dosyalayanin sundugu
+    bagimsiz instance aranir. Hicbiri yoksa hata EYLEME DONUSTURULEBILIR olmali:
+    hangi dosyalamanin XBRL tasimadigini soylemek, bos donmekten iyidir.
+    """
+    veri = await _c().filing_index(dizin)
+    adlar = [str(x.get("name", "")) for x in (veri.get("directory") or {}).get("item", [])]
+
+    for ad in adlar:
+        if _AYIKLANAN_INSTANCE.search(ad):
+            return f"{dizin}/{ad}"
+    for ad in adlar:
+        if ad.lower().endswith(".xml") and not _LINKBASE.search(ad) \
+                and not ad.lower().startswith(("metalinks", "filingsummary")):
+            return f"{dizin}/{ad}"
+    raise ValueError(
+        "This filing has no XBRL instance document, so it carries no tagged "
+        "facts to break down. Filings before inline XBRL became mandatory "
+        "(fiscal periods ending 2019-06-15 for large accelerated filers, later "
+        "for smaller ones) may predate tagging entirely. Files present: "
+        f"{', '.join(adlar[:20]) or 'none'}."
+    )
+
+
+async def _instance(dizin: str, belgeler: list[FilingDocument]) -> tuple[Instance, str]:
+    url = await _instance_url(dizin, belgeler)
+    if url not in _INSTANCE:
+        cozulmus = ayristir(await _c().filing_document(url))
+        if len(_INSTANCE) >= INSTANCE_SINIRI:
+            _INSTANCE.pop(next(iter(_INSTANCE)))
+        _INSTANCE[url] = cozulmus
+    return _INSTANCE[url], url
+
+
+async def _dosyalama_ve_instance(
+    ticker: str, accession: str | None, form_type: str
+) -> tuple[dict, Instance, str]:
+    cik = await _c().cik_for_ticker(ticker)
+    kayit = await _dosyalama_bul(cik, accession, form_type)
+    dizin = (
+        f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
+        f"{kayit['accession_number'].replace('-', '')}"
+    )
+    belgeler = await _okunabilir_belgeler(dizin, kayit["primary_document"])
+    inst, url = await _instance(dizin, belgeler)
+    return kayit, inst, url
+
+
+class DimensionValue(BaseModel):
+    axis: str = Field(
+        description="The dimension, as the filing writes it, e.g. "
+        "us-gaap:StatementBusinessSegmentsAxis"
+    )
+    member: str | None = Field(
+        default=None,
+        description="The member on that axis, e.g. tsla:AutomotiveSegmentMember. "
+        "None for a typed dimension, whose value is in typed_value instead",
+    )
+    typed_value: str | None = Field(default=None)
+
+
+class AxisInfo(BaseModel):
+    axis: str
+    members: list[str] = Field(description="Members seen on this axis in this filing")
+    fact_count: int = Field(description="Facts qualified by this axis")
+
+
+class DimensionCatalog(BaseModel):
+    accession_number: str
+    form: str
+    filing_date: str
+    instance_url: str = Field(
+        description="The XBRL instance these dimensions were read from. SEC "
+        "extracts it from the filer's inline document; the values and contexts "
+        "are the filer's, the container is SEC's"
+    )
+    total_facts: int
+    dimensional_facts: int = Field(
+        description="Facts qualified by at least one axis. The rest apply to "
+        "the whole entity and are what SEC's XBRL REST API returns"
+    )
+    total_matching: int = Field(description="Axes matching the request")
+    returned: int
+    has_more: bool
+    axes: list[AxisInfo]
+    tags_with_dimensions: list[str] = Field(
+        description="Tags that have at least one dimensional fact here; pass "
+        "one as concept to sec_edgar_get_dimensional_facts"
+    )
+
+
+class DimensionalFact(BaseModel):
+    tag: str
+    dimensions: list[DimensionValue] = Field(
+        description="Every axis qualifying this fact. More than one is normal - "
+        "a figure can be segment AND geography at once, and treating such a "
+        "fact as a plain segment figure double counts it"
+    )
+    value: float | None = Field(
+        default=None, description="Numeric value, already at full scale"
+    )
+    text_value: str | None = Field(
+        default=None, description="Set instead of value when the fact is not numeric"
+    )
+    unit: str | None = None
+    decimals: str | None = Field(
+        default=None,
+        description="Rounding precision as reported, NOT a multiplier: -6 means "
+        "the value is accurate to the nearest million, not expressed in millions",
+    )
+    period_start: str | None = None
+    period_end: str | None = None
+    context_id: str = Field(
+        description="Context in the instance document; with the URL it locates "
+        "this exact fact in the filing"
+    )
+    fact_id: str | None = Field(
+        default=None, description="Fact id as SEC's extraction assigns it"
+    )
+    is_nil: bool = False
+
+
+class Reconciliation(BaseModel):
+    period_end: str
+    unit: str | None = None
+    consolidated_value: float | None = Field(
+        default=None,
+        description="The value reported WITHOUT any dimension for this tag and "
+        "period. None means the filing reports no such total",
+    )
+    members_sum: float | None = Field(
+        default=None, description="Sum of the member values returned for this period"
+    )
+    difference: float | None = Field(
+        default=None, description="consolidated_value - members_sum, when both exist"
+    )
+    agrees: bool | None = Field(
+        default=None,
+        description="True when the two agree. False is NOT necessarily an error "
+        "in this tool: the members may be an incomplete breakdown, or the total "
+        "may itself be tagged on a parent member. Nothing is summed silently - "
+        "both numbers are shown so the discrepancy is visible",
+    )
+
+
+class DimensionalFacts(BaseModel):
+    accession_number: str
+    form: str
+    filing_date: str
+    instance_url: str
+    concept: str
+    resolved_tag: str
+    axis_filter: str | None = None
+    member_filter: str | None = None
+    total_matching: int
+    returned: int
+    has_more: bool
+    facts: list[DimensionalFact]
+    reconciliation: list[Reconciliation] = Field(
+        default_factory=list,
+        description="Only filled when a single axis was requested; comparing a "
+        "sum across mixed axes would double count",
+    )
+
+
+def _olcu(inst: Instance, o: Olgu) -> tuple[Baglam, str | None]:
+    return inst.baglamlar.get(o.context_id, BOS_BAGLAM), inst.birimler.get(o.unit_id or "")
+
+
+def _etiket_cozumle(concept: str) -> list[str]:
+    """Takma ad -> aday etiketler, ama BURADA BIRLESTIRME YOK (KK-8'in bilincli
+    istisnasi degil - burada zaten tek dosyalama okunuyor, etiketler arasi
+    tarihsel birlesme sorusu yok). Etiket taksonomi onekiyle eslesir."""
+    anahtar = concept.strip().lower()
+    return CONCEPT_ALIASES.get(anahtar, [concept.strip()])
+
+
+def _etiket_uyuyor(tag: str, adaylar: list[str]) -> bool:
+    """`us-gaap:Revenues` ile `Revenues` ve `us-gaap:Revenues` eslesir."""
+    yerel = tag.split(":")[-1].lower()
+    for a in adaylar:
+        ay = a.split(":")[-1].lower()
+        if yerel == ay:
+            return True
+    return False
+
+
+@mcp.tool(
+    name="sec_edgar_list_fact_dimensions",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
+    description=(
+        "Lists the breakdowns a filing actually contains - business segments, "
+        "geographies, product lines - by reading the filing's XBRL instance "
+        "document. Call this BEFORE sec_edgar_get_dimensional_facts so the axis "
+        "and member names come from the filing rather than from a guess.\n"
+        "This is data SEC's XBRL REST API does not return: those endpoints "
+        "aggregate facts that 'apply to the entire filing entity', and a segment "
+        "figure applies to a part of it."
+    ),
+)
+async def list_fact_dimensions(
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. TSLA")],
+    accession_number: Annotated[
+        str | None,
+        Field(default=None, description="Exact filing to read. Omit to read the "
+              "most recent filing of form_type"),
+    ] = None,
+    form_type: Annotated[
+        str,
+        Field(default="10-K", description="Form type to read when no accession "
+              "number is given"),
+    ] = "10-K",
+    concept: Annotated[
+        str | None,
+        Field(default=None, description="Restrict to axes used by this concept "
+              "(alias or tag). Omit to list every axis in the filing"),
+    ] = None,
+    limit: Annotated[
+        int,
+        Field(default=25, ge=1, le=100, description="Maximum axes to return"),
+    ] = 25,
+) -> DimensionCatalog:
+    kayit, inst, url = await _dosyalama_ve_instance(ticker, accession_number, form_type)
+    adaylar = _etiket_cozumle(concept) if concept else None
+
+    eksenler: dict[str, dict] = {}
+    etiketler: set[str] = set()
+    boyutlu = inst.boyutlu()
+    for o in boyutlu:
+        if adaylar and not _etiket_uyuyor(o.tag, adaylar):
+            continue
+        etiketler.add(o.tag)
+        for b in inst.baglamlar[o.context_id].boyutlar:
+            kayit_e = eksenler.setdefault(b.axis, {"uyeler": set(), "sayi": 0})
+            kayit_e["sayi"] += 1
+            if b.member:
+                kayit_e["uyeler"].add(b.member)
+
+    sirali = sorted(eksenler.items(), key=lambda kv: (-kv[1]["sayi"], kv[0]))
+    return DimensionCatalog(
+        accession_number=kayit["accession_number"],
+        form=kayit["form"],
+        filing_date=kayit["filing_date"],
+        instance_url=url,
+        total_facts=len(inst.olgular),
+        dimensional_facts=len(boyutlu),
+        total_matching=len(sirali),
+        returned=min(limit, len(sirali)),
+        has_more=len(sirali) > limit,
+        axes=[
+            AxisInfo(axis=eksen, members=sorted(v["uyeler"]), fact_count=v["sayi"])
+            for eksen, v in sirali[:limit]
+        ],
+        tags_with_dimensions=sorted(etiketler)[:60],
+    )
+
+
+@mcp.tool(
+    name="sec_edgar_get_dimensional_facts",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
+    description=(
+        "Returns a concept broken down by segment, geography or any other axis "
+        "the filing uses - the numbers behind a consolidated total. Discover the "
+        "axis and member names with sec_edgar_list_fact_dimensions first.\n"
+        "When one axis is requested the response also reports the entity-wide "
+        "total for the same periods next to the sum of the members. They do not "
+        "always agree, and the tool does not decide which is right: a filing may "
+        "report no total at all, or tag the total on a parent member, and real "
+        "filings are known to break the arithmetic. Both numbers are shown so "
+        "the discrepancy is visible rather than averaged away."
+    ),
+)
+async def get_dimensional_facts(
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. TSLA")],
+    concept: Annotated[
+        str,
+        Field(description="An alias (revenue, gross_profit, ...) or a tag, with "
+              "or without its taxonomy prefix"),
+    ],
+    accession_number: Annotated[
+        str | None,
+        Field(default=None, description="Exact filing to read. Omit for the most "
+              "recent filing of form_type"),
+    ] = None,
+    form_type: Annotated[
+        str,
+        Field(default="10-K", description="Form type when no accession number is given"),
+    ] = "10-K",
+    axis: Annotated[
+        str | None,
+        Field(default=None, description="Keep only facts on this axis, e.g. "
+              "us-gaap:StatementBusinessSegmentsAxis. Matching ignores the prefix"),
+    ] = None,
+    member: Annotated[
+        str | None,
+        Field(default=None, description="Keep only this member, e.g. "
+              "tsla:AutomotiveSegmentMember. Matching ignores the prefix"),
+    ] = None,
+    limit: Annotated[
+        int,
+        Field(default=40, ge=1, le=200, description="Maximum facts to return"),
+    ] = 40,
+) -> DimensionalFacts:
+    kayit, inst, url = await _dosyalama_ve_instance(ticker, accession_number, form_type)
+    adaylar = _etiket_cozumle(concept)
+
+    def _son(q: str | None) -> str:
+        return (q or "").split(":")[-1].lower()
+
+    def eksen_uyuyor(b: Boyut) -> bool:
+        if axis and _son(b.axis) != _son(axis):
+            return False
+        return not (member and _son(b.member) != _son(member))
+
+    secilen: list[DimensionalFact] = []
+    eslesen = 0
+    cozulen_etiket = ""
+    for o in inst.boyutlu():
+        if not _etiket_uyuyor(o.tag, adaylar):
+            continue
+        baglam, birim = _olcu(inst, o)
+        if (axis or member) and not any(eksen_uyuyor(b) for b in baglam.boyutlar):
+            continue
+        eslesen += 1
+        cozulen_etiket = cozulen_etiket or o.tag
+        if len(secilen) >= limit:
+            continue
+        secilen.append(DimensionalFact(
+            tag=o.tag,
+            dimensions=[DimensionValue(axis=b.axis, member=b.member,
+                                       typed_value=b.typed_value)
+                        for b in baglam.boyutlar],
+            value=float(o.deger) if sayi_mi(o.deger) and o.deger else None,
+            text_value=None if sayi_mi(o.deger) else o.deger,
+            unit=birim or None,
+            decimals=o.decimals,
+            period_start=baglam.start,
+            period_end=baglam.end,
+            context_id=o.context_id,
+            fact_id=o.fact_id,
+            is_nil=o.nil,
+        ))
+
+    if not eslesen:
+        mevcut = sorted({o.tag for o in inst.boyutlu()})[:15]
+        raise ValueError(
+            f"No dimensional facts for '{concept}' in this filing"
+            + (f" on axis '{axis}'" if axis else "")
+            + ". Call sec_edgar_list_fact_dimensions to see which tags are "
+            "broken down here"
+            + (f"; it reports tags such as: {', '.join(mevcut)}." if mevcut
+               else ", and note this filing has no dimensional facts at all.")
+        )
+
+    return DimensionalFacts(
+        accession_number=kayit["accession_number"],
+        form=kayit["form"],
+        filing_date=kayit["filing_date"],
+        instance_url=url,
+        concept=concept,
+        resolved_tag=cozulen_etiket,
+        axis_filter=axis,
+        member_filter=member,
+        total_matching=eslesen,
+        returned=len(secilen),
+        has_more=eslesen > len(secilen),
+        facts=secilen,
+        reconciliation=_mutabakat(inst, adaylar, secilen) if axis else [],
+    )
+
+
+def _mutabakat(
+    inst: Instance, adaylar: list[str], secilen: list[DimensionalFact]
+) -> list[Reconciliation]:
+    """Uye toplami ile tuzel kisi geneli toplami YAN YANA koyar.
+
+    Neden toplamayi karara baglamiyoruz: "boyutsuz fact = toplam, boyutlu
+    fact'ler = kirilim" kurali gercek dosyalamalarda tutmuyor. Bazi
+    dosyalamalarda toplam fact'i HIC YOK (yalnizca uyeler var), bazilarinda
+    toplam KENDISI boyutlu - domain/parent uyeye isaretlenmis. XBRL US'in Data
+    Quality Committee'sinin DQC_0150 kurali ("Segment Reporting
+    Inconsistencies") tam olarak uye toplamlarinin raporlanan toplamla tutup
+    tutmadigini denetliyor; boyle bir kural varsa, gercek dosyalamalar bunu
+    ihlal ediyor demektir.
+
+    Bu yuzden arac hangisinin dogru oldugunu SECMEZ; ikisini de gosterir.
+    """
+    toplamlar: dict[tuple[str, str | None], float] = {}
+    for f in secilen:
+        # Cok boyutlu fact toplama girmez: segment VE cografya ile nitelenmis
+        # bir rakam, segment kiriliminin bir parcasi degil kesisimidir; toplama
+        # katmak cift sayar.
+        if f.value is None or f.is_nil or len(f.dimensions) != 1:
+            continue
+        k = (f.period_end or "", f.unit)
+        toplamlar[k] = toplamlar.get(k, 0.0) + f.value
+
+    genel: dict[tuple[str, str | None], float] = {}
+    for o in inst.boyutsuz():
+        if not _etiket_uyuyor(o.tag, adaylar) or not sayi_mi(o.deger) or o.nil:
+            continue
+        baglam, birim = _olcu(inst, o)
+        genel[(baglam.end or "", birim or None)] = float(o.deger or 0)
+
+    out: list[Reconciliation] = []
+    for (donem, birim), toplam in sorted(toplamlar.items()):
+        gen = genel.get((donem, birim))
+        fark = None if gen is None else gen - toplam
+        out.append(Reconciliation(
+            period_end=donem,
+            unit=birim,
+            consolidated_value=gen,
+            members_sum=toplam,
+            difference=fark,
+            agrees=None if fark is None else abs(fark) < 1.0,
+        ))
+    return out
 
 
 def main() -> None:

@@ -24,6 +24,7 @@ Kullanim:
     python arac/tani.py AAPL Assets --matris   # calisan referans
     python arac/tani.py --tarama               # kac sirket etkileniyor
     python arac/tani.py TSLA --envanter        # companyfacts'te NE VAR (taksonomiler)
+    python arac/tani.py TSLA --ixbrl           # fact id'leri inline belgeye kadar izleniyor mu
 """
 from __future__ import annotations
 
@@ -304,10 +305,75 @@ async def _tarama(c: EdgarClient, tag: str) -> int:
     return 1 if bos else 0
 
 
+async def _ixbrl(c: EdgarClient, ticker: str) -> int:
+    """Kaynak zincirinin son halkasini olcer: SEC'in ayikladigi instance'taki
+    `id="f-..."` degerleri, DOSYALAYANIN kendi inline belgesindeki isaretli
+    parcalarin id'leriyle ayni mi?
+
+    Neden onemli: ayni ise, dondugumuz her rakam dosyalayanin kendi belgesindeki
+    tam yerine kadar izlenebilir - SEC'in ayiklamasi bir ara katman olmaktan
+    cikip yalnizca kabuk olur. Bu soru 14 Agu 2026'da tasarim sirasinda soruldu
+    ve olculemedi: gelistirme ortamindan sec.gov'a dogrudan cikis yok, HTML'i
+    metne ceviren araclar da nitelikleri dusuruyor. Bu mod onu bu makinede
+    olcer; TAHMIN ETMEK yerine.
+    """
+    import re as _re
+
+    cik = await c.cik_for_ticker(ticker)
+    sub = await c.submissions(cik)
+    r = sub.get("filings", {}).get("recent", {})
+    i = next((k for k in range(len(r.get("form", []))) if r["form"][k] == "10-K"), None)
+    if i is None:
+        print(f"{ticker} icin son dosyalamalar arasinda 10-K yok.")
+        return 1
+
+    erisim = r["accessionNumber"][i]
+    dizin = (f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+             f"{erisim.replace('-', '')}")
+    print(f"Dosyalama: {erisim}  ({r['filingDate'][i]})")
+
+    veri = await c.filing_index(dizin)
+    adlar = [str(x.get("name", "")) for x in (veri.get("directory") or {}).get("item", [])]
+    instance = next((a for a in adlar if a.lower().endswith("_htm.xml")), None)
+    if instance is None:
+        print("  Bu dosyalamada SEC'in ayikladigi instance (*_htm.xml) YOK.")
+        print("  Muhtemelen inline XBRL zorunlulugundan onceki bir dosyalama.")
+        return 1
+
+    inline = r["primaryDocument"][i]
+    print(f"  instance: {instance}")
+    print(f"  inline:   {inline}")
+
+    ham = await c.filing_document(f"{dizin}/{instance}")
+    kimlikler = _re.findall(r'\sid="([^"]+)"', ham)
+    fact_kimlikleri = [k for k in kimlikler if k.startswith("f")][:200]
+    print(f"  instance'ta {len(kimlikler)} id, ornek: {fact_kimlikleri[:5]}")
+
+    govde = await c.filing_document(f"{dizin}/{inline}")
+    print(f"  inline belge {len(govde):,} karakter")
+
+    bulunan = sum(1 for k in fact_kimlikleri if f'id="{k}"' in govde)
+    oran = bulunan / len(fact_kimlikleri) if fact_kimlikleri else 0
+    print(f"\n  ilk {len(fact_kimlikleri)} fact id'sinden {bulunan} tanesi "
+          f"inline belgede de var  ({oran:.0%})")
+    print("\nYORUM:")
+    if oran > 0.9:
+        print("  Zincir KAPALI: fact id'leri dosyalayanin kendi belgesindeki")
+        print("  isaretli parcalarla ayni. Dondugumuz her rakam oraya kadar izlenebilir.")
+    elif oran > 0:
+        print("  Zincir KISMEN kapali. Hangi fact turlerinin eslesmedigine bakilmali;")
+        print("  belgelemede 'kismen' yazilmali, 'tamamen' degil.")
+    else:
+        print("  Zincir KAPALI DEGIL: id'ler SEC'in ayiklamasina ait, inline belgede")
+        print("  karsiligi yok. `fact_id` yalnizca instance icinde anlamli;")
+        print("  dokumantasyon bunu boyle soylemeli.")
+    return 0
+
+
 async def main() -> int:
     argv = [a for a in sys.argv[1:] if not a.startswith("--")]
     bayraklar = {a for a in sys.argv[1:] if a.startswith("--")}
-    if bayraklar - {"--matris", "--tarama", "--envanter"}:
+    if bayraklar - {"--matris", "--tarama", "--envanter", "--ixbrl"}:
         print(__doc__)
         return 2
 
@@ -318,6 +384,16 @@ async def main() -> int:
         c = EdgarClient()
         try:
             return await _tarama(c, argv[0] if argv else "Assets")
+        finally:
+            await c.aclose()
+
+    if "--ixbrl" in bayraklar:
+        if len(argv) != 1:
+            print("KULLANIM: python arac/tani.py TICKER --ixbrl")
+            return 2
+        c = EdgarClient()
+        try:
+            return await _ixbrl(c, argv[0])
         finally:
             await c.aclose()
 

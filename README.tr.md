@@ -32,6 +32,8 @@ tuzak barındırıyor. Bu projenin asıl kısmı o tuzakları ele alması.
 | `sec_edgar_read_filing_text` | XBRL'in taşımadığı anlatı: MD&A, risk faktörleri, vergi ve segment dipnotları; 8-K ekleri ve dosyalama içi arama dahil |
 | `sec_edgar_list_available_concepts` | Şirketin fiilen raporladığı etiketler, kullandığı her taksonomide |
 | `sec_edgar_compare_companies` | Bir kavramın, o dönemde raporlayan tüm şirketlerdeki değeri; sıralı |
+| `sec_edgar_list_fact_dimensions` | Dosyalamanın içerdiği kırılımlar — segment, coğrafya, ürün hattı |
+| `sec_edgar_get_dimensional_facts` | Konsolide toplamın arkasındaki rakamlar, toplamıyla yan yana |
 
 Her araç Pydantic modeli döndürür; MCP `outputSchema` otomatik üretilir ve
 istemci sonuçları tip güvenli tüketir. Liste döndüren araçlar
@@ -103,6 +105,45 @@ dipnotta değil veride söylüyor:
 
 Sıra her zaman tüm çerçeveye göre hesaplanır; üç şirket sorulunca biri sırf o
 üçün içinde "birinci" olmaz.
+
+### Segment verisi, ve REST API'sinde neden yok
+
+SEC `companyconcept`, `companyfacts` ve `frames` uçlarını "tüzel kişinin
+**tamamına** ait fact'leri toplayan" uçlar diye tarif ediyor. Segment rakamı
+tüzel kişinin bir **parçasına** ait; o yüzden bu uçlarda kırılım yok. (SEC
+"dimensional" kelimesini kullanmıyor; cümleden çıkarılan bu okuma bir çıkarım —
+ve ölçüm onu destekliyor: Tesla'nın segment kırılımı `companyfacts`'te yok,
+dosyalamanın XBRL'inde var.)
+
+`sec_edgar_list_fact_dimensions` dosyalamanın XBRL instance'ını okuyup gerçekten
+içerdiği eksen ve üyeleri bildiriyor; ikinci çağrı tahmin etmek yerine onları
+adıyla istiyor. `sec_edgar_get_dimensional_facts` fact'leri döndürüyor — her
+biri context id'si, birimi, dönemi ve kendisini niteleyen eksenlerle birlikte.
+
+**İki kez okunmayı hak eden kısım.** Bir kırılım ile onun toplamı **iki ayrı
+iddiadır**, ve bu araç ikisini tek denkleme çevirmeyi reddediyor:
+
+- Bazı dosyalamalar o kavram için hiç tüzel kişi geneli toplamı raporlamıyor;
+  bazıları toplamı bir üst üyeye işaretliyor, yani toplamın kendisi boyutlu.
+- Üyeler her zaman toplamı vermiyor. XBRL US bunun için ayrı bir veri kalitesi
+  kuralı yayımlıyor (DQC_0150) — yani vermeyen dosyalamalar var.
+- İki ekseni birden taşıyan bir rakam (segment **ve** coğrafya) bir kesişimdir,
+  bir segmentin payı değil. Segment toplamına katmak işin bir kısmını iki kez
+  sayar.
+- `xsi:nil` işaretli bir toplam sıfır değildir.
+
+Bu yüzden sessizce toplama yapılmıyor. Tek eksen istendiğinde yanıt üye
+toplamını ve tüzel kişi geneli toplamı farkıyla birlikte yan yana veriyor,
+hangi fact'leri toplamın dışında bıraktığını söylüyor. Hangi rakamın doğru
+olduğuna karar vermek okuyucuya bırakılıyor — buna karar verebilecek tek kişi o.
+
+Kaynak hakkında bir not: okunan dosya `<ad>_htm.xml`, SEC'in dosyalayanın
+inline XBRL belgesinden yaptığı **ayıklamadır** — SEC'in kendi dağıtım
+spesifikasyonu onu EDGAR üretimi çıktılar arasında sayıyor. Değerler ve
+context'ler dosyalayanın, kabuk SEC'in. Inline XBRL kademeli olarak zorunlu
+oldu (büyük hızlandırılmış dosyalayanlar için 2019-06-15, diğerleri için 2020
+ve 2021'de biten dönemler); öncesindeki dosyalamalarda dosyalayanın sunduğu
+instance okunuyor.
 
 ## Ele alınan üç tuzak
 

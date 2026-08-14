@@ -644,3 +644,74 @@ Cerceve yaniti buyuk (olculdu: 2.543 sirket), bu yuzden FIFO onbellek
 harness'inin gozunden kacti - pytest `test_x[2025Q1]` yazar, harness duz
 esitlik ariyordu ve calisan bir korumayi "KORUMASIZ" diye raporladi. Duzeltildi
 (`yakalandi()`), testle sabit. Pattern olarak P-25.
+
+### KK-31: Boyutlu XBRL - segment verisi, ve "toplam" diye bir kesinlik yok
+**Tarih:** 14 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §3, §12, §18
+
+Tesla raporunun kapanmayan iki boslugu (segment kirilimi, birim satis) XBRL
+REST API'sinde yok cunku o uclar boyutlu fact tasimiyor. SEC kendi API sayfasi
+bu uclari "aggregate facts that ... **apply to the entire filing entity**" diye
+tarif ediyor; segment fact'i tuzel kisinin bir PARCASINA ait. SEC "dimensional"
+demiyor - bu alintiyla desteklenen bir cikarim, birebir teyit degil, ve
+dokumantasyonda boyle yaziyor.
+
+Iki yeni arac: `sec_edgar_list_fact_dimensions` (kesif - hangi eksen, hangi
+uyeler) ve `sec_edgar_get_dimensional_facts` (veri). Kesif AYRI arac, cunku
+"hangi eksenler var" ile "su etiketi su eksende getir" farkli anlarda sorulur
+ve kesif cagrisi ucuz olmali (`list_available_concepts` ile ayni kalip).
+
+**Kaynak: `<mnemonic>-<tarih>_htm.xml`.** Ilk cerceveme gore bu "dosyalayanin
+kendi XBRL'i" idi; **yanlisti.** SEC'in dagitim spesifikasyonu (PDS Technical
+Specification, Mart 2025, "DRAFT") bu dosyayi `FilingSummary.xml`, `R*.htm` ve
+`MetaLinks.json` ile AYNI listede - "EDGAR-generated" ciktilar arasinda -
+sayiyor: "{name}_htm.xml — Only when Inline XBRL .htm document present". Fark
+gercek ama kucuk: degerler ve context'ler dosyalayanin, kabuk SEC'in. R-dosyasi
+ise bir RENDER (yerlesim, olcek basligi, cozulmus etiket). Dokumantasyon artik
+bunu boyle soyluyor.
+
+`<accession>-xbrl.zip` "does not contain any processing outputs" diyor, yani
+`_htm.xml`'i ICERMEZ - "tek istekte hepsini al" fikri bu yuzden dustu.
+
+**Geriye donuk kapsam:** inline XBRL zorunlulugu kademeli geldi (SEC Release
+33-10514): buyuk hizlandirilmis dosyalayanlar 2019-06-15, hizlandirilmis
+2020-06-15, digerleri 2021-06-15 sonrasi biten donemler. Oncesinde `_htm.xml`
+yok; instance'i dosyalayan sunuyordu. Yedek yol var ve linkbase'leri
+(`_cal/_def/_lab/_pre`) eliyor.
+
+**En tehlikeli tuzak: mukerrer sayim.** "Boyutsuz fact = toplam, boyutlu
+fact'ler = kirilim" kurali gercek dosyalamalarda TUTMUYOR. Bazi dosyalamalarda
+toplam fact'i hic yok; bazilarinda toplam KENDISI boyutlu (domain/parent uyeye
+isaretlenmis - XBRL US'in gelir rehberi bu yapiyi acikca oneriyor: "This
+structure ... prevents double counting"). XBRL US Data Quality Committee'nin
+**DQC_0150** kurali tam olarak uye toplamlarinin raporlanan toplamla tutup
+tutmadigini denetliyor; boyle bir kural varsa gercek dosyalamalar bunu ihlal
+ediyor demektir.
+
+**Karar:** arac sessizce toplama YAPMAZ ve hangisinin dogru oldugunu SECMEZ.
+Tek eksen istendiginde uye toplami ile tuzel kisi geneli toplami yan yana
+donuyor (`reconciliation`), fark gorunur. Uc incelik testle sabit:
+1. Cok boyutlu fact (segment VE cografya) toplama GIRMEZ - o bir kirilim
+   parcasi degil kesisimdir.
+2. `xsi:nil` toplam **0 degildir**; `consolidated_value` None doner. "Toplam
+   raporlanmadi" ile "toplam sifir" ayri seyler.
+3. Toplanacak sayisal uye kalmadiginda mutabakat satiri hic uretilmez;
+   "members_sum = 0" demek sifirlarin toplandigini soylerdi.
+
+**Diger olculmus/kaynakli tuzaklar:** `decimals` bir CARPAN degil hassasiyettir
+(deger zaten tam olcekli); boyutlar `entity/segment` ICINDE ya da `scenario`
+icinde durabilir (yalnizca birine bakmak bazi dosyalamalarda tum kirilimi
+gorunmez yapar); `typedMember` explicit'ten ayri kod yolu ister; bir context
+birden fazla boyut tasiyabilir.
+
+**Bagimlilik eklenmedi** (KK-3): stdlib `xml.etree.ElementTree`, tek gecis
+`iterparse`. `lxml`'in kazandirdigi hiz; darbogaz 2,7 MB'i INDIRMEK.
+Ad alani onekleri `start-ns` olaylarindan okunuyor ki QName'ler dosyalamada
+gorulen haliyle (`us-gaap:Revenues`) donsun - uydurma onek uretilmiyor.
+
+**Hala olculmemis:** `id="f-1"` degerleri dosyalayanin inline belgesindeki
+`ix:` eleman id'leriyle ayni mi? Ayniysa kaynak zinciri tamamen kapanir.
+Gelistirme ortamindan olculemedi (sec.gov'a dogrudan cikis yok, HTML'i metne
+ceviren araclar nitelikleri dusuruyor). `python arac/tani.py TSLA --ixbrl` bunu
+kullanicinin makinesinde olcuyor ve uc sonucu (kapali / kismen / degil) ayirt
+ediyor. Cevap gelene kadar dokumantasyon "SEC'in ayiklamasinin atadigi id"
+diyor, fazlasini degil.

@@ -209,6 +209,7 @@ DIZIN_JSON = {"directory": {"name": "/Archives/edgar/data/320193/000032019325000
     {"name": "aapl-8k.htm", "type": "text.gif", "size": "26572"},
     {"name": "aapl-8k.xsd", "type": "text.gif", "size": "1848"},
     {"name": "aapl-8k_lab.xml", "type": "text.gif", "size": "21885"},
+    {"name": "aapl-8k_htm.xml", "type": "text.gif", "size": "2667"},
 ]}}
 
 
@@ -261,6 +262,150 @@ CERCEVE_BOS = {"taxonomy": "us-gaap", "tag": "OperatingIncomeLoss",
                "pts": 0, "data": []}
 
 
+# ---- XBRL instance (C: boyutlu fact'ler)
+# Kok, ad alanlari ve context bicimi GERCEK dosyalamadan alindi (TSLA FY2025
+# 10-K, `tsla-20251231_htm.xml`, 14 Agu 2026 - birebir alintiyla dogrulandi).
+# `<unit>` ve sayisal fact niteliklerinin (`decimals`, `unitRef`) yazimi ise
+# XBRL 2.1 spesifikasyonundan kuruldu: 2,7 MB'lik dosyanin yalnizca basi
+# okunabildi, o kisimda sayisal fact yok. Bu ayrim bilerek kayitli - ilk canli
+# calistirma bunu dogrulayacak.
+#
+# Fixture'a bilerek konulan zor durumlar:
+#   c-3/c-4  segment ekseninde iki uye; toplamlari konsolide ile TAM tutuyor
+#   c-5      AYNI context'te iki boyut (segment + cografya) -> toplama girmemeli
+#   c-6      cografya ekseni, gross_profit; uye toplami konsolideyle TUTMUYOR
+#   c-7      typed dimension
+#   c-8      `scenario` icinde boyut (segment yerine) - ikisi de gecerli
+#   f-nil    xsi:nil fact
+#   metin    sayisal olmayan fact
+INSTANCE_XML = """<?xml version="1.0" encoding="utf-8"?>
+<xbrl xml:lang="en-US"
+  xmlns="http://www.xbrl.org/2003/instance"
+  xmlns:dei="http://xbrl.sec.gov/dei/2025"
+  xmlns:iso4217="http://www.xbrl.org/2003/iso4217"
+  xmlns:srt="http://fasb.org/srt/2025"
+  xmlns:tsla="http://www.tesla.com/20251231"
+  xmlns:us-gaap="http://fasb.org/us-gaap/2025"
+  xmlns:xbrldi="http://xbrl.org/2006/xbrldi"
+  xmlns:xbrli="http://www.xbrl.org/2003/instance"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <context id="c-1">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier></entity>
+    <period><startDate>2025-01-01</startDate><endDate>2025-12-31</endDate></period>
+  </context>
+  <context id="c-2">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier></entity>
+    <period><instant>2025-12-31</instant></period>
+  </context>
+  <context id="c-3">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier>
+      <segment>
+        <xbrldi:explicitMember dimension="us-gaap:StatementBusinessSegmentsAxis">
+          tsla:AutomotiveSegmentMember
+        </xbrldi:explicitMember>
+      </segment>
+    </entity>
+    <period><startDate>2025-01-01</startDate><endDate>2025-12-31</endDate></period>
+  </context>
+  <context id="c-4">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier>
+      <segment>
+        <xbrldi:explicitMember dimension="us-gaap:StatementBusinessSegmentsAxis">
+          tsla:EnergyGenerationAndStorageSegmentMember
+        </xbrldi:explicitMember>
+      </segment>
+    </entity>
+    <period><startDate>2025-01-01</startDate><endDate>2025-12-31</endDate></period>
+  </context>
+  <context id="c-5">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier>
+      <segment>
+        <xbrldi:explicitMember dimension="us-gaap:StatementBusinessSegmentsAxis">
+          tsla:AutomotiveSegmentMember
+        </xbrldi:explicitMember>
+        <xbrldi:explicitMember dimension="srt:StatementGeographicalAxis">
+          country:US
+        </xbrldi:explicitMember>
+      </segment>
+    </entity>
+    <period><startDate>2025-01-01</startDate><endDate>2025-12-31</endDate></period>
+  </context>
+  <context id="c-6">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier>
+      <segment>
+        <xbrldi:explicitMember dimension="srt:StatementGeographicalAxis">
+          country:CN
+        </xbrldi:explicitMember>
+      </segment>
+    </entity>
+    <period><startDate>2025-01-01</startDate><endDate>2025-12-31</endDate></period>
+  </context>
+  <context id="c-7">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier>
+      <segment>
+        <xbrldi:typedMember dimension="tsla:PlantAxis">
+          <tsla:PlantName>Fremont</tsla:PlantName>
+        </xbrldi:typedMember>
+      </segment>
+    </entity>
+    <period><instant>2025-12-31</instant></period>
+  </context>
+  <context id="c-8">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier></entity>
+    <period><startDate>2025-01-01</startDate><endDate>2025-12-31</endDate></period>
+    <scenario>
+      <xbrldi:explicitMember dimension="srt:ProductOrServiceAxis">
+        tsla:EnergyStorageMember
+      </xbrldi:explicitMember>
+    </scenario>
+  </context>
+  <unit id="usd"><measure>iso4217:USD</measure></unit>
+  <unit id="usdPerShare">
+    <divide>
+      <unitNumerator><measure>iso4217:USD</measure></unitNumerator>
+      <unitDenominator><measure>xbrli:shares</measure></unitDenominator>
+    </divide>
+  </unit>
+  <us-gaap:Revenues contextRef="c-1" unitRef="usd" decimals="-6" id="f-1">97690000000</us-gaap:Revenues>
+  <us-gaap:Revenues contextRef="c-3" unitRef="usd" decimals="-6" id="f-2">77000000000</us-gaap:Revenues>
+  <us-gaap:Revenues contextRef="c-4" unitRef="usd" decimals="-6" id="f-3">20690000000</us-gaap:Revenues>
+  <us-gaap:Revenues contextRef="c-5" unitRef="usd" decimals="-6" id="f-4">41000000000</us-gaap:Revenues>
+  <us-gaap:Revenues contextRef="c-8" unitRef="usd" decimals="-6" id="f-5">10100000000</us-gaap:Revenues>
+  <us-gaap:GrossProfit contextRef="c-1" unitRef="usd" decimals="-6" id="f-6">17094000000</us-gaap:GrossProfit>
+  <us-gaap:GrossProfit contextRef="c-6" unitRef="usd" decimals="-6" id="f-7">4000000000</us-gaap:GrossProfit>
+  <us-gaap:OperatingIncomeLoss contextRef="c-1" unitRef="usd" xsi:nil="true" id="f-13"/>
+  <us-gaap:OperatingIncomeLoss contextRef="c-3" unitRef="usd" decimals="-6" id="f-14">9000000000</us-gaap:OperatingIncomeLoss>
+  <us-gaap:OperatingIncomeLoss contextRef="c-4" unitRef="usd" decimals="-6" id="f-15">1500000000</us-gaap:OperatingIncomeLoss>
+  <us-gaap:Assets contextRef="c-7" unitRef="usd" decimals="-6" id="f-8">12000000000</us-gaap:Assets>
+  <us-gaap:Assets contextRef="c-2" unitRef="usd" decimals="-6" id="f-9">130000000000</us-gaap:Assets>
+  <us-gaap:EarningsPerShareDiluted contextRef="c-3" unitRef="usdPerShare" decimals="2" id="f-10">2.15</us-gaap:EarningsPerShareDiluted>
+  <us-gaap:Revenues contextRef="c-6" unitRef="usd" xsi:nil="true" id="f-nil"/>
+  <dei:EntityRegistrantName contextRef="c-1" id="f-11">Tesla, Inc.</dei:EntityRegistrantName>
+  <tsla:SegmentDescription contextRef="c-3" id="f-12">Design and sale of vehicles</tsla:SegmentDescription>
+</xbrl>"""
+
+# Inline XBRL zorunlulugundan onceki dosyalama: `_htm.xml` yok, dosyalayanin
+# sundugu bagimsiz instance var. Linkbase'ler ayni uzantiyi paylasiyor.
+DIZIN_ESKI_JSON = {"directory": {"item": [
+    # Sira bilerek boyle: linkbase'ler instance'tan ONCE. SEC index.json'in
+    # siralamasini hicbir yerde garanti etmiyor; ilk .xml'i alan bir kod
+    # olculen dosyalamada kazara dogru calisiyordu.
+    {"name": "tsla-20181231_lab.xml", "type": "text.gif", "size": "800"},
+    {"name": "tsla-20181231_def.xml", "type": "text.gif", "size": "700"},
+    {"name": "tsla-20181231_cal.xml", "type": "text.gif", "size": "500"},
+    {"name": "tsla-20181231_pre.xml", "type": "text.gif", "size": "400"},
+    {"name": "MetaLinks.json", "type": "text.gif", "size": "600"},
+    {"name": "tsla-20181231.xml", "type": "text.gif", "size": "3100"},
+    {"name": "tsla-20181231.xsd", "type": "text.gif", "size": "900"},
+    {"name": "aapl-20240928.htm", "type": "text.gif", "size": "2400"},
+]}}
+
+DIZIN_XBRLSIZ_JSON = {"directory": {"item": [
+    {"name": "aapl-8k.htm", "type": "text.gif", "size": "2400"},
+    {"name": "report.css", "type": "text.gif", "size": "100"},
+]}}
+
+
 ISTEK_KAYDI: list[str] = []
 
 
@@ -274,6 +419,9 @@ def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=SUBS)
     if "companyfacts" in u:
         return httpx.Response(200, json=FACTS)
+    if u.endswith("_htm.xml") or u.endswith("tsla-20181231.xml"):
+        return httpx.Response(200, text=INSTANCE_XML,
+                              headers={"Content-Type": "application/xml"})
     if "/api/xbrl/frames/" in u:
         if "/Assets/USD/CY2025Q1I.json" in u:
             return httpx.Response(200, json=CERCEVE_VARLIK)
@@ -283,6 +431,10 @@ def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json=CERCEVE_GELIR)
         return httpx.Response(404, json={"error": "not found"})
     if u.endswith("/index.json"):
+        if "000032019324000123" in u:
+            return httpx.Response(200, json=DIZIN_ESKI_JSON)
+        if "000032019325000012" in u:
+            return httpx.Response(200, json=DIZIN_XBRLSIZ_JSON)
         return httpx.Response(200, json=DIZIN_JSON)
     if "/Archives/edgar/data/" in u:
         if "exhibit991.htm" in u:
@@ -330,6 +482,7 @@ def srv(monkeypatch):
     s._BELGE_METNI.clear()
     s._DIZIN_LISTESI.clear()
     s._CERCEVE.clear()
+    s._INSTANCE.clear()
     return s
 
 @pytest.mark.anyio
@@ -575,6 +728,8 @@ async def test_arac_isimleri_servis_onekli():
         "sec_edgar_read_filing_text",
         "sec_edgar_list_available_concepts",
         "sec_edgar_compare_companies",
+        "sec_edgar_list_fact_dimensions",
+        "sec_edgar_get_dimensional_facts",
     }, f"beklenmeyen arac isimleri: {isimler}"
 
 
@@ -1478,3 +1633,205 @@ async def test_cerceve_ikinci_kez_indirilmiyor(srv):
     await srv.compare_companies(concept="revenue", period="CY2025Q1", limit=3)
     istekler = [u for u in ISTEK_KAYDI if "/frames/" in u]
     assert len(istekler) == 1, f"cerceve {len(istekler)} kez indirilmis"
+
+
+# ============ Boyutlu XBRL (C): segment/cografya kirilimlari
+@pytest.mark.anyio
+async def test_boyut_kesfi_eksenleri_ve_uyeleri_listeliyor(srv):
+    """Model eksen adini tahmin etmemeli; dosyalamanin kendi adlarini gormeli."""
+    b = await srv.list_fact_dimensions(ticker="AAPL",
+                                       accession_number="0000320193-25-000041")
+    eksenler = {a.axis for a in b.axes}
+    assert "us-gaap:StatementBusinessSegmentsAxis" in eksenler
+    assert "srt:StatementGeographicalAxis" in eksenler
+    assert "srt:ProductOrServiceAxis" in eksenler, "scenario icindeki boyut kacti"
+    assert "tsla:PlantAxis" in eksenler, "typed dimension listelenmemis"
+
+    segment = [a for a in b.axes if a.axis.endswith("StatementBusinessSegmentsAxis")][0]
+    assert "tsla:AutomotiveSegmentMember" in segment.members
+    assert "tsla:EnergyGenerationAndStorageSegmentMember" in segment.members
+    assert b.dimensional_facts < b.total_facts, "boyutsuz fact'ler de sayilmali"
+    assert "us-gaap:Revenues" in b.tags_with_dimensions
+
+
+@pytest.mark.anyio
+async def test_boyut_kesfi_kavrama_gore_daraltiliyor(srv):
+    b = await srv.list_fact_dimensions(ticker="AAPL",
+                                       accession_number="0000320193-25-000041",
+                                       concept="gross_profit")
+    assert {a.axis for a in b.axes} == {"srt:StatementGeographicalAxis"}
+    assert b.tags_with_dimensions == ["us-gaap:GrossProfit"]
+
+
+@pytest.mark.anyio
+async def test_segment_kirilimi_geliyor_ve_kaynagina_kadar_izlenebiliyor(srv):
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
+    uyeler = {f.dimensions[0].member: f.value for f in b.facts
+              if len(f.dimensions) == 1}
+    assert uyeler["tsla:AutomotiveSegmentMember"] == 77000000000
+    assert uyeler["tsla:EnergyGenerationAndStorageSegmentMember"] == 20690000000
+
+    otomotiv = [f for f in b.facts
+                if f.dimensions[0].member == "tsla:AutomotiveSegmentMember"
+                and len(f.dimensions) == 1][0]
+    assert otomotiv.context_id == "c-3" and otomotiv.fact_id == "f-2"
+    assert otomotiv.unit == "USD" and otomotiv.decimals == "-6"
+    assert otomotiv.period_start == "2025-01-01" and otomotiv.period_end == "2025-12-31"
+    assert b.instance_url.endswith("_htm.xml")
+
+
+@pytest.mark.anyio
+async def test_uye_toplami_ile_konsolide_yan_yana_veriliyor(srv):
+    """Arac hangisinin dogru oldugunu SECMEZ, ikisini de gosterir."""
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
+    assert len(b.reconciliation) == 1
+    m = b.reconciliation[0]
+    assert m.members_sum == 97690000000
+    assert m.consolidated_value == 97690000000
+    assert m.agrees is True and m.difference == 0
+
+
+@pytest.mark.anyio
+async def test_tutmayan_toplam_gizlenmiyor(srv):
+    """Gercek dosyalamalar uye toplamini tutturamayabiliyor (XBRL US DQC_0150
+    kurali tam bunun icin var). Tutmadiginda arac bunu SOYLEMELI."""
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="gross_profit", axis="srt:StatementGeographicalAxis")
+    m = b.reconciliation[0]
+    assert m.members_sum == 4000000000
+    assert m.consolidated_value == 17094000000
+    assert m.agrees is False
+    assert m.difference == 13094000000
+
+
+@pytest.mark.anyio
+async def test_cok_boyutlu_fact_toplamaya_girmiyor(srv):
+    """Segment VE cografya ile nitelenmis bir rakam, segment kiriliminin bir
+    parcasi degil kesisimidir; toplama katmak cift sayar."""
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
+    cok = [f for f in b.facts if len(f.dimensions) > 1]
+    assert cok, "cok boyutlu fact hic donmemis - fixture bozulmus olabilir"
+    assert {d.axis for d in cok[0].dimensions} == {
+        "us-gaap:StatementBusinessSegmentsAxis", "srt:StatementGeographicalAxis"}
+    assert b.reconciliation[0].members_sum == 97690000000, \
+        "41 milyarlik kesisim toplama karismis"
+
+
+@pytest.mark.anyio
+async def test_eksen_verilmezse_mutabakat_hesaplanmiyor(srv):
+    """Farkli eksenlerdeki uyeleri toplamak anlamsiz; sessizce yapmaktansa
+    hic yapmamak dogru."""
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041", concept="revenue")
+    assert b.reconciliation == []
+    assert b.total_matching >= 4
+
+
+@pytest.mark.anyio
+async def test_uyeye_gore_daraltma_calisiyor(srv):
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis",
+        member="tsla:EnergyGenerationAndStorageSegmentMember")
+    assert b.total_matching == 1
+    assert b.facts[0].value == 20690000000
+
+
+@pytest.mark.anyio
+async def test_sayisal_olmayan_ve_nil_fact_sessizce_sayiya_cevrilmiyor(srv):
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="tsla:SegmentDescription")
+    f = b.facts[0]
+    assert f.value is None and f.text_value == "Design and sale of vehicles"
+
+    n = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="srt:StatementGeographicalAxis")
+    nil = [x for x in n.facts if x.is_nil]
+    assert nil and nil[0].value is None, "nil fact sifir sanilmis"
+    # Toplanacak sayisal uye kalmadiginda mutabakat satiri HIC uretilmiyor.
+    # "members_sum = 0" demek, sifirlarin toplandigini soylerdi; dogru olan,
+    # toplanacak bir sey olmadigini soylemek.
+    assert n.reconciliation == [], "nil fact toplama girmis ve 0 diye raporlanmis"
+
+
+@pytest.mark.anyio
+async def test_typed_dimension_dusurulmuyor(srv):
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="total_assets", axis="tsla:PlantAxis")
+    d = b.facts[0].dimensions[0]
+    assert d.member is None and d.typed_value == "Fremont"
+
+
+@pytest.mark.anyio
+async def test_pay_bolu_payda_birimi_okunuyor(srv):
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="eps_diluted")
+    assert b.facts[0].unit == "USD/shares"
+
+
+@pytest.mark.anyio
+async def test_inline_oncesi_dosyalamada_dosyalayanin_instance_i_okunuyor(srv):
+    """Inline XBRL zorunlulugu kademeli geldi (buyuk hizlandirilmis
+    dosyalayanlar icin 2019-06-15'te biten donemler). Oncesinde `_htm.xml` yok;
+    instance'i dosyalayan sunuyordu. Linkbase'ler ayni uzantiyi paylasir."""
+    b = await srv.list_fact_dimensions(ticker="AAPL",
+                                       accession_number="0000320193-24-000123")
+    assert b.instance_url.endswith("tsla-20181231.xml")
+    assert not b.instance_url.endswith("_lab.xml"), "linkbase instance sanilmis"
+
+
+@pytest.mark.anyio
+async def test_xbrl_tasimayan_dosyalamada_eyleme_donusturulebilir_hata(srv):
+    with pytest.raises(ValueError) as e:
+        await srv.list_fact_dimensions(ticker="AAPL",
+                                       accession_number="0000320193-25-000012")
+    mesaj = str(e.value)
+    assert "no XBRL instance" in mesaj and "aapl-8k.htm" in mesaj
+
+
+@pytest.mark.anyio
+async def test_boyutlu_fact_bulunamayinca_mevcut_etiketler_soyleniyor(srv):
+    with pytest.raises(ValueError) as e:
+        await srv.get_dimensional_facts(
+            ticker="AAPL", accession_number="0000320193-25-000041",
+            concept="operating_cash_flow")
+    mesaj = str(e.value)
+    assert "sec_edgar_list_fact_dimensions" in mesaj
+    assert "us-gaap:Revenues" in mesaj
+
+
+@pytest.mark.anyio
+async def test_instance_ikinci_kez_indirilmiyor(srv):
+    ISTEK_KAYDI.clear()
+    await srv.list_fact_dimensions(ticker="AAPL",
+                                   accession_number="0000320193-25-000041")
+    await srv.get_dimensional_facts(ticker="AAPL",
+                                    accession_number="0000320193-25-000041",
+                                    concept="revenue")
+    indirme = [u for u in ISTEK_KAYDI if u.endswith("_htm.xml")]
+    assert len(indirme) == 1, f"instance {len(indirme)} kez indirilmis"
+
+
+@pytest.mark.anyio
+async def test_raporlanmayan_toplam_sifir_sanilmiyor(srv):
+    """Bir dosyalama toplami `xsi:nil` ile isaretleyebilir. Onu 0 diye okumak,
+    "toplam raporlanmadi" ile "toplam sifir" arasindaki farki yok eder ve
+    mutabakati uydurma bir 9,0 milyar dolarlik fark uzerine kurar."""
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="operating_income", axis="us-gaap:StatementBusinessSegmentsAxis")
+    m = b.reconciliation[0]
+    assert m.members_sum == 10500000000
+    assert m.consolidated_value is None, "nil toplam 0 sanilmis"
+    assert m.difference is None and m.agrees is None

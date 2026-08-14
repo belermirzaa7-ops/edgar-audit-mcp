@@ -224,4 +224,23 @@
     </verification>
   </qa_pair>
 
+  <qa_pair>
+    <question>Tesla's FY2025 10-K tags some property, plant and equipment facts against a dimension. Name the axis and the member exactly as the filing writes them, say which file inside the filing carries that information, and explain why the SEC XBRL REST API cannot return it.</question>
+    <answer>The axis is us-gaap:PropertyPlantAndEquipmentByTypeAxis and the member is tsla:OperatingLeaseVehiclesMember — the member sits in Tesla's own extension namespace (http://www.tesla.com/20251231), not in us-gaap. The information lives in the XBRL instance document tsla-20251231_htm.xml, in context c-6, whose period is the instant 2025-12-31. The REST API cannot return it because SEC describes companyconcept, companyfacts and frames as aggregating facts that "apply to the entire filing entity"; a fact qualified by an axis applies to a part of the entity, so it falls outside that description. Note also what tsla-20251231_htm.xml is: SEC extracts it from the filer's inline XBRL document, so the values and contexts are the filer's while the container is SEC's.</answer>
+    <verification>
+      sec_edgar_list_fact_dimensions(ticker="TSLA", form_type="10-K")
+        -> axes include us-gaap:PropertyPlantAndEquipmentByTypeAxis with
+           tsla:OperatingLeaseVehiclesMember among its members
+      sec_edgar_get_dimensional_facts(ticker="TSLA", concept="total_assets",
+                                      axis="us-gaap:PropertyPlantAndEquipmentByTypeAxis")
+        -> facts carrying context_id and fact_id, each traceable back into the instance
+      Measured 14 Aug 2026 by fetching
+      https://www.sec.gov/Archives/edgar/data/1318605/000162828026003952/tsla-20251231_htm.xml
+      directly; the context above was quoted verbatim from that file. The quoted SEC
+      sentence is from https://www.sec.gov/search-filings/edgar-application-programming-interfaces
+      — SEC does not use the word "dimensional", so the conclusion drawn from it is
+      supported inference rather than a direct statement.
+    </verification>
+  </qa_pair>
+
 </evaluation>

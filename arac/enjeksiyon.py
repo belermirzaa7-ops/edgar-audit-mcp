@@ -22,6 +22,7 @@ DOSYALAR = [
     "src/edgar_mcp/client.py",
     "arac/sir_tarama.py",
     "src/edgar_mcp/belge.py",
+    "src/edgar_mcp/xbrl.py",
     "Dockerfile",
 ]
 
@@ -530,6 +531,79 @@ ENJEKSIYONLAR = [
   "        return eslesen[0] if eslesen else None",
   "        return None",
   "test_cerceve_tickeri_olmayan_sirket_cokmeye_yol_acmiyor"),
+
+ # ---- C: boyutlu XBRL
+ ("C: scenario icindeki boyutlari gormezden gel",
+  "src/edgar_mcp/xbrl.py",
+  'for kapsayici in (f".//{{{INSTANCE_NS}}}segment", f".//{{{INSTANCE_NS}}}scenario"):',
+  'for kapsayici in (f".//{{{INSTANCE_NS}}}segment",):',
+  "test_boyut_kesfi_eksenleri_ve_uyeleri_listeliyor"),
+
+ ("C: typed dimension'lari dusur",
+  "src/edgar_mcp/xbrl.py",
+  "            for uye in kap.findall(f\"{{{XBRLDI_NS}}}typedMember\"):",
+  "            for uye in []:",
+  "test_typed_dimension_dusurulmuyor"),
+
+ ("C: uye metnindeki bosluklari temizleme",
+  "src/edgar_mcp/xbrl.py",
+  "    return \" \".join(e.text.split()) or None",
+  "    return e.text or None",
+  "test_segment_kirilimi_geliyor_ve_kaynagina_kadar_izlenebiliyor"),
+
+ ("C: pay/payda birimini okuma",
+  "src/edgar_mcp/xbrl.py",
+  '    bol = e.find(f"{{{INSTANCE_NS}}}divide")',
+  "    bol = None",
+  "test_pay_bolu_payda_birimi_okunuyor"),
+
+ ("C: nil fact'i normal deger say",
+  "src/edgar_mcp/xbrl.py",
+  'nil=(veri.get(f"{{{XSI_NS}}}nil") or "").lower() == "true",',
+  "nil=False,",
+  "test_sayisal_olmayan_ve_nil_fact_sessizce_sayiya_cevrilmiyor"),
+
+ ("C: sayisal olmayan degeri de sayiya cevirmeye calis",
+  "src/edgar_mcp/server.py",
+  "            value=float(o.deger) if sayi_mi(o.deger) and o.deger else None,",
+  "            value=None,",
+  "test_segment_kirilimi_geliyor_ve_kaynagina_kadar_izlenebiliyor"),
+
+ ("C: cok boyutlu fact'i de toplama kat (cift sayim)",
+  "src/edgar_mcp/server.py",
+  "        if f.value is None or f.is_nil or len(f.dimensions) != 1:",
+  "        if f.value is None or f.is_nil:",
+  "test_cok_boyutlu_fact_toplamaya_girmiyor"),
+
+ ("C: nil fact'i toplama kat",
+  "src/edgar_mcp/server.py",
+  "        if not _etiket_uyuyor(o.tag, adaylar) or not sayi_mi(o.deger) or o.nil:",
+  "        if not _etiket_uyuyor(o.tag, adaylar):",
+  "test_raporlanmayan_toplam_sifir_sanilmiyor"),
+
+ ("C: eksen verilmeden de mutabakat hesapla",
+  "src/edgar_mcp/server.py",
+  "        reconciliation=_mutabakat(inst, adaylar, secilen) if axis else [],",
+  "        reconciliation=_mutabakat(inst, adaylar, secilen),",
+  "test_eksen_verilmezse_mutabakat_hesaplanmiyor"),
+
+ ("C: linkbase dosyasini instance sanmayi engelleyen filtreyi kaldir",
+  "src/edgar_mcp/server.py",
+  "        if ad.lower().endswith(\".xml\") and not _LINKBASE.search(ad) \\",
+  "        if ad.lower().endswith(\".xml\") and not None \\",
+  "test_inline_oncesi_dosyalamada_dosyalayanin_instance_i_okunuyor"),
+
+ ("C: instance onbellegini kapat",
+  "src/edgar_mcp/server.py",
+  "    if url not in _INSTANCE:",
+  "    if True:",
+  "test_instance_ikinci_kez_indirilmiyor"),
+
+ ("C: XBRL'siz dosyalamada sessizce bos don",
+  "src/edgar_mcp/server.py",
+  '    raise ValueError(\n        "This filing has no XBRL instance document',
+  '    return ""\n    raise ValueError(\n        "This filing has no XBRL instance document',
+  "test_xbrl_tasimayan_dosyalamada_eyleme_donusturulebilir_hata"),
 ]
 
 
