@@ -708,10 +708,16 @@ birden fazla boyut tasiyabilir.
 Ad alani onekleri `start-ns` olaylarindan okunuyor ki QName'ler dosyalamada
 gorulen haliyle (`us-gaap:Revenues`) donsun - uydurma onek uretilmiyor.
 
-**Hala olculmemis:** `id="f-1"` degerleri dosyalayanin inline belgesindeki
-`ix:` eleman id'leriyle ayni mi? Ayniysa kaynak zinciri tamamen kapanir.
-Gelistirme ortamindan olculemedi (sec.gov'a dogrudan cikis yok, HTML'i metne
-ceviren araclar nitelikleri dusuruyor). `python arac/tani.py TSLA --ixbrl` bunu
-kullanicinin makinesinde olcuyor ve uc sonucu (kapali / kismen / degil) ayirt
-ediyor. Cevap gelene kadar dokumantasyon "SEC'in ayiklamasinin atadigi id"
-diyor, fazlasini degil.
+**OLCULDU (14 Agu 2026 aksami) - zincir kapali.** Soru suydu: `id="f-1663"`
+degerleri dosyalayanin inline belgesindeki `ix:` eleman id'leriyle ayni mi?
+`arac/tani.py TSLA --ixbrl` TSLA FY2025 10-K'sinda olctu: instance'tan alinan
+ilk 200 fact id'sinin **200'u de** 2,39 MB'lik inline belgede birebir bulundu
+(%100). Yani `fact_id` SEC'in ayiklamasina ozgu bir sayac degil; dosyalayanin
+kendi belgesindeki isaretli parcanin kimligi. Dondugumuz her rakam oraya kadar
+izlenebilir ve sema aciklamasi artik bunu soyluyor.
+
+**Ilk calistirmada olcum aracinin kendisi kusurluydu:** id'ler regex ile
+toplaniyordu ve `id=` niteligi birimlerde de var - `fsdsubscription` fact
+sanildi. Sonucu degistirmedi ama arac, olctugunu iddia ettigi seyi tam
+olcmuyordu. Artik instance ayristirilip yalnizca `fact_id` tasiyan olgular
+sayiliyor: olculen sey, aracin GERCEKTEN dondurdugu id'ler.

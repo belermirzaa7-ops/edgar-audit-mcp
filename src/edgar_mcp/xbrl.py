@@ -189,6 +189,23 @@ def ayristir(govde: str) -> Instance:
     """
     inst = Instance()
     ayristirici = ET.iterparse(io.StringIO(govde), events=("start-ns", "end"))
+    try:
+        _doldur(inst, ayristirici)
+    except ET.ParseError as e:
+        # Cig bir traceback, cagirana ne yapacagini soylemez (§18). Bu durum
+        # gercekten olabilir: kesilmis indirme, ya da XML yerine HTML hata
+        # sayfasi donmesi.
+        bas = govde.lstrip()[:60].replace("\n", " ")
+        raise ValueError(
+            f"This XBRL instance document could not be parsed as XML ({e}). "
+            f"The response began with: {bas!r}. If that looks like HTML rather "
+            "than XML, SEC returned an error page instead of the document; "
+            "retrying the same call usually resolves it."
+        ) from e
+    return inst
+
+
+def _doldur(inst: Instance, ayristirici) -> None:
     for olay, veri in ayristirici:
         if olay == "start-ns":
             onek, uri = veri
@@ -216,7 +233,6 @@ def ayristir(govde: str) -> Instance:
                 nil=(veri.get(f"{{{XSI_NS}}}nil") or "").lower() == "true",
             ))
             veri.clear()
-    return inst
 
 
 _SAYI = re.compile(r"^-?\d+(\.\d+)?$")

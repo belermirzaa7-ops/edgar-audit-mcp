@@ -140,7 +140,11 @@ olduğuna karar vermek okuyucuya bırakılıyor — buna karar verebilecek tek k
 Kaynak hakkında bir not: okunan dosya `<ad>_htm.xml`, SEC'in dosyalayanın
 inline XBRL belgesinden yaptığı **ayıklamadır** — SEC'in kendi dağıtım
 spesifikasyonu onu EDGAR üretimi çıktılar arasında sayıyor. Değerler ve
-context'ler dosyalayanın, kabuk SEC'in. Inline XBRL kademeli olarak zorunlu
+context'ler dosyalayanın, kabuk SEC'in. Zincir bundan daha ileri gidiyor ve bu
+varsayılmadı, ölçüldü: Tesla'nın FY2025 instance'ından alınan ilk 200 fact
+id'sinin 200'ü de şirketin dosyaladığı 2,4 MB'lık inline belgede bulundu. Yani
+dönen bir rakamın `fact_id` değeri, dosyalayanın kendi belgesindeki işaretli
+parçayı gösteriyor — SEC'in ayıklamasındaki bir satırı değil. Inline XBRL kademeli olarak zorunlu
 oldu (büyük hızlandırılmış dosyalayanlar için 2019-06-15, diğerleri için 2020
 ve 2021'de biten dönemler); öncesindeki dosyalamalarda dosyalayanın sunduğu
 instance okunuyor.

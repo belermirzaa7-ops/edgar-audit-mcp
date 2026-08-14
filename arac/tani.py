@@ -317,7 +317,7 @@ async def _ixbrl(c: EdgarClient, ticker: str) -> int:
     metne ceviren araclar da nitelikleri dusuruyor. Bu mod onu bu makinede
     olcer; TAHMIN ETMEK yerine.
     """
-    import re as _re
+    from edgar_mcp.xbrl import ayristir
 
     cik = await c.cik_for_ticker(ticker)
     sub = await c.submissions(cik)
@@ -344,10 +344,15 @@ async def _ixbrl(c: EdgarClient, ticker: str) -> int:
     print(f"  instance: {instance}")
     print(f"  inline:   {inline}")
 
-    ham = await c.filing_document(f"{dizin}/{instance}")
-    kimlikler = _re.findall(r'\sid="([^"]+)"', ham)
-    fact_kimlikleri = [k for k in kimlikler if k.startswith("f")][:200]
-    print(f"  instance'ta {len(kimlikler)} id, ornek: {fact_kimlikleri[:5]}")
+    # Id'leri regex ile toplamak yetmez: `id=` niteligi birimlerde ve baska
+    # elemanlarda da var (14 Agu 2026 ilk calistirmada `fsdsubscription` fact
+    # sanildi). Olculmesi gereken sey ARACIN DONDURDUGU id'ler, o yuzden
+    # instance ayristirilip yalnizca fact id'leri aliniyor.
+    inst = ayristir(await c.filing_document(f"{dizin}/{instance}"))
+    fact_kimlikleri = [o.fact_id for o in inst.olgular if o.fact_id][:200]
+    print(f"  instance'ta {len(inst.olgular)} fact, "
+          f"{sum(1 for o in inst.olgular if o.fact_id)} tanesi id tasiyor")
+    print(f"  ornek: {fact_kimlikleri[:5]}")
 
     govde = await c.filing_document(f"{dizin}/{inline}")
     print(f"  inline belge {len(govde):,} karakter")

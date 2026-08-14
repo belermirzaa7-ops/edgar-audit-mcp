@@ -1573,7 +1573,10 @@ class DimensionalFact(BaseModel):
         "this exact fact in the filing"
     )
     fact_id: str | None = Field(
-        default=None, description="Fact id as SEC's extraction assigns it"
+        default=None,
+        description="Identifies the tagged element in the filer's own inline "
+        "document, so a value can be located there and not only in SEC's "
+        "extraction of it",
     )
     is_nil: bool = False
 

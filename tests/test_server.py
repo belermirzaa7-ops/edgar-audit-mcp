@@ -1835,3 +1835,16 @@ async def test_raporlanmayan_toplam_sifir_sanilmiyor(srv):
     assert m.members_sum == 10500000000
     assert m.consolidated_value is None, "nil toplam 0 sanilmis"
     assert m.difference is None and m.agrees is None
+
+
+@pytest.mark.anyio
+async def test_bozuk_instance_cig_traceback_yerine_eyleme_donusturulebilir_hata(srv):
+    """SEC bazen XML yerine HTML hata sayfasi dondurur; indirme de kesilebilir.
+    Cig bir ParseError cagirana ne yapacagini soylemez (§18)."""
+    from edgar_mcp import xbrl
+
+    with pytest.raises(ValueError) as e:
+        xbrl.ayristir("<html><body>Service temporarily unavailable</body>")
+    mesaj = str(e.value)
+    assert "could not be parsed as XML" in mesaj
+    assert "<html>" in mesaj, "hata mesaji ne geldigini gostermiyor"

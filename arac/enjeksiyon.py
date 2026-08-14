@@ -604,6 +604,12 @@ ENJEKSIYONLAR = [
   '    raise ValueError(\n        "This filing has no XBRL instance document',
   '    return ""\n    raise ValueError(\n        "This filing has no XBRL instance document',
   "test_xbrl_tasimayan_dosyalamada_eyleme_donusturulebilir_hata"),
+
+ ("C: bozuk XML'i cig traceback olarak birak",
+  "src/edgar_mcp/xbrl.py",
+  "    except ET.ParseError as e:",
+  "    except ZeroDivisionError as e:",
+  "test_bozuk_instance_cig_traceback_yerine_eyleme_donusturulebilir_hata"),
 ]
 
 

@@ -362,7 +362,9 @@ def test_tani_ixbrl_modu_zincirin_kapali_olup_olmadigini_soyluyor(monkeypatch, c
 
     monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@example.com")
 
-    INSTANCE = ('<?xml version="1.0"?><xbrl xmlns="http://www.xbrl.org/2003/instance">'
+    INSTANCE = ('<?xml version="1.0"?><xbrl xmlns="http://www.xbrl.org/2003/instance"'
+                ' xmlns:us-gaap="http://fasb.org/us-gaap/2025">'
+                '<unit id="fsdsubscription"><measure>pure</measure></unit>'
                 '<us-gaap:Revenues contextRef="c-1" id="f-1">1</us-gaap:Revenues>'
                 '<us-gaap:Assets contextRef="c-1" id="f-2">2</us-gaap:Assets>'
                 "</xbrl>")

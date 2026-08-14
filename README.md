@@ -145,7 +145,11 @@ left to the reader, who is the only one who can.
 A note on provenance: the file being read, `<name>_htm.xml`, is SEC's
 extraction from the filer's inline XBRL document — SEC's own dissemination
 spec lists it among EDGAR-generated outputs. The values and contexts are the
-filer's; the container is SEC's. Filings from before inline XBRL was phased in
+filer's; the container is SEC's. The chain reaches further than that, and it
+was measured rather than assumed: every one of the first 200 fact ids taken
+from Tesla's FY2025 instance also appears in the 2.4 MB inline document the
+company filed, so the `fact_id` on a returned figure locates the tagged span
+in the filer's own document, not just a row in SEC's extraction. Filings from before inline XBRL was phased in
 (fiscal periods ending 2019-06-15 for large accelerated filers, 2020 and 2021
 for smaller ones) carry a filer-submitted instance instead, and that is read
 instead.
