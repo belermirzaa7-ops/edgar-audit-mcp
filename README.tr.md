@@ -31,6 +31,7 @@ tuzak barındırıyor. Bu projenin asıl kısmı o tuzakları ele alması.
 | `sec_edgar_get_fact_revisions` | Bir rakamın dosyalamalar arasında nasıl değiştiği — yeniden düzenlemeler, her değişimin erişim numarasıyla |
 | `sec_edgar_read_filing_text` | XBRL'in taşımadığı anlatı: MD&A, risk faktörleri, vergi ve segment dipnotları; 8-K ekleri ve dosyalama içi arama dahil |
 | `sec_edgar_list_available_concepts` | Şirketin fiilen raporladığı etiketler, kullandığı her taksonomide |
+| `sec_edgar_compare_companies` | Bir kavramın, o dönemde raporlayan tüm şirketlerdeki değeri; sıralı |
 
 Her araç Pydantic modeli döndürür; MCP `outputSchema` otomatik üretilir ve
 istemci sonuçları tip güvenli tüketir. Liste döndüren araçlar
@@ -78,6 +79,30 @@ Araç bölümsüz çağrılırsa dosyalamanın gerçekten sahip olduğu başlık
 döndürür; ikinci çağrı tahmin etmek yerine birini adıyla ister. Doğru başlığın
 ne olduğu belli değilse `search` bir ifadenin kaç kez ve nerede geçtiğini
 bildirir; her konum doğrudan `offset` olarak geri verilebilir.
+
+### Şirketler arası karşılaştırma
+
+Diğer araçlar tek şirket hakkında konuşur. `sec_edgar_compare_companies` SEC'in
+`frames` ucunu okur: bir etiketi o dönemde raporlayan **tüm** şirketlerin değeri
+— ölçüldü, CY2025Q1 gelir çerçevesinde 2.543 şirket.
+
+Çerçeve, eşdeğer bir sıralama gibi görünür ama tam olarak değildir; yanıt bunu
+dipnotta değil veride söylüyor:
+
+- **Bir çerçevedeki dönemler aynı dönem değildir.** SEC her şirketin en yakın
+  mali dönemini takvim çerçevesine yerleştirir. CY2025Q1'de dönem bitişleri
+  2025-02-23 ile 2025-05-04 arasında değişiyor — yetmiş gün. Apple orada kendi
+  mali ikinci çeyreğiyle var: 2024-12-29 / 2025-03-29. Her satır kendi
+  `period_end`'ini taşıyor, yanıt da tüm çerçevenin aralığını bildiriyor.
+- **Çerçevede olmayan şirket, kavramı raporlamamış demek değildir.** Farklı bir
+  etiketle raporlamış ya da mali dönemi çerçeveye oturmamış olabilir. İstenen
+  ticker çerçevede yoksa sessizce düşürülmüyor, `missing_tickers` içinde dönüyor.
+- **Bilanço kaleminin süresel çerçevesi yoktur.** `Assets` için `CY2025Q1` 404
+  verir, var olan çerçeve `CY2025Q1I`'dir. İkisi de deneniyor ve cevaplayan
+  yanıtta yazıyor.
+
+Sıra her zaman tüm çerçeveye göre hesaplanır; üç şirket sorulunca biri sırf o
+üçün içinde "birinci" olmaz.
 
 ## Ele alınan üç tuzak
 

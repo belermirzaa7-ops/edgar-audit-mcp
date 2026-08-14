@@ -1159,6 +1159,282 @@ async def list_available_concepts(
     )
 
 
+# ---------------------------------------------------------------- cerceveler
+# SEC'in `frames` ucu: bir etiketin BIR donemdeki tum sirketlerdeki degeri.
+# Yanit buyuk (olculdu 14 Agu 2026: us-gaap/Revenues/USD/CY2025Q1 -> 1.933
+# sirket), bu yuzden FIFO onbellek.
+_CERCEVE: dict[str, dict] = {}
+CERCEVE_SINIRI = 3
+
+_CERCEVE_KALIBI = re.compile(r"^(?:cy)?\s*(\d{4})\s*(?:[-_ ]?q([1-4]))?\s*(i?)$",
+                             re.IGNORECASE)
+
+
+def _cerceve_normalle(period: str) -> str:
+    """'2025Q1', 'cy2025 q1', 'CY2025Q1I', '2025' -> SEC'in cerceve adi.
+
+    Modelin SEC'in ic gosterimini ezberlemesini beklemek P-12'nin ta kendisi;
+    yazilis serbest, normallestirme burada.
+    """
+    m = _CERCEVE_KALIBI.match(period.strip())
+    if not m:
+        raise ValueError(
+            f"'{period}' is not a period this tool understands. Use a calendar "
+            "year (2025 / CY2025) or a calendar quarter (2025Q1 / CY2025Q1). "
+            "Add I for a balance-sheet date, e.g. CY2025Q1I."
+        )
+    yil, ceyrek, anlik = m.group(1), m.group(2), m.group(3)
+    return f"CY{yil}" + (f"Q{ceyrek}" if ceyrek else "") + ("I" if anlik else "")
+
+
+def _cerceve_esi(cerceve: str) -> str | None:
+    """Suresel <-> anlik esi. Yillik cercevenin anlik esi yoktur."""
+    if cerceve.endswith("I"):
+        return cerceve[:-1]
+    return cerceve + "I" if re.search(r"Q[1-4]$", cerceve) else None
+
+
+async def _cerceve_verisi(
+    taxonomy: str, tag: str, unit: str, cerceve: str
+) -> tuple[dict, str] | None:
+    """Cerceveyi getirir; yoksa suresel/anlik esini dener.
+
+    Neden es deneniyor (olculdu 14 Agu 2026): `us-gaap/Assets/USD/CY2025Q1`
+    404 verir, `.../CY2025Q1I` calisir. Bilanco kalemi bir ANA aittir, gelir
+    tablosu kalemi bir SUREYE. Modelin bunu bilmesini beklemek yerine ikisi de
+    deneniyor ve hangisinin cevapladigi yanitta yaziyor - gizli fallback yok
+    (KK-23 ile ayni ilke).
+    """
+    for aday in (cerceve, _cerceve_esi(cerceve)):
+        if aday is None:
+            continue
+        anahtar = f"{taxonomy}/{tag}/{unit}/{aday}"
+        if anahtar in _CERCEVE:
+            return _CERCEVE[anahtar], aday
+        veri = await _c().frame(taxonomy, tag, unit, aday)
+        if veri is not None:
+            if len(_CERCEVE) >= CERCEVE_SINIRI:
+                _CERCEVE.pop(next(iter(_CERCEVE)))
+            _CERCEVE[anahtar] = veri
+            return veri, aday
+    return None
+
+
+class CompanyValue(BaseModel):
+    rank: int = Field(
+        description="Position among ALL companies in this frame, by value, "
+        "descending - not among the rows returned here"
+    )
+    cik: str
+    ticker: str | None = Field(
+        default=None, description="None when the CIK has no ticker in SEC's "
+        "company_tickers.json, which is normal for private filers and funds"
+    )
+    company: str
+    location: str | None = Field(
+        default=None, description="Registrant's state or country code as SEC "
+        "reports it, e.g. US-CA"
+    )
+    value: float
+    period_start: str | None = Field(
+        default=None, description="None for balance-sheet frames, which have a "
+        "date rather than a span"
+    )
+    period_end: str = Field(
+        description="This company's own period end. Read it: within one frame "
+        "these dates differ from company to company"
+    )
+    accession_number: str = Field(description="The filing this value came from")
+
+
+class CompanyComparison(BaseModel):
+    concept: str = Field(description="The concept as it was requested")
+    resolved_tag: str = Field(description="The US-GAAP tag the frame was read under")
+    tags_tried: list[str] = Field(
+        description="Every candidate tag tried before one returned a frame"
+    )
+    taxonomy: str
+    unit: str
+    frame: str = Field(description="The frame that answered, in SEC's own naming")
+    frame_requested: str = Field(
+        description="What was asked for; differs from frame when the "
+        "duration/instant counterpart was the one that existed"
+    )
+    frame_kind: Literal["duration", "instant"]
+    total_companies: int = Field(description="How many companies the frame holds")
+    returned: int
+    has_more: bool = Field(description="True if the frame holds more than was returned")
+    period_end_earliest: str = Field(
+        description="Earliest period end in the whole frame"
+    )
+    period_end_latest: str = Field(
+        description="Latest period end in the whole frame. Compare it with "
+        "period_end_earliest before treating this as a like-for-like ranking: "
+        "SEC buckets each company's nearest fiscal period into the calendar "
+        "frame, so the spread is often weeks and can exceed two months"
+    )
+    companies: list[CompanyValue]
+    missing_tickers: list[str] = Field(
+        default_factory=list,
+        description="Requested tickers that are NOT in this frame. Absence is "
+        "not zero and not 'does not report it': the company may tag the "
+        "concept differently, or its fiscal period may not fit this frame. "
+        "Check with sec_edgar_get_concept_series before concluding anything",
+    )
+
+
+@mcp.tool(
+    name="sec_edgar_compare_companies",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
+    description=(
+        "Compares one financial concept across ALL companies that reported it "
+        "for a single period, ranked by value. Use it for questions of the form "
+        "'how does X compare with its peers' or 'who reported the most Y in "
+        "period Z'. The other tools answer about one company at a time; this "
+        "one answers about a population.\n"
+        "Two things about SEC's period buckets that change how the answer "
+        "should be read, both reported in the response rather than hidden: a "
+        "company's own period end can differ from the calendar frame by weeks "
+        "(measured in the CY2025Q1 revenue frame: ends from 2025-02-23 to "
+        "2025-05-04, seventy days apart), and a "
+        "company missing from a frame has NOT necessarily failed to report the "
+        "concept."
+    ),
+)
+async def compare_companies(
+    concept: Annotated[
+        str,
+        Field(
+            description=(
+                "An alias (revenue, net_income, total_assets, ...) or a raw tag. "
+                "A frame is read under ONE tag, so unlike "
+                "sec_edgar_get_concept_series no tags are merged; the tag that "
+                "answered is named in the response."
+            )
+        ),
+    ],
+    period: Annotated[
+        str,
+        Field(
+            description="Calendar year (2025 / CY2025) or quarter (2025Q1 / "
+            "CY2025Q1). Add I for a balance-sheet date (CY2025Q1I); if the "
+            "wrong one is asked for, the counterpart is tried automatically."
+        ),
+    ],
+    unit: Annotated[
+        str,
+        Field(default="USD", description="Unit of measure, e.g. USD or shares"),
+    ] = "USD",
+    tickers: Annotated[
+        list[str] | None,
+        Field(
+            default=None,
+            description="Restrict the answer to these companies while still "
+            "ranking them against the whole frame. Any that the frame does not "
+            "hold come back in missing_tickers instead of being dropped.",
+        ),
+    ] = None,
+    order: Annotated[
+        Literal["value_desc", "value_asc"],
+        Field(default="value_desc", description="Sort direction by value"),
+    ] = "value_desc",
+    limit: Annotated[
+        int,
+        Field(default=25, ge=1, le=100,
+              description="Maximum companies to return; check has_more"),
+    ] = 25,
+) -> CompanyComparison:
+    cerceve = _cerceve_normalle(period)
+    anahtar = concept.strip().lower()
+    adaylar = CONCEPT_ALIASES.get(anahtar, [concept.strip()])
+
+    bulunan = None
+    for aday in adaylar:
+        taksonomi, etiket = _bol(aday)
+        bulunan = await _cerceve_verisi(taksonomi, etiket, unit, cerceve)
+        if bulunan is not None:
+            secilen_taksonomi, secilen_etiket = taksonomi, etiket
+            break
+
+    if bulunan is None:
+        raise ValueError(
+            f"SEC has no frame for '{concept}' in {cerceve} with unit '{unit}' "
+            f"(tried: {', '.join(adaylar)}, and the duration/instant "
+            "counterpart of that frame). A frame exists only for periods SEC "
+            "has assembled; try the annual frame (e.g. CY2025), a different "
+            "unit, or sec_edgar_list_available_concepts to find the tag a "
+            "company reports this under."
+        )
+
+    veri, kullanilan = bulunan
+    satirlar = veri.get("data") or []
+    if not satirlar:
+        raise ValueError(
+            f"The frame {kullanilan} for {secilen_etiket} exists but holds no "
+            "companies. This is an upstream anomaly, not an empty answer to a "
+            "valid question - reading it as 'nobody reported this' would be "
+            "wrong."
+        )
+
+    ters = order == "value_desc"
+    sirali = sorted(satirlar, key=lambda r: float(r.get("val") or 0), reverse=ters)
+
+    istenen: dict[str, str] = {}
+    if tickers:
+        for t in tickers:
+            istenen[await _c().cik_for_ticker(t)] = t.upper()
+
+    secilenler: list[CompanyValue] = []
+    gorulen: set[str] = set()
+    for i, r in enumerate(sirali, 1):
+        cik = str(r.get("cik", "")).zfill(10)
+        if istenen and cik not in istenen:
+            continue
+        gorulen.add(cik)
+        if len(secilenler) >= limit:
+            continue
+        secilenler.append(
+            CompanyValue(
+                rank=i,
+                cik=cik,
+                ticker=istenen.get(cik) or await _c().ticker_for_cik(cik),
+                company=str(r.get("entityName", "")).strip(),
+                location=r.get("loc"),
+                value=float(r.get("val") or 0),
+                period_start=r.get("start"),
+                period_end=str(r.get("end", "")),
+                accession_number=str(r.get("accn", "")),
+            )
+        )
+
+    eslesen_sayisi = len(gorulen) if istenen else len(sirali)
+    bitisler = sorted(str(r.get("end", "")) for r in satirlar if r.get("end"))
+    return CompanyComparison(
+        concept=concept,
+        resolved_tag=secilen_etiket,
+        tags_tried=adaylar,
+        taxonomy=secilen_taksonomi,
+        unit=unit,
+        frame=kullanilan,
+        frame_requested=cerceve,
+        frame_kind="instant" if kullanilan.endswith("I") else "duration",
+        total_companies=eslesen_sayisi,
+        returned=len(secilenler),
+        has_more=eslesen_sayisi > len(secilenler),
+        period_end_earliest=bitisler[0] if bitisler else "",
+        period_end_latest=bitisler[-1] if bitisler else "",
+        companies=secilenler,
+        missing_tickers=sorted(
+            ad for cik, ad in istenen.items() if cik not in gorulen
+        ),
+    )
+
+
 def main() -> None:
     mcp.run(transport="stdio")
 

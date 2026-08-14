@@ -37,6 +37,7 @@ can verify rather than remember.
 | [P-22](#p-22) | Could two copies of this tool be running at once? | `test_enjeksiyon_ayni_anda_iki_kez_calismiyor` |
 | [P-23](#p-23) | Is the document I am reading the one that carries the content, or the one that announces it? | `test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor` |
 | [P-24](#p-24) | Did I edit the working tree by hand to test an idea, and is that edit still there? | `arac/enjeksiyon.py` refuses to start while any test is red |
+| [P-25](#p-25) | Does my tooling recognise the test names pytest actually prints? | `test_enjeksiyon_parametreli_testi_de_taniyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -630,6 +631,31 @@ which is why the suite is run before anything is believed.
 tried. Cost: two red tests carried into the next session, and a packaged
 release that would have shipped a disabled counter had the suite not been run
 first.
+
+
+<a id="p-25"></a>
+### P-25 · A verifier that cannot recognise its own success reports failure
+
+**Symptom.** The fault-injection harness reported a protection as **KORUMASIZ**
+— unguarded — while printing, in the same row, the very tests that had turned
+red. The output contradicted itself and the contradiction was easy to read past,
+because "unguarded" is exactly what a real gap looks like.
+
+**Root cause.** The harness matched the expected test name by equality against
+the names pytest prints. pytest prints a parametrized test as
+`test_cerceve_donem_yazimi_serbest` followed by `[2025Q1]`, one line per case. No parametrized test could ever
+match, so any guard proven by one was reported as missing. Six red tests, all of
+them the right ones, and the verdict was still "no guard".
+
+**Detection.** Matching accepts the exact name or the name followed by `[`,
+which is the only form pytest adds. A test pins both directions, including that
+the prefix match does not stretch to a longer name that merely starts the same way.
+Guard: `test_enjeksiyon_parametreli_testi_de_taniyor`.
+
+**Incident.** 14 Aug 2026, on the first parametrized target ever added to the
+harness — a period-syntax guard covering six spellings. This is the same failure
+class as P-21: the tool for distinguishing "guard missing" from "measurement
+broken" was itself broken, and it fails toward the more alarming reading.
 
 ---
 

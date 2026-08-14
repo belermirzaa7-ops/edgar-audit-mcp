@@ -598,3 +598,49 @@ Sekiz yeni enjeksiyon dogruluyor: uzanti filtresi, gezinme sayfasi elemesi,
 uretilen rapor elemesi, siralama yonu, `is_primary` bayragi, `document`
 parametresi, belge adi dogrulamasi + hata mesajinin dosya listesi, arama toplam
 sayaci ve vurgu kirpmasi.
+
+### KK-30: Cerceve (frames) araci - "ayni donem" bir varsayimdir, veriyle yalanlanir
+**Tarih:** 14 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §12, §16, §18
+
+`sec_edgar_compare_companies`, SEC'in `frames` ucunu kullanarak bir kavramin
+BIR donemdeki tum sirketlerdeki degerini dondurur. Diger araclar tek sirket
+hakkinda konusur; bu arac bir populasyon hakkinda konusur.
+
+**Dort olcum, dordu de tasarimi belirledi (14 Agu 2026):**
+
+1. **Cerceve "ayni donem" degil, "ayni takvim kovasi".**
+   `us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax/USD/CY2025Q1`
+   cercevesinde Apple'in satiri **2024-12-29 / 2025-03-29** (kendi mali ikinci
+   ceyregi). Ayni cercevede en erken bitis 2025-02-23, en gec 2025-05-04 -
+   **yetmis gun**. Sirala-ve-karsilastir yapan bir model bunu gormezse
+   esdeger olmayan donemleri esdeger sanar. Karar: her satir kendi
+   `period_end`'ini tasir, ve yanit tum cercevenin
+   `period_end_earliest`/`period_end_latest` araligini bildirir.
+
+2. **Bilanco kalemi suresel cercevede YOK.** Olculdu:
+   `us-gaap/Assets/USD/CY2025Q1` -> 404, `.../CY2025Q1I` -> dolu. Modelin bu
+   ayrimi bilmesini beklemek P-12'dir; ikisi de deneniyor ve hangisinin
+   cevapladigi `frame` alaninda yaziyor (KK-23'teki `source_endpoint` ile ayni
+   ilke: gizli fallback yok).
+
+3. **Cercevede olmamak "raporlamiyor" demek degil.** Bir sirket kavrami baska
+   bir etiketle taglemis ya da mali donemi kovaya oturmamis olabilir. Istenen
+   ticker cercevede yoksa sessizce dusurulmuyor, `missing_tickers` icinde
+   sebebiyle birlikte donuyor.
+
+4. **Sira, filtreden ONCE hesaplanir.** Uc sirket istendiginde "birinci olmak"
+   o ucun icinde birinci olmak degildir; `rank` her zaman **tum cerceveye**
+   gore verilir. Yoksa rakam gercekte olmayan bir liderlik anlatir.
+
+**Takma ad birlestirmesi burada YAPILMAZ** (KK-8'in bilincli istisnasi): bir
+cerceve tek etiket altinda kurulur, iki etiketin cercevelerini birlestirmek
+farkli sirket kumelerini ayni listeye karistirirdi. Aday etiketler sirayla
+denenir, cevaplayan `resolved_tag` olarak yaziliyor.
+
+Cerceve yaniti buyuk (olculdu: 2.543 sirket), bu yuzden FIFO onbellek
+(`_CERCEVE`, 3 cerceve). On enjeksiyon dogruluyor.
+
+**Harness'ta bulunan kusur:** bu araca eklenen ilk PARAMETRELI test, enjeksiyon
+harness'inin gozunden kacti - pytest `test_x[2025Q1]` yazar, harness duz
+esitlik ariyordu ve calisan bir korumayi "KORUMASIZ" diye raporladi. Duzeltildi
+(`yakalandi()`), testle sabit. Pattern olarak P-25.

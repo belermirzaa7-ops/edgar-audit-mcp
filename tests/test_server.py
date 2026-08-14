@@ -8,7 +8,9 @@ import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
-TICKERS = {"0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."}}
+TICKERS = {"0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."},
+           "1": {"cik_str": 789019, "ticker": "MSFT", "title": "Microsoft Corp"},
+           "2": {"cik_str": 1318605, "ticker": "TSLA", "title": "Tesla, Inc."}}
 SUBS = {"name": "Apple Inc.", "sicDescription": "Electronic Computers",
         "fiscalYearEnd": "0927",
         # Gercek SEC submissions verisi karisik form turleri icerir; sahte veri de icermeli.
@@ -210,6 +212,55 @@ DIZIN_JSON = {"directory": {"name": "/Archives/edgar/data/320193/000032019325000
 ]}}
 
 
+# ---- SEC `frames` ucu: bir donemin TUM sirketlerdeki degeri.
+# Satir bicimi ve BOYUTLAR gercek yanittan kopyalandi (us-gaap/
+# RevenueFromContractWithCustomerExcludingAssessedTax/USD/CY2025Q1, 14 Agu 2026).
+# Apple satiri birebir gercek: {"accn":"0000320193-26-000013","cik":320193,
+# "entityName":"Apple Inc.","loc":"US-CA","start":"2024-12-29",
+# "end":"2025-03-29","val":95359000000}
+#
+# Dikkat edilen sey: bitis tarihleri AYNI DEGIL. Gercek cercevede en erken
+# bitis 2025-02-23, en gec 2025-05-04 olarak olculdu - 70 gun. Sahte veri bunu
+# taklit etmezse "ayni donemi karsilastiriyoruz" yanilgisini hicbir test
+# yakalayamaz (P-4).
+CERCEVE_GELIR = {
+    "taxonomy": "us-gaap",
+    "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+    "ccp": "CY2025Q1",
+    "uom": "USD",
+    "label": "Revenue from Contract with Customer, Excluding Assessed Tax",
+    "pts": 4,
+    "data": [
+        {"accn": "0000320193-26-000013", "cik": 320193, "entityName": "Apple Inc.",
+         "loc": "US-CA", "start": "2024-12-29", "end": "2025-03-29", "val": 95359000000},
+        {"accn": "0000354950-25-000060", "cik": 354950, "entityName": "HOME DEPOT, INC.",
+         "loc": "US-GA", "start": "2025-02-03", "end": "2025-05-04", "val": 39860000000},
+        {"accn": "0000023217-25-000034", "cik": 23217, "entityName": "CONAGRA BRANDS, INC.",
+         "loc": "US-IL", "start": "2024-11-25", "end": "2025-02-23", "val": 2843300000},
+        {"accn": "0001069878-25-000011", "cik": 1069878, "entityName": "PRIVATE FILER LLC",
+         "loc": None, "start": "2025-01-01", "end": "2025-03-31", "val": 121000000},
+    ],
+}
+
+# Bilanco kalemi: SUREsel cerceve 404 verir, ANLIK olan calisir. Gercek olcum
+# (14 Agu 2026): us-gaap/Assets/USD/CY2025Q1 -> 404, .../CY2025Q1I -> dolu.
+# Anlik satirlarda `start` YOKTUR.
+CERCEVE_VARLIK = {
+    "taxonomy": "us-gaap", "tag": "Assets", "ccp": "CY2025Q1I", "uom": "USD",
+    "label": "Assets", "pts": 2,
+    "data": [
+        {"accn": "0000320193-26-000013", "cik": 320193, "entityName": "Apple Inc.",
+         "loc": "US-CA", "end": "2025-03-29", "val": 331233000000},
+        {"accn": "0000001750-25-000519", "cik": 1750, "entityName": "AAR CORP",
+         "loc": "US-IL", "end": "2025-02-28", "val": 2859100000},
+    ],
+}
+
+CERCEVE_BOS = {"taxonomy": "us-gaap", "tag": "OperatingIncomeLoss",
+               "ccp": "CY2025Q1", "uom": "USD", "label": "Operating Income (Loss)",
+               "pts": 0, "data": []}
+
+
 ISTEK_KAYDI: list[str] = []
 
 
@@ -223,6 +274,14 @@ def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=SUBS)
     if "companyfacts" in u:
         return httpx.Response(200, json=FACTS)
+    if "/api/xbrl/frames/" in u:
+        if "/Assets/USD/CY2025Q1I.json" in u:
+            return httpx.Response(200, json=CERCEVE_VARLIK)
+        if "/OperatingIncomeLoss/USD/CY2025Q1.json" in u:
+            return httpx.Response(200, json=CERCEVE_BOS)
+        if "RevenueFromContractWithCustomerExcludingAssessedTax/USD/CY2025Q1.json" in u:
+            return httpx.Response(200, json=CERCEVE_GELIR)
+        return httpx.Response(404, json={"error": "not found"})
     if u.endswith("/index.json"):
         return httpx.Response(200, json=DIZIN_JSON)
     if "/Archives/edgar/data/" in u:
@@ -270,6 +329,7 @@ def srv(monkeypatch):
     # otekinin onbellegini kullanir ve "indirildi mi" olcumu anlamsizlasir.
     s._BELGE_METNI.clear()
     s._DIZIN_LISTESI.clear()
+    s._CERCEVE.clear()
     return s
 
 @pytest.mark.anyio
@@ -514,6 +574,7 @@ async def test_arac_isimleri_servis_onekli():
         "sec_edgar_get_fact_revisions",
         "sec_edgar_read_filing_text",
         "sec_edgar_list_available_concepts",
+        "sec_edgar_compare_companies",
     }, f"beklenmeyen arac isimleri: {isimler}"
 
 
@@ -1297,3 +1358,123 @@ async def test_arama_vurgu_sayisi_sinirli_ama_toplam_dogru(srv):
     b = await srv.read_filing_text(ticker="AAPL", search="filler")
     assert b.search_total_matches > s.ARAMA_VURGU_SINIRI
     assert len(b.search_hits) == s.ARAMA_VURGU_SINIRI
+
+
+# ============ Sirketler arasi karsilastirma (B3, `frames` ucu)
+@pytest.mark.anyio
+async def test_cerceve_degere_gore_siraliyor_ve_kirpmayi_bildiriyor(srv):
+    b = await srv.compare_companies(concept="revenue", period="CY2025Q1", limit=2)
+    assert [c.company for c in b.companies] == ["Apple Inc.", "HOME DEPOT, INC."]
+    assert [c.rank for c in b.companies] == [1, 2]
+    assert b.total_companies == 4 and b.returned == 2 and b.has_more is True
+    assert b.resolved_tag == "RevenueFromContractWithCustomerExcludingAssessedTax"
+    assert b.frame == "CY2025Q1" and b.frame_kind == "duration"
+
+
+@pytest.mark.anyio
+async def test_cerceve_artan_siralamada_sira_numarasi_da_donuyor(srv):
+    b = await srv.compare_companies(concept="revenue", period="CY2025Q1",
+                                    order="value_asc", limit=1)
+    assert b.companies[0].company == "PRIVATE FILER LLC"
+    assert b.companies[0].rank == 1, "sira numarasi istenen siralamayi izlemeli"
+
+
+@pytest.mark.anyio
+async def test_cerceve_donem_bitisleri_ayni_degil_ve_bu_gorunuyor(srv):
+    """Bir cerceve 'ayni donem' DEGIL, 'ayni takvim kovasina dusen donemler'.
+    Gercek olcumde (14 Agu 2026, CY2025Q1 gelir cercevesi) en erken bitis
+    2025-02-23, en gec 2025-05-04 - 70 gun. Bunu gizlemek, karsilastirmayi
+    esdeger sanmaya davet eder."""
+    b = await srv.compare_companies(concept="revenue", period="CY2025Q1", limit=100)
+    assert b.period_end_earliest == "2025-02-23"
+    assert b.period_end_latest == "2025-05-04"
+    assert b.period_end_earliest != b.period_end_latest
+    bitisler = {c.company: c.period_end for c in b.companies}
+    assert bitisler["Apple Inc."] == "2025-03-29", "sirketin kendi donem sonu korunmali"
+    assert bitisler["HOME DEPOT, INC."] == "2025-05-04"
+
+
+@pytest.mark.anyio
+async def test_cerceve_bilanco_kaleminde_anlik_esine_dusuyor(srv):
+    """Olculdu: us-gaap/Assets/USD/CY2025Q1 -> 404, CY2025Q1I -> dolu. Model
+    bu ayrimi bilmek zorunda kalmamali, ama hangisinin cevapladigini gormeli."""
+    b = await srv.compare_companies(concept="total_assets", period="CY2025Q1")
+    assert b.frame_requested == "CY2025Q1"
+    assert b.frame == "CY2025Q1I" and b.frame_kind == "instant"
+    assert b.companies[0].period_start is None, "anlik cercevede donem baslangici yok"
+    assert b.companies[0].period_end == "2025-03-29"
+
+
+@pytest.mark.anyio
+async def test_cerceve_istenen_ticker_yoksa_sessizce_dusmuyor(srv):
+    """Bir sirketin cercevede olmamasi 'sifir' ya da 'raporlamiyor' demek
+    degil - farkli etiketle raporluyor ya da mali donemi kovaya oturmuyor
+    olabilir. Sessizce listeden dusurmek modele yanlis sonuc cikartir."""
+    b = await srv.compare_companies(concept="revenue", period="CY2025Q1",
+                                    tickers=["AAPL", "MSFT", "TSLA"])
+    assert [c.ticker for c in b.companies] == ["AAPL"]
+    assert b.missing_tickers == ["MSFT", "TSLA"]
+    assert b.total_companies == 1, "toplam, istenen kumeye gore raporlanmali"
+
+
+@pytest.mark.anyio
+async def test_cerceve_filtrelense_de_sira_tum_sirketlere_gore(srv):
+    """Uc sirket istendiginde 'birinci' olmak, sadece o ucun icinde birinci
+    olmak degil; sira TUM cerceveye gore verilmezse rakam yaniltir."""
+    b = await srv.compare_companies(concept="revenue", period="CY2025Q1",
+                                    tickers=["AAPL"], order="value_asc")
+    assert b.companies[0].rank == 4, "artan siralamada Apple 4 sirketin sonuncusu"
+
+
+@pytest.mark.anyio
+async def test_cerceve_tickeri_olmayan_sirket_cokmeye_yol_acmiyor(srv):
+    b = await srv.compare_companies(concept="revenue", period="CY2025Q1", limit=100)
+    ozel = [c for c in b.companies if c.company == "PRIVATE FILER LLC"][0]
+    assert ozel.ticker is None and ozel.location is None
+    assert [c for c in b.companies if c.ticker == "AAPL"], "ticker cozumu calismiyor"
+
+
+@pytest.mark.parametrize("yazim", ["CY2025Q1", "2025Q1", "2025q1", " cy2025 q1 ",
+                                   "2025-Q1", "2025_q1"])
+@pytest.mark.anyio
+async def test_cerceve_donem_yazimi_serbest(srv, yazim):
+    b = await srv.compare_companies(concept="revenue", period=yazim, limit=1)
+    assert b.frame == "CY2025Q1"
+
+
+@pytest.mark.anyio
+async def test_cerceve_anlasilmayan_donem_eyleme_donusturulebilir_hata_verir(srv):
+    with pytest.raises(ValueError) as e:
+        await srv.compare_companies(concept="revenue", period="last quarter")
+    mesaj = str(e.value)
+    assert "CY2025Q1" in mesaj and "CY2025" in mesaj
+
+
+@pytest.mark.anyio
+async def test_cerceve_bulunamayinca_denenenleri_sayiyor(srv):
+    with pytest.raises(ValueError) as e:
+        await srv.compare_companies(concept="OlmayanEtiket", period="CY2025Q1")
+    mesaj = str(e.value)
+    assert "OlmayanEtiket" in mesaj and "CY2025Q1" in mesaj
+    assert "sec_edgar_list_available_concepts" in mesaj
+
+
+@pytest.mark.anyio
+async def test_cerceve_bos_data_sessiz_basari_olmuyor(srv):
+    """KK-23'un ayni ilkesi: bos bir basari, gercek 'veri yok' cevabindan
+    ayirt edilemez. Cerceve var ama icinde sirket yoksa bu bir anomalidir."""
+    with pytest.raises(ValueError) as e:
+        await srv.compare_companies(concept="OperatingIncomeLoss", period="CY2025Q1")
+    assert "no companies" in str(e.value)
+
+
+@pytest.mark.anyio
+async def test_cerceve_ikinci_kez_indirilmiyor(srv):
+    """Bir cerceve yanit gercekte megabaytlarca (olculdu: CY2025Q1 gelir
+    cercevesi 2.543 sirket). Sayfalama icin yeniden indirmek SEC hiz sinirini
+    yer."""
+    ISTEK_KAYDI.clear()
+    await srv.compare_companies(concept="revenue", period="CY2025Q1", limit=1)
+    await srv.compare_companies(concept="revenue", period="CY2025Q1", limit=3)
+    istekler = [u for u in ISTEK_KAYDI if "/frames/" in u]
+    assert len(istekler) == 1, f"cerceve {len(istekler)} kez indirilmis"

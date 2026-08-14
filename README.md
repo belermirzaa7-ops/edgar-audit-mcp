@@ -33,6 +33,7 @@ answers. The interesting part of this project is handling them.
 | `sec_edgar_get_fact_revisions` | How a reported figure changed across filings — restatements, with the accession number of each change |
 | `sec_edgar_read_filing_text` | The narrative XBRL does not carry: MD&A, risk factors, the tax and segment notes — including 8-K exhibits and in-filing search |
 | `sec_edgar_list_available_concepts` | Which tags a company actually reports, in any taxonomy it uses |
+| `sec_edgar_compare_companies` | One concept across every company that reported it for a period, ranked |
 
 Every tool returns a Pydantic model, so MCP `outputSchema` is generated
 automatically and clients consume the results type-safely. List-returning tools
@@ -81,6 +82,31 @@ Calling the tool without a section returns the headings the filing actually
 has, so the next call names one instead of guessing. When the right heading is
 not obvious, `search` reports how many times a phrase occurs and where; each
 position can be passed straight back as `offset`.
+
+### Comparing across companies
+
+The other tools answer about one company. `sec_edgar_compare_companies` reads
+SEC's `frames` endpoint, which holds one period's value for every company that
+reported a tag — 2,543 companies in the CY2025Q1 revenue frame, measured.
+
+A frame looks like a like-for-like ranking and is not quite one, so the response
+says so in data rather than in a footnote:
+
+- **The periods inside one frame are not the same period.** SEC assigns each
+  company's nearest fiscal period to a calendar frame. In CY2025Q1 the period
+  ends run from 2025-02-23 to 2025-05-04 — seventy days apart. Apple appears
+  there with its own fiscal second quarter, 2024-12-29 to 2025-03-29. Every row
+  carries its own `period_end`, and the response reports the spread across the
+  whole frame.
+- **A missing company has not necessarily failed to report the concept.** It may
+  tag it differently, or have no period that fits. Requested tickers that the
+  frame does not hold come back in `missing_tickers` instead of being dropped.
+- **A balance-sheet tag has no duration frame.** `Assets` in `CY2025Q1` is a
+  404; `CY2025Q1I` is the frame that exists. Both are tried and the one that
+  answered is named in the response.
+
+Rank is always computed against the whole frame, so asking about three companies
+does not make one of them "first".
 
 ## Three traps this server handles
 

@@ -83,6 +83,33 @@ class EdgarClient:
             )
         return cik
 
+    async def ticker_for_cik(self, cik: str) -> str | None:
+        """CIK -> ticker. Ayni CIK birden fazla sembol tasiyabilir (GOOG/GOOGL
+        gibi hisse siniflari); alfabetik ilki doner ve bu bilincli bir
+        sadelestirmedir - cerceve verisi CIK basina tek satir tasidigi icin
+        hangi sinifin gosterildigi sorusu orada zaten yok."""
+        if self._ticker_cache is None:
+            await self.cik_for_ticker("AAPL")     # haritayi doldurur
+        assert self._ticker_cache is not None
+        eslesen = sorted(t for t, c in self._ticker_cache.items() if c == cik)
+        return eslesen[0] if eslesen else None
+
+    async def frame(self, taxonomy: str, tag: str, unit: str, frame: str) -> dict | None:
+        """Bir donemin TUM sirketlerdeki degeri. Cerceve yoksa None.
+
+        404 burada hata degil bilgidir: istenen etiket/donem/birim ucluşu icin
+        SEC'in cercevesi ya hic yoktur ya da suresel/anlik turu tutmamistir
+        (bilanco kalemleri `CY2025Q1I`, gelir tablosu kalemleri `CY2025Q1`).
+        Cagiran taraf bu ayrimi kullanip otekini deniyor.
+        """
+        url = f"{SEC_DATA}/api/xbrl/frames/{taxonomy}/{tag}/{unit}/{frame}.json"
+        try:
+            return await self._get(url)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return None
+            raise
+
     async def submissions(self, cik: str) -> dict:
         return await self._get(f"{SEC_DATA}/submissions/CIK{cik}.json")
 

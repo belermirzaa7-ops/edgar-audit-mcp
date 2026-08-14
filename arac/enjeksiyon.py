@@ -469,7 +469,79 @@ ENJEKSIYONLAR = [
   "        if len(vurgular) < ARAMA_VURGU_SINIRI:",
   "        if True:",
   "test_arama_vurgu_sayisi_sinirli_ama_toplam_dogru"),
+
+ # ---- B3: sirketler arasi karsilastirma (frames)
+ ("B3: suresel/anlik es cercevesini deneme",
+  "src/edgar_mcp/server.py",
+  "    for aday in (cerceve, _cerceve_esi(cerceve)):",
+  "    for aday in (cerceve,):",
+  "test_cerceve_bilanco_kaleminde_anlik_esine_dusuyor"),
+
+ ("B3: sira numarasini filtreden SONRA say",
+  "src/edgar_mcp/server.py",
+  "                rank=i,",
+  "                rank=len(secilenler) + 1,",
+  "test_cerceve_filtrelense_de_sira_tum_sirketlere_gore"),
+
+ ("B3: cercevede olmayan tickeri sessizce dusur",
+  "src/edgar_mcp/server.py",
+  "            ad for cik, ad in istenen.items() if cik not in gorulen",
+  "            ad for cik, ad in istenen.items() if False",
+  "test_cerceve_istenen_ticker_yoksa_sessizce_dusmuyor"),
+
+ ("B3: donem araligini tek noktaya cokert",
+  "src/edgar_mcp/server.py",
+  'period_end_earliest=bitisler[0] if bitisler else "",',
+  'period_end_earliest=bitisler[-1] if bitisler else "",',
+  "test_cerceve_donem_bitisleri_ayni_degil_ve_bu_gorunuyor"),
+
+ ("B3: cerceve onbellegini kapat",
+  "src/edgar_mcp/server.py",
+  "        if anahtar in _CERCEVE:",
+  "        if False:",
+  "test_cerceve_ikinci_kez_indirilmiyor"),
+
+ ("B3: bos cerceveyi sessiz basari say",
+  "src/edgar_mcp/server.py",
+  "    if not satirlar:",
+  "    if False:",
+  "test_cerceve_bos_data_sessiz_basari_olmuyor"),
+
+ ("B3: donem yazimini katilastir (yalniz CY... kabul et)",
+  "src/edgar_mcp/server.py",
+  r'_CERCEVE_KALIBI = re.compile(r"^(?:cy)?\s*(\d{4})\s*(?:[-_ ]?q([1-4]))?\s*(i?)$",',
+  r'_CERCEVE_KALIBI = re.compile(r"^cy(\d{4})(?:q([1-4]))?(i?)$",',
+  "test_cerceve_donem_yazimi_serbest"),
+
+ ("B3: siralama yonunu yoksay",
+  "src/edgar_mcp/server.py",
+  "reverse=ters)",
+  "reverse=True)",
+  "test_cerceve_artan_siralamada_sira_numarasi_da_donuyor"),
+
+ ("B3: limit kirpmasini kaldir",
+  "src/edgar_mcp/server.py",
+  "        if len(secilenler) >= limit:",
+  "        if False:",
+  "test_cerceve_degere_gore_siraliyor_ve_kirpmayi_bildiriyor"),
+
+ ("B3: CIK -> ticker cozumunu kapat",
+  "src/edgar_mcp/client.py",
+  "        return eslesen[0] if eslesen else None",
+  "        return None",
+  "test_cerceve_tickeri_olmayan_sirket_cokmeye_yol_acmiyor"),
 ]
+
+
+def yakalandi(beklenen: str, kirmizi: list[str]) -> bool:
+    """Beklenen test kirmiziya dondu mu.
+
+    Parametreli testler pytest ciktisinda `test_x[2025Q1]` diye gorunur; duz
+    esitlik arayan bir kontrol bunlari HIC eslestiremez ve gercekte calisan bir
+    korumayi "KORUMASIZ" diye raporlar (14 Agu 2026'da bir kez oldu: donem
+    yazimi enjeksiyonu alti parametrenin altisini da kirmiziya dondurmustu).
+    """
+    return any(t == beklenen or t.startswith(beklenen + "[") for t in kirmizi)
 
 
 def sozdizimi_gecerli(yol: str, kaynak: str) -> bool:
@@ -557,7 +629,7 @@ def main() -> int:
             (KOK / dosya).write_text(bozuk)
             k = testler()
             (KOK / dosya).write_text(metin)
-            sonuc.append((ad, ", ".join(k) or "hicbiri", beklenen in k))
+            sonuc.append((ad, ", ".join(k) or "hicbiri", yakalandi(beklenen, k)))
     finally:
         geri_al()
 

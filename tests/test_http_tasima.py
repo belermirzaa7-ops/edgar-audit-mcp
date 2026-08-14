@@ -151,5 +151,5 @@ def test_stdio_tasimasi_resmi_istemciyle_araclari_listeliyor():
     # sabitleniyor; burada GERCEK tel uzerinden ayni kumenin geldigi dogrulanir.
     assert "sec_edgar_get_concept_series" in adlar
     assert "sec_edgar_get_fact_revisions" in adlar
-    assert len(adlar) == 6, adlar
+    assert len(adlar) == 7, adlar
     assert all(a.startswith("sec_edgar_") for a in adlar), adlar

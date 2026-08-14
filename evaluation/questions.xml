@@ -10,12 +10,11 @@
   in <verification> so the next person can repeat the measurement instead of
   trusting this file.
 
-  One exception, stated rather than hidden: question 16 covers the `document`
-  and `search` parameters, which were added on 14 Aug 2026 and were not yet
-  installed in any client when the answer was written. Its figures were read
-  from the filing's own directory listing and exhibit, fetched directly from
-  sec.gov the same day. The tool calls that reproduce it are recorded in the
-  same form; they have not themselves been executed against the live API.
+  Question 16, covering the `document` and `search` parameters added on 14 Aug
+  2026, was written from the filing's own directory listing and exhibit fetched
+  directly from sec.gov, because no client had the new build installed yet. The
+  tool calls were executed against the live API later the same day, once the
+  build was installed, and the recorded figures below are what they returned.
 
   Design rules applied to each question:
     - answerable only through the tools, not from general knowledge
@@ -197,10 +196,31 @@
         -> the production/deliveries table with Total 451,758 / 480,126
       sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-26-046717",
                                  document="exhibit99111111.htm", search="480,126")
-        -> at least one hit; its position, passed back as offset, lands in the deliveries table
-      Measured 14 Aug 2026 by fetching
+        -> search_total_matches 1, hit at position 592, context showing the Total row
+           451,758 / 480,126; the exhibit converts to 2,080 characters in total
+      Measured 14 Aug 2026, first from
       https://www.sec.gov/Archives/edgar/data/1318605/000162828026046717/index.json
-      and .../exhibit99111111.htm directly; see the note at the top of this file.
+      and .../exhibit99111111.htm directly, then through the tools themselves.
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>For the first calendar quarter of 2025, how many companies did the SEC assemble into the revenue frame, what did Apple report there, and why is Apple's figure not measured over the same days as the rest of the frame?</question>
+    <answer>The frame us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax/USD/CY2025Q1 holds 2,543 companies. Apple appears with 95,359,000,000 USD for the period 2024-12-29 to 2025-03-29, filed under accession 0000320193-26-000013. That period is Apple's own fiscal second quarter, not the calendar first quarter: SEC assigns each company's nearest fiscal period to a calendar frame, so period ends inside this one calendar frame range from 2025-02-23 to 2025-05-04 — about ten weeks apart. A frame is therefore a bucket of comparable-but-not-identical periods, and a company absent from it has not necessarily failed to report the concept; it may tag it differently or have no period that fits.</answer>
+    <verification>
+      sec_edgar_compare_companies(concept="revenue", period="CY2025Q1", tickers=["AAPL"])
+        -> resolved_tag RevenueFromContractWithCustomerExcludingAssessedTax, frame CY2025Q1,
+           frame_kind duration, Apple 95,359,000,000 with period_start 2024-12-29 and
+           period_end 2025-03-29, and period_end_earliest / period_end_latest showing the spread
+      sec_edgar_compare_companies(concept="total_assets", period="CY2025Q1")
+        -> frame_requested CY2025Q1 but frame CY2025Q1I: a balance-sheet tag has no duration
+           frame, and the instant counterpart is read instead
+      Provenance, since these differ in strength: Apple's row and the company count (the
+      frame's own "pts" field, 2,543) were quoted verbatim from
+      https://data.sec.gov/api/xbrl/frames/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax/USD/CY2025Q1.json
+      on 14 Aug 2026. The earliest and latest period ends come from a scan of that same
+      array rather than a verbatim quote; the tool recomputes both on every call, so they
+      are the fields to trust over this file.
     </verification>
   </qa_pair>
 

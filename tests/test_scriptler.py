@@ -336,3 +336,16 @@ def test_enjeksiyon_aday_secimi_yalnizca_eslesenleri_calistiriyor():
 
     # Buyuk/kucuk harf farki adayi kacirmamali
     assert mod.secilenler(["--aday", ad[:20].upper()]) == secili
+
+
+def test_enjeksiyon_parametreli_testi_de_taniyor():
+    """pytest parametreli testleri `test_x[deger]` diye raporlar. Duz esitlik
+    arayan harness bunlari eslestiremez ve calisan bir korumayi 'KORUMASIZ'
+    sanir - 14 Agu 2026'da bir kez oyle oldu."""
+    import importlib
+
+    mod = importlib.import_module("arac.enjeksiyon")
+    assert mod.yakalandi("test_x", ["test_x"])
+    assert mod.yakalandi("test_x", ["test_x[2025Q1]", "test_y"])
+    assert not mod.yakalandi("test_x", ["test_xyz"]), "onek eslesmesi cok genis"
+    assert not mod.yakalandi("test_x", [])
