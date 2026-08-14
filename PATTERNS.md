@@ -34,6 +34,7 @@ can verify rather than remember.
 | [P-19](#p-19) | Does a 200 from upstream actually carry rows, and did I check the second endpoint? | `test_bos_companyconcept_yanitinda_companyfacts_e_dusulur`, `test_iki_uc_da_bossa_sessiz_basari_yerine_hata` |
 | [P-20](#p-20) | Have I actually run the deployment path the README promises? | `test_http_tasimasi_araclari_el_sikismasiz_listeler`, `test_stdio_tasimasi_resmi_istemciyle_araclari_listeliyor`, `test_dockerfile_loopback_disina_baglaniyor`, CI job `docker` |
 | [P-21](#p-21) | Did my fault injection actually compile, or did it just break the import? | `test_enjeksiyon_bozuk_sozdizimini_koruma_eksigi_sanmiyor` |
+| [P-22](#p-22) | Could two copies of this tool be running at once? | `test_enjeksiyon_ayni_anda_iki_kez_calismiyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -533,6 +534,34 @@ injection meant to strip a period's older values replaced
 `gruplar.setdefault(...).append(` with a line that opened a bracket it never
 closed. The harness said the new tool had no guard; it had two, and neither had
 run.
+
+---
+
+<a id="p-22"></a>
+### P-22 · A tool that rewrites the working tree must refuse to run twice
+
+**Symptom.** Two protections reported as unguarded, with unrelated tests named
+as the ones that failed - a `Dockerfile` test and a concept test failing while
+a text-parsing guard was being checked. Afterwards the test suite stayed red:
+nine tests failed against a working tree that looked clean in the editor.
+
+**Root cause.** Two copies of the fault-injection harness were started by
+mistake. Each one breaks a file, runs the suite, and restores the file. Run
+them together and one is holding a file broken while the other runs the suite,
+so the second one measures the first one's damage. Worse, when one was killed
+mid-injection its restore never completed, and an injected line survived in
+`src/` - every later test ran against sabotaged code.
+
+**Detection.** The harness takes an exclusive lock file at startup and refuses
+to start if one exists, naming the file so a stale lock can be removed. The
+existing crash-safe restore covers the case where a run dies; the lock covers
+the case where a run never should have started.
+
+**Incident.** 14 Aug 2026. Recovered by scanning every injection's replacement
+string against the working tree, which found one still applied - the alias map
+had been left emptied. That scan is worth remembering as the recovery
+procedure: for each injection, if the target string is missing and the
+replacement string is present, the file is still sabotaged.
 
 ---
 

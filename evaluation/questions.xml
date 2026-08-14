@@ -3,7 +3,9 @@
   Evaluation set for the sec-edgar-mcp tools.
 
   How this file was produced: every question below was answered by calling the
-  tools against the live SEC API on 13 Aug 2026 and reading the result. No
+  tools against the live SEC API - the first ten on 13 Aug 2026, the last five
+  on 14 Aug 2026 when the revision, taxonomy and filing-text tools were added -
+  and reading the result. No
   answer is from memory or from a model's guess. The exact calls are recorded
   in <verification> so the next person can repeat the measurement instead of
   trusting this file.
@@ -14,6 +16,8 @@
     - one verifiable answer, no judgement call
     - anchored to a named fiscal year, never to "the latest", so the expected
       answer does not rot as new filings arrive
+    - every tool the server exposes appears in at least one question; a test
+      enforces this, so adding a tool without covering it turns the suite red
 
   Known instability: SEC values can be revised in later filings, and this
   server returns the most recently filed value for a period. If a revision
@@ -114,6 +118,60 @@
       sec_edgar_get_concept_series(ticker="AAPL", concept="revenue", limit=25) -> total_periods 19, FY2007-FY2025
       sec_edgar_get_concept_series(ticker="AAPL", concept="revenue", limit=3)
         -> returned 3, has_more true, fiscal years 2023 / 2024 / 2025
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Tesla first reported its 2017 and 2018 annual revenue, and both figures were later reported with a different value. How large were those changes, and do they amount to a restatement?</question>
+    <answer>No, they are rounding. 2017 revenue went from 11,758,751,000 to 11,759,000,000 (+249,000, about 0.002%) and 2018 from 21,461,268,000 to 21,461,000,000 (-268,000, about 0.001%). Both new values first appear in the 10-K filed 2020-02-13, accession 0001564590-20-004475, where the company began presenting figures in millions rather than thousands.</answer>
+    <verification>
+      sec_edgar_get_fact_revisions(ticker="TSLA", concept="revenue")
+        -> two revised periods: 2017-12-31 and 2018-12-31, each with two distinct values,
+           second value first_reported_in 10-K filed 2020-02-13
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Does Tesla's reported annual net income history contain any material restatement?</question>
+    <answer>No. Only two annual periods were ever reported with a different value - 2017 (-1,961,400,000 to -1,962,000,000) and 2018 (-976,091,000 to -976,000,000). The larger of the two is about 0.03% and both come from the same 2020 change in presentation units, so no year's result was materially restated.</answer>
+    <verification>
+      sec_edgar_get_fact_revisions(ticker="TSLA", concept="net_income")
+        -> periods_revised = 2, both in 2017 and 2018, change_percent below 0.05%
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>What aggregate market value of shares held by non-affiliates did Tesla report on the cover of its FY2025 annual report, how does it compare with the year before, and why is that figure not the company's market capitalisation?</question>
+    <answer>892,930 million USD measured on 30 June 2025, against 550,170 million measured on 28 June 2024 - an increase of about 62%. It is not market capitalisation because the cover-page figure counts only shares held by non-affiliates: holdings of officers, directors and ten-percent owners are excluded, so true market capitalisation is higher.</answer>
+    <verification>
+      sec_edgar_get_concept_series(ticker="TSLA", concept="public_float", period="all")
+        -> taxonomy "dei", 2025-06-30 = 892930000000, 2024-06-28 = 550170000000
+      sec_edgar_list_available_concepts(ticker="TSLA", taxonomy="dei")
+        -> confirms EntityPublicFloat is a cover-page fact
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Tesla's total gross profit fell from 20,853 million USD in 2022 to 17,094 million in 2025. Which reportable segment caused the decline, and what did the other segment do?</question>
+    <answer>The automotive segment caused it: its gross profit fell from 20,565 million in 2022 to 13,292 million in 2025, a drop of 7,273 million. The energy generation and storage segment moved the other way, from 288 million to 3,802 million, adding 3,514 million. The two net to the 3,759 million decline in the group total. Segment figures are not in the XBRL API; they are in the segment note of the annual reports.</answer>
+    <verification>
+      sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-26-003952", section="Segment Reporting")
+        -> automotive gross profit 13,292 (2025) and energy 3,802 (2025)
+      sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-24-002390", section="Note 18")
+        -> automotive 20,565 and energy 288 for 2022
+      sec_edgar_get_concept_series(ticker="TSLA", concept="gross_profit") -> group totals agree exactly
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Tesla recorded a tax benefit rather than a tax expense in 2023. What does the filing itself give as the reason, and which note carries it in the FY2023 report compared with the FY2025 report?</question>
+    <answer>The company released 6.54 billion USD of the valuation allowance on its U.S. federal and state deferred tax assets, excluding California, after concluding those assets were more likely than not to be realised. That is why the year shows a benefit of 5,001 million instead of an expense; the rate reconciliation carries it as a 5,962 million change in valuation allowance. The note is numbered 14 in the FY2023 report and 12 in the FY2025 report, so the number cannot be hardcoded across years.</answer>
+    <verification>
+      sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-24-002390", section="income taxes")
+        -> "we released $6.54 billion of our valuation allowance..."; section_matched "Note 14 - Income Taxes"
+      sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-26-003952")
+        -> available_sections lists "Note 12 - Income Taxes"
+      sec_edgar_get_concept_series(ticker="TSLA", concept="IncomeTaxExpenseBenefit") -> FY2023 = -5001000000
     </verification>
   </qa_pair>
 

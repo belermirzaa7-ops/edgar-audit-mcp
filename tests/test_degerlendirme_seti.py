@@ -20,9 +20,26 @@ def _ciftler() -> list[ET.Element]:
     return ET.parse(YOL).getroot().findall("qa_pair")
 
 
-def test_xml_gecerli_ve_on_soru_var():
+def test_xml_gecerli_ve_beklenen_sayida_soru_var():
     ciftler = _ciftler()
-    assert len(ciftler) == 10, f"10 soru bekleniyordu, {len(ciftler)} var"
+    assert len(ciftler) == 15, f"15 soru bekleniyordu, {len(ciftler)} var"
+
+
+def test_her_arac_degerlendirme_setinde_temsil_ediliyor():
+    """Standart: API'yi genisletmek eval set bir bosluk gosterince acilir.
+    Tersi de gecerli - yeni bir arac eklendiginde set onu kapsamali, yoksa
+    "dogrulandi" dedigimiz sey eski yuzeyin dogrulamasi olur."""
+    import asyncio
+    import os
+    import sys
+
+    sys.path.insert(0, str(KOK / "src"))
+    os.environ.setdefault("SEC_USER_AGENT", "Test Runner test@example.com")
+    from edgar_mcp.server import mcp
+
+    metin = YOL.read_text(encoding="utf-8")
+    eksik = [t.name for t in asyncio.run(mcp.list_tools()) if t.name not in metin]
+    assert not eksik, f"degerlendirme seti bu araclari hic cagirmiyor: {eksik}"
 
 
 def test_her_soru_cevap_ve_olcum_tasiyor():

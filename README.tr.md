@@ -62,8 +62,10 @@ Bunu göründüğünden zorlaştıran iki şey var ve ikisi de testle korunuyor:
   gerçek metin geliyorsa bölüm sayılır; yine de iki kez geçiyorsa uzun olan
   kazanır.
 - **Dosyalamalar milyonlarca karakter.** Metin `offset` / `has_more` ile
-  sınırlı parçalar hâlinde döner ve indirilen belge önbelleklenir; bir bölümde
-  sayfa çevirmek her çağrıda birkaç MB yeniden indirmez.
+  sınırlı parçalar hâlinde döner. Önbellekte ham HTML değil **çevrilmiş metin**
+  durur: 2,2 MB HTML'i çevirmek ölçülen 0,61 saniye, yani her sayfa çevirmede
+  yeniden ayrıştırmak saniyeleri harcıyordu; ayrıca metin, geldiği işaretlemeden
+  yaklaşık yirmi kat küçük.
 
 Araç bölümsüz çağrılırsa dosyalamanın gerçekten sahip olduğu başlıkları
 döndürür; ikinci çağrı tahmin etmek yerine birini adıyla ister.

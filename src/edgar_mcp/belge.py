@@ -14,6 +14,10 @@ Iki tuzak burada cozuluyor, ikisi de olculebilir:
 2. **Tablolar.** Mali tablolar HTML tablosudur; etiketler duz atilirsa satirlar
    birbirine yapisir ve sayilar okunamaz hale gelir. Hucreler ` | ` ile,
    satirlar yeni satirla ayriliyor.
+3. **Gizli iXBRL basligi.** Modern dosyalamalar `display:none` bir blokla
+   basliyor; icinde yuzlerce ad alani URL'si ve etiket var. Olculdu (14 Agu
+   2026, TSLA FY2023 10-K): belgenin ILK 1200 karakteri tamamen bu gurultu.
+   Gizlenmis ogeler metne alinmiyor.
 """
 from __future__ import annotations
 
@@ -31,22 +35,37 @@ _BLOK = {"p", "div", "br", "tr", "table", "h1", "h2", "h3", "h4", "h5", "h6",
          "li", "ul", "ol", "section", "article", "header", "footer"}
 
 
+def _gizli_mi(attrs: list) -> bool:
+    """`style="display:none"` tasiyan oge ve altindaki her sey metne girmez.
+    Inline XBRL dosyalamalari gizli bir blokla baslar; o blok yuzlerce ad alani
+    URL'si icerir ve belgenin ilk sayfasini gurultuye cevirir."""
+    for ad, deger in attrs:
+        if ad and ad.lower() == "style" and deger:
+            duz = deger.replace(" ", "").lower()
+            if "display:none" in duz:
+                return True
+    return False
+
+
 class _MetinToplayici(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.parcalar: list[str] = []
         self._atla = 0
+        self._gizli_yigin: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list) -> None:
-        if tag in _ATLANAN:
+        if tag in _ATLANAN or _gizli_mi(attrs):
             self._atla += 1
+            self._gizli_yigin.append(tag)
         elif tag in ("td", "th"):
             self.parcalar.append(" | ")
         elif tag in _BLOK:
             self.parcalar.append("\n")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in _ATLANAN and self._atla:
+        if self._gizli_yigin and self._gizli_yigin[-1] == tag and self._atla:
+            self._gizli_yigin.pop()
             self._atla -= 1
         elif tag in _BLOK:
             self.parcalar.append("\n")
@@ -86,11 +105,23 @@ _NOT = re.compile(_ONEK + r"note\s+(\d{1,2})\s*[.\-:—|]?\s*(.{0,90})$",
                   re.IGNORECASE | re.MULTILINE)
 
 
+def _kod(baslik: str) -> str:
+    """Basligin kimligi: "ITEM 7. MANAGEMENT'S..." -> "item 7"."""
+    m = re.match(r"\s*(item|note)\s+(\d{1,2}[a-c]?)", baslik, re.IGNORECASE)
+    return f"{m.group(1).lower()} {m.group(2).lower()}" if m else baslik.lower()
+
+
 def bolumler(metin: str, esik: int = BOLUM_ESIGI) -> list[tuple[str, int, int]]:
-    """(baslik, baslangic, bitis) listesi. Icindekiler tablosu elenir.
+    """(baslik, baslangic, bitis) listesi. Icindekiler tablosu elenir ve ayni
+    bolum kodu bir kez listelenir.
 
     Eleme kurali: bir aday basliktan sonraki metin, bir sonraki adaya kadar
     `esik` karakterden kisaysa o aday gercek bolum degildir.
+
+    Tekillestirme (olculdu, 14 Agu 2026, TSLA FY2023 10-K): esikten gecen
+    ikinci bir "Item 16" listenin BASINDA, ITEM 1'den once goruluyordu - kapak
+    sayfasindaki bir referans. Ayni kod birden fazla kez gecerse EN UZUN blok
+    kalir; listedeki sira belgedeki sira olur.
     """
     adaylar: list[tuple[str, int]] = []
     for kalip in (_ITEM, _NOT):
@@ -99,12 +130,18 @@ def bolumler(metin: str, esik: int = BOLUM_ESIGI) -> list[tuple[str, int, int]]:
             adaylar.append((baslik, m.start()))
     adaylar.sort(key=lambda x: x[1])
 
-    out: list[tuple[str, int, int]] = []
+    gecerli: list[tuple[str, int, int]] = []
     for i, (baslik, bas) in enumerate(adaylar):
         son = adaylar[i + 1][1] if i + 1 < len(adaylar) else len(metin)
         if son - bas >= esik:
-            out.append((baslik, bas, son))
-    return out
+            gecerli.append((baslik, bas, son))
+
+    en_uzun: dict[str, tuple[str, int, int]] = {}
+    for b in gecerli:
+        k = _kod(b[0])
+        if k not in en_uzun or (b[2] - b[1]) > (en_uzun[k][2] - en_uzun[k][1]):
+            en_uzun[k] = b
+    return sorted(en_uzun.values(), key=lambda b: b[1])
 
 
 def bolum_sec(

@@ -296,3 +296,23 @@ def test_enjeksiyon_bozuk_sozdizimini_koruma_eksigi_sanmiyor():
     assert not mod.sozdizimi_gecerli("src/x.py", "def f():\n    return [1\n")
     # Python olmayan dosyalar muaf: Dockerfile da enjeksiyon hedefi
     assert mod.sozdizimi_gecerli("Dockerfile", "CMD [\"python\", \"-c\", \"x(\"]")
+
+
+def test_enjeksiyon_ayni_anda_iki_kez_calismiyor(tmp_path, monkeypatch):
+    """14 Agu 2026 olayi: iki harness ayni anda calisti, biri dosyayi bozmusken
+    oteki test kosturdu, ilgisiz testler kirmiziya dondu ve calisma dizininde
+    enjekte edilmis bir dosya kaldi."""
+    import importlib
+
+    mod = importlib.import_module("arac.enjeksiyon")
+    kilit = tmp_path / "kilit"
+    monkeypatch.setattr(mod, "KILIT", kilit)
+
+    assert mod.kilitle() is True, "ilk kilit alinamadi"
+    assert kilit.exists()
+    assert mod.kilitle() is False, "ikinci calisma engellenmedi"
+
+    mod.kilidi_birak()
+    assert not kilit.exists()
+    assert mod.kilitle() is True, "kilit birakildiktan sonra alinamiyor"
+    mod.kilidi_birak()

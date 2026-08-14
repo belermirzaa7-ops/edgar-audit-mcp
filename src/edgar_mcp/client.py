@@ -55,10 +55,6 @@ class EdgarClient:
         )
         self._ticker_cache: dict[str, str] | None = None
         self._facts_cache: dict[str, dict] = {}
-        # Dosyalama belgeleri 5-15 MB olabilir; sayfalama icin ayni belge
-        # defalarca istenir. Sinirli sayida belge bellekte tutulur.
-        self._belge_cache: dict[str, str] = {}
-        self.BELGE_CACHE_SINIRI = 3
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -98,18 +94,14 @@ class EdgarClient:
     async def filing_document(self, url: str) -> str:
         """Dosyalama belgesinin HAM govdesi (HTML ya da duz metin).
 
-        JSON degil metin doner; `_get` kullanilamaz. Onbellek FIFO ve kucuk:
-        bir 10-K birkac MB, sinirsiz onbellek uzun calisan sunucuda bellegi
-        sessizce sisirir.
+        JSON degil metin doner; `_get` kullanilamaz. Onbellek BURADA DEGIL:
+        cagiran taraf ham HTML'i degil, cevrilmis metni saklar (bkz.
+        server._belge_metni). 10 MB'lik HTML'i saklamak, ondan uretilen
+        0,5 MB'lik metni saklamaktan yirmi kat pahali.
         """
-        if url in self._belge_cache:
-            return self._belge_cache[url]
         await self._limiter.acquire()
         r = await self._http.get(url)
         r.raise_for_status()
-        if len(self._belge_cache) >= self.BELGE_CACHE_SINIRI:
-            self._belge_cache.pop(next(iter(self._belge_cache)))
-        self._belge_cache[url] = r.text
         return r.text
 
     async def company_facts(self, cik: str) -> dict:

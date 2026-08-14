@@ -665,6 +665,24 @@ async def get_concept_series(
     )
 
 
+# Cevrilmis belge metni. Neden ham HTML degil de metin (14 Agu 2026, olculdu):
+# 2,2 MB HTML'in metne cevrilmesi 0,61 saniye suruyor ve sayfalama ayni belgeyi
+# defalarca ister - her cagride yeniden cevirmek bir bolumu bes parcada okurken
+# saniyeleri bosa harciyordu. Metin ayrica HTML'den ~20 kat kucuk.
+_BELGE_METNI: dict[str, str] = {}
+BELGE_METNI_SINIRI = 3
+
+
+async def _belge_metni(url: str) -> str:
+    if url in _BELGE_METNI:
+        return _BELGE_METNI[url]
+    metin = metne_cevir(await _c().filing_document(url))
+    if len(_BELGE_METNI) >= BELGE_METNI_SINIRI:
+        _BELGE_METNI.pop(next(iter(_BELGE_METNI)))
+    _BELGE_METNI[url] = metin
+    return metin
+
+
 async def _dosyalama_bul(cik: str, accession: str | None, form_type: str) -> dict:
     """Erisim numarasindan (ya da form turunden) dosyalama kaydini bulur."""
     sub = await _c().submissions(cik)
@@ -756,7 +774,7 @@ async def read_filing_text(
         f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
         f"{kayit['accession_number'].replace('-', '')}/{kayit['primary_document']}"
     )
-    metin = metne_cevir(await _c().filing_document(url))
+    metin = await _belge_metni(url)
 
     bulunanlar = bolumler(metin)
     basliklar = [b[0] for b in bulunanlar]

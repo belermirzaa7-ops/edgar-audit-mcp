@@ -16,6 +16,7 @@ import sys
 
 KOK = pathlib.Path(__file__).resolve().parents[1]
 YEDEK_DIZIN = KOK / ".enjeksiyon_yedek"
+KILIT = KOK / ".enjeksiyon_kilit"
 DOSYALAR = [
     "src/edgar_mcp/server.py",
     "src/edgar_mcp/client.py",
@@ -46,6 +47,29 @@ def geri_al(sessiz=True):
             (KOK / f).write_bytes(y.read_bytes())
             if not sessiz:
                 print(f"  geri yuklendi: {f}")
+
+
+def kilitle() -> bool:
+    """Ayni anda iki harness calisamaz.
+
+    Neden (14 Agu 2026, olay): iki harness yanlislikla ayni anda baslatildi.
+    Biri dosyayi bozmusken oteki testleri kosturdu; ILGISIZ testler kirmiziya
+    dondu ve iki koruma "KORUMASIZ" diye raporlandi. Daha kotusu, biri
+    oldurulunce geri alma tamamlanmadi ve calisma dizininde enjekte edilmis bir
+    dosya KALDI - sonraki testler onun uzerinde kosuyordu.
+    """
+    try:
+        with open(KILIT, "x", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
+        return True
+    except FileExistsError:
+        print(f"  DURDU: baska bir enjeksiyon calismasi var gibi ({KILIT}).")
+        print("  Calisan yoksa bu dosyayi silip tekrar dene.")
+        return False
+
+
+def kilidi_birak():
+    KILIT.unlink(missing_ok=True)
 
 
 def temizle():
@@ -251,6 +275,30 @@ ENJEKSIYONLAR = [
   '_ONEK = r"^\\s*"',
   "test_tablo_icindeki_basliklar_da_bulunuyor"),
 
+ ("Belge: cevrilmis metin onbellegini kapat (her sayfada yeniden ayristir)",
+  "src/edgar_mcp/server.py",
+  "    if url in _BELGE_METNI:",
+  "    if False:",
+  "test_belge_metne_bir_kez_cevriliyor"),
+
+ ("Belge: bolum listesini tekillestirme (ayni kod iki kez cikssin)",
+  "src/edgar_mcp/belge.py",
+  "    return sorted(en_uzun.values(), key=lambda b: b[1])",
+  "    return gecerli",
+  "test_bolum_listesi_ayni_kodu_bir_kez_veriyor"),
+
+ ("Belge: tekillestirmede EN UZUN yerine ilkini tut",
+  "src/edgar_mcp/belge.py",
+  "        if k not in en_uzun or (b[2] - b[1]) > (en_uzun[k][2] - en_uzun[k][1]):",
+  "        if k not in en_uzun:",
+  "test_ayni_baslik_iki_kez_gecerse_ASIL_bolum_secilir"),
+
+ ("Belge: gizli iXBRL blogunu metne al (ad alani gurultusu)",
+  "src/edgar_mcp/belge.py",
+  "        if tag in _ATLANAN or _gizli_mi(attrs):",
+  "        if tag in _ATLANAN:",
+  "test_gizli_ixbrl_blogu_metne_girmiyor"),
+
  ("Belge: icindekiler tablosu esigini kaldir (TOC bolum sayilsin)",
   "src/edgar_mcp/belge.py",
   "BOLUM_ESIGI = 400",
@@ -261,12 +309,12 @@ ENJEKSIYONLAR = [
   "src/edgar_mcp/belge.py",
   "    return max(eslesen, key=lambda b: b[2] - b[1])",
   "    return eslesen[0]",
-  "test_ayni_baslik_iki_kez_gecerse_ASIL_bolum_secilir"),
+  "test_alt_dize_aramasinda_en_uzun_bolum_kazanir"),
 
  ("Belge: script/style atlamayi kapat (govde metne sizsin)",
   "src/edgar_mcp/belge.py",
-  "        if tag in _ATLANAN:",
-  "        if False:",
+  "        if tag in _ATLANAN or _gizli_mi(attrs):",
+  "        if _gizli_mi(attrs):",
   "test_script_ve_stil_metne_karismiyor"),
 
  ("Belge: sayfalamayi kaldir (tum belgeyi don)",
@@ -274,12 +322,6 @@ ENJEKSIYONLAR = [
   "    parca = metin[offset:offset + max_characters]",
   "    parca = metin[offset:]",
   "test_belge_metni_sayfalaniyor"),
-
- ("Belge: onbellegi kapat (her sayfada yeniden indir)",
-  "src/edgar_mcp/client.py",
-  "        if url in self._belge_cache:",
-  "        if False:",
-  "test_ayni_belge_iki_kez_indirilmiyor"),
 
  ("Taksonomi onekini yoksay (her etiketi us-gaap'ta ara)",
   "src/edgar_mcp/server.py",
@@ -380,6 +422,10 @@ def sozdizimi_gecerli(yol: str, kaynak: str) -> bool:
 
 
 def main() -> int:
+    if not kilitle():
+        return 1
+    atexit.register(kilidi_birak)
+
     # Onceki cokmeden artik kalmis olabilir: once onu geri yukle.
     if YEDEK_DIZIN.exists():
         print("Onceki calismadan artik yedek bulundu, geri yukleniyor...")
@@ -397,7 +443,9 @@ def main() -> int:
     yedekle()
     atexit.register(geri_al)
     for sig in (signal.SIGINT, signal.SIGTERM):
-        signal.signal(sig, lambda *_: (geri_al(sessiz=False), sys.exit(130)))
+        signal.signal(
+            sig, lambda *_: (geri_al(sessiz=False), kilidi_birak(), sys.exit(130))
+        )
 
     sonuc = []
     try:
@@ -435,6 +483,7 @@ def main() -> int:
     k = testler()
     print(f"  Testler: {'tumu yesil' if not k else 'KIRMIZI: ' + str(k)}")
 
+    kilidi_birak()
     basarili = sum(1 for *_, ok in sonuc if ok)
     print(f"\nSONUC: {basarili}/{len(sonuc)} koruma dogrulandi.")
     temizle()

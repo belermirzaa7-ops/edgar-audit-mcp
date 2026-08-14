@@ -524,3 +524,31 @@ kapat, sayfalamayi kaldir, onbellegi kapat.
 TABLOSU icinde durur; metne cevrilince satir " | " ile baslar ve satir-basi
 capasi tutmaz - o dosyalamalar "bolumsuz" gorunur. Regex satir basinda
 `| > * - .` gibi isaretlere izin veriyor.
+### KK-28: Bakim turu - onbellek katmani, bolum tekillestirme, eval set kapsami
+**Tarih:** 14 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §2, §11
+
+Uc kusur, ucu de canli kullanimda goruldu ya da olculdu:
+
+**1. Ayristirma her cagride tekrarlaniyordu.** Istemci ham HTML'i onbellege
+aliyordu ama metne cevirme her sayfa cevirmede yeniden yapiliyordu. Olculdu:
+2,2 MB HTML -> **0,61 saniye**. Bir bolumu bes parcada okumak saniyeleri bosa
+harciyordu.
+
+**Karar:** onbellek istemciden sunucuya tasindi ve **cevrilmis metni** tutuyor
+(`server._BELGE_METNI`, FIFO, 3 belge). Ham HTML artik hic saklanmiyor - metin
+ondan ~20 kat kucuk. `srv` fixture'i onbellegi temizliyor: modul duzeyinde
+durum testler arasi sizarsa "indirildi mi" olcumu anlamsizlasir.
+
+**2. Bolum listesinde ayni kod iki kez cikiyordu.** Canli olcumde (TSLA FY2023
+10-K) esikten gecen ikinci bir "Item 16" listenin BASINDA, ITEM 1'den once
+goruldu - kapak sayfasindaki bir referans bolum sanilmisti.
+
+**Karar:** liste kod bazinda tekillestiriliyor (`item 7`, `note 12`), ayni kod
+birden fazla gecerse **en uzun blok** kaliyor. Alt dize aramasinda (farkli
+kodlar ayni ifadeyi tasiyabilir) yine en uzun blok kazaniyor; ikisi ayri
+testlerle korunuyor.
+
+**3. Degerlendirme seti uc yeni araci kapsamiyordu.** Kendi kuralimiz "API'yi
+genisletmek eval set bir bosluk gosterince acilir" diyordu; tersi de gecerli.
+Set 15 soruya cikti ve `test_her_arac_degerlendirme_setinde_temsil_ediliyor`
+artik kapsanmayan bir arac eklenmesini kirmiziya donduruyor.

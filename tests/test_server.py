@@ -103,9 +103,11 @@ BELGE_HTML = """<html><head><title>10-K</title>
 <style>.x { color: red; }</style>
 <script>var gizli = "SCRIPT ICERIGI SIZDI";</script></head>
 <body>
+<div style="display:none">false0001318605 http://fasb.org/us-gaap/2023#RevenueFromContractWithCustomerExcludingAssessedTax GIZLI IXBRL GURULTUSU</div>
 <div>Table of Contents</div>
 <div>Item 1. Business</div>
 <div>Item 1A. Risk Factors</div>
+<div>Item 3. Legal Proceedings</div>
 <div>Item 7. Management's Discussion and Analysis</div>
 <div>Item 8. Financial Statements</div>
 
@@ -154,6 +156,17 @@ BELGE_TABLO = """<html><body>
 </body></html>"""
 
 
+# Dorduncu belge: "taxes" ifadesi IKI farkli baslikta geciyor; kisa olan bir
+# atif, uzun olan asil dipnot.
+VERGI_UZUN_ISARET = "REAL TAX FOOTNOTE BODY"
+BELGE_IKI_VERGI = """<html><body>
+<div>Note 3 – Deferred Taxes Summary</div>
+<p>""" + "See Note 12 for the detail. " * 20 + """</p>
+<div>Note 12 – Income Taxes</div>
+<p>""" + VERGI_UZUN_ISARET + """. """ + "Tax detail. " * 200 + """</p>
+</body></html>"""
+
+
 ISTEK_KAYDI: list[str] = []
 
 
@@ -168,6 +181,9 @@ def handler(request: httpx.Request) -> httpx.Response:
     if "companyfacts" in u:
         return httpx.Response(200, json=FACTS)
     if "/Archives/edgar/data/" in u:
+        if "form4.xml" in u:
+            return httpx.Response(200, text=BELGE_IKI_VERGI,
+                                  headers={"Content-Type": "text/html"})
         if "aapl-8k.htm" in u:
             return httpx.Response(200, text=BELGE_TABLO,
                                   headers={"Content-Type": "text/html"})
@@ -199,6 +215,9 @@ def srv(monkeypatch):
     c._http = httpx.AsyncClient(transport=httpx.MockTransport(handler),
                                 headers={"User-Agent": "Test Runner test@ornek.com"})
     s._client = c
+    # Belge metni onbellegi modul duzeyinde: testler arasi sizarsa bir test
+    # otekinin onbellegini kullanir ve "indirildi mi" olcumu anlamsizlasir.
+    s._BELGE_METNI.clear()
     return s
 
 @pytest.mark.anyio
@@ -978,6 +997,11 @@ async def test_icindekiler_tablosu_bolum_sanilmiyor(srv):
     yediler = [x for x in b.available_sections if x.lower().startswith("item 7")]
     assert len(yediler) == 1, f"icindekiler girisi de bolum sayilmis: {yediler}"
 
+    # Icindekilerde adi gecen ama GOVDESI OLMAYAN madde listeye girmemeli.
+    # Gercek ornek: TSLA FY2025 10-K'da ITEM 3 yok, FY2023'te var.
+    ucler = [x for x in b.available_sections if x.lower().startswith("item 3")]
+    assert not ucler, f"govdesiz icindekiler girisi bolum sayilmis: {ucler}"
+
 
 @pytest.mark.anyio
 async def test_dipnot_basligiyla_da_bolum_secilebiliyor(srv):
@@ -1077,3 +1101,66 @@ async def test_tablo_icindeki_basliklar_da_bulunuyor(srv):
                                    section="Item 7", max_characters=40000)
     assert TABLO_ISARET in b.text
     assert b.section_matched and "item 7" in b.section_matched.lower()
+
+
+@pytest.mark.anyio
+async def test_gizli_ixbrl_blogu_metne_girmiyor(srv):
+    """Olculdu (14 Agu 2026, TSLA FY2023 10-K): modern dosyalamalar
+    `display:none` bir blokla basliyor ve belgenin ILK 1200 karakteri ad alani
+    URL'lerinden ibaret. Model belgeyi bastan okudugunda gurultuyle karsilasir
+    ve icerigi orada sanir."""
+    b = await srv.read_filing_text(ticker="AAPL", max_characters=2000)
+    assert "GIZLI IXBRL GURULTUSU" not in b.text
+    assert "fasb.org" not in b.text
+    assert b.text.lstrip().startswith("Table of Contents"), b.text[:120]
+
+
+@pytest.mark.anyio
+async def test_belge_metne_bir_kez_cevriliyor(srv, monkeypatch):
+    """Olculdu (14 Agu 2026): 2,2 MB HTML'i metne cevirmek 0,61 saniye.
+    Sayfalama ayni belgeyi defalarca ister; her cagride yeniden cevirmek
+    bir bolumu bes parcada okurken saniyeleri bosa harcar."""
+    from edgar_mcp import belge as b
+    from edgar_mcp import server as s
+
+    sayac = {"n": 0}
+    gercek = b.metne_cevir
+
+    def sayan(govde: str) -> str:
+        sayac["n"] += 1
+        return gercek(govde)
+
+    monkeypatch.setattr(s, "metne_cevir", sayan)
+
+    await srv.read_filing_text(ticker="AAPL", max_characters=500)
+    await srv.read_filing_text(ticker="AAPL", offset=500, max_characters=500)
+    await srv.read_filing_text(ticker="AAPL", section="Item 7", max_characters=500)
+    assert sayac["n"] == 1, f"belge {sayac['n']} kez ayristirilmis"
+
+
+@pytest.mark.anyio
+async def test_bolum_listesi_ayni_kodu_bir_kez_veriyor(srv):
+    """Canli olcumde (TSLA FY2023 10-K) esikten gecen ikinci bir "Item 16"
+    listenin BASINDA, ITEM 1'den once goruluyordu - kapak sayfasindaki bir
+    referans bolum sanilmisti."""
+    b = await srv.read_filing_text(ticker="AAPL",
+                                   accession_number="0000320193-24-000123")
+    kodlar = [x.lower().split(".")[0].strip() for x in b.available_sections]
+    assert len(kodlar) == len(set(kodlar)), f"ayni kod birden fazla: {kodlar}"
+    # ve kalan, kisa icindekiler girisi degil ASIL bolum olmali
+    tam = await srv.read_filing_text(ticker="AAPL",
+                                     accession_number="0000320193-24-000123",
+                                     section="Item 7", max_characters=40000)
+    assert UZUN_TOC_ISARET in tam.text
+
+
+@pytest.mark.anyio
+async def test_alt_dize_aramasinda_en_uzun_bolum_kazanir(srv):
+    """Iki FARKLI baslik ayni ifadeyi tasiyabilir ("taxes"). Tekillestirme
+    burada yardim etmez - kodlar farkli. Kural: en uzun blok kazanir, cunku
+    asil bolum ozet/atif satirindan uzundur."""
+    b = await srv.read_filing_text(ticker="AAPL",
+                                   accession_number="0000320193-25-000012",
+                                   section="taxes", max_characters=40000)
+    assert VERGI_UZUN_ISARET in b.text
+    assert b.section_matched and "note 12" in b.section_matched.lower()
