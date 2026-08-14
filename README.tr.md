@@ -29,6 +29,7 @@ tuzak barındırıyor. Bu projenin asıl kısmı o tuzakları ele alması.
 | `sec_edgar_list_filings` | Son dosyalamalar, form türüne göre filtrelenebilir |
 | `sec_edgar_get_concept_series` | Tek bir finansal kalemin zaman serisi |
 | `sec_edgar_get_fact_revisions` | Bir rakamın dosyalamalar arasında nasıl değiştiği — yeniden düzenlemeler, her değişimin erişim numarasıyla |
+| `sec_edgar_read_filing_text` | XBRL'in taşımadığı anlatı: MD&A, risk faktörleri, vergi ve segment dipnotları |
 | `sec_edgar_list_available_concepts` | Şirketin fiilen raporladığı etiketler, kullandığı her taksonomide |
 
 Her araç Pydantic modeli döndürür; MCP `outputSchema` otomatik üretilir ve
@@ -45,6 +46,27 @@ tablolar `us-gaap` içinde, halka açıklık oranı ve hisse adedi `dei` içinde
 Her araç `readOnlyHint: true` ilan eder. Bu bir **ipucudur**, garanti
 değil — garanti, pakette hiçbir yazma yolunun bulunmaması ve bunu bir testin
 zorunlu tutmasıdır.
+
+### Dosyalama metnini okumak
+
+XBRL rakamı taşır, gerekçeyi taşımaz. `sec_edgar_read_filing_text` dosyalamanın
+kendisini okuyup adlandırılmış bir bölümü döndürür — MD&A, risk faktörleri,
+gelir vergisi dipnotu.
+
+Bunu göründüğünden zorlaştıran iki şey var ve ikisi de testle korunuyor:
+
+- **İçindekiler tablosu bölümle aynı şeyi yazar.** "Item 7. Management's
+  Discussion and Analysis" bir 10-K'da en az iki kez geçer: bir kez içindekiler
+  girişi, bir kez bölümün kendisi. İlk eşleşmeyi almak modele iki satırlık bir
+  gezinme listesi verir ve bölüm boş görünür. Bir başlık, ancak ardından
+  gerçek metin geliyorsa bölüm sayılır; yine de iki kez geçiyorsa uzun olan
+  kazanır.
+- **Dosyalamalar milyonlarca karakter.** Metin `offset` / `has_more` ile
+  sınırlı parçalar hâlinde döner ve indirilen belge önbelleklenir; bir bölümde
+  sayfa çevirmek her çağrıda birkaç MB yeniden indirmez.
+
+Araç bölümsüz çağrılırsa dosyalamanın gerçekten sahip olduğu başlıkları
+döndürür; ikinci çağrı tahmin etmek yerine birini adıyla ister.
 
 ## Ele alınan üç tuzak
 

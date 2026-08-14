@@ -492,3 +492,35 @@ listeler (§18/P-13).
 **2018-01-31'de emekliye ayrildigini** ve verinin 2014-2018 arasinda bittigini
 gosterdi. Guncel donem icin segment kirilimi companyfacts'te YOK; sirkete ozel
 taksonomi de yok. Rapordaki "segment gorulemiyor" sinirlamasi gecerli.
+
+### KK-27: Dosyalama metni ayri bir modul, ve icindekiler tablosu ilk tuzak
+**Tarih:** 14 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §3, §16
+
+Tesla raporunda dort ve besinci bosluk metinden geliyordu: kilavuzluk ve 2023
+vergi kaleminin gerekcesi XBRL'de yok, dosyalamanin METNINDE var.
+`sec_edgar_read_filing_text` bunu aciyor.
+
+**Bagimlilik eklenmedi.** HTML->metin donusumu stdlib `html.parser` ile
+(`src/edgar_mcp/belge.py`); BeautifulSoup cekirdek bagimliligini birkac satir
+icin buyuturdu (KK-3).
+
+**Uc karar, ucu de testle sabit:**
+1. **Icindekiler tablosu bolum degildir.** "Item 7. ..." bir 10-K'da en az iki
+   kez gecer. Bir baslik adayi, ancak ardindan `BOLUM_ESIGI` (400) karakterden
+   fazla metin geliyorsa gercek bolumdur. Esik yetmediginde -- bazi
+   dosyalamalarda icindekiler girisleri uzun aciklamalar tasir -- ikinci kural
+   devreye girer: ayni baslik birden fazla kez geciyorsa EN UZUN blok secilir.
+2. **Tablolar duz atilmaz.** Mali tablolar HTML tablosudur; hucreler ` | ` ile
+   ayrilmazsa sayilar birbirine yapisir ve okunamaz.
+3. **Sayfalama zorunlu.** Bir 10-K milyonlarca karakter; `max_characters` +
+   `offset` + `has_more` ile parca parca verilir. Indirilen belge istemcide
+   FIFO onbellege alinir (en fazla 3 belge) - sayfalama ayni belgeyi tekrar
+   tekrar ister, her seferinde birkac MB indirmek SEC hiz sinirini yer.
+
+Bes enjeksiyon dogruluyor: esigi kaldir, ilk eslesmeyi al, script atlamayi
+kapat, sayfalamayi kaldir, onbellegi kapat.
+
+**Dorduncu karar (ayni gun eklendi):** basliklar gercek dosyalamalarda HTML
+TABLOSU icinde durur; metne cevrilince satir " | " ile baslar ve satir-basi
+capasi tutmaz - o dosyalamalar "bolumsuz" gorunur. Regex satir basinda
+`| > * - .` gibi isaretlere izin veriyor.

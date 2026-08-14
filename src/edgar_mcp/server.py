@@ -14,7 +14,8 @@ from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
-from .client import EdgarClient
+from .belge import bolum_sec, bolumler, metne_cevir
+from .client import SEC_WWW, EdgarClient
 
 mcp = MCPServer(
     name="sec-edgar",
@@ -267,6 +268,34 @@ class RevisionReport(BaseModel):
     revisions: list[FactRevision] = Field(
         description="Most recent period last"
     )
+
+
+class FilingText(BaseModel):
+    accession_number: str
+    form: str
+    filing_date: str
+    document_url: str = Field(description="The document this text was read from")
+    available_sections: list[str] = Field(
+        description="Section headings found in this filing, in document order. "
+        "Pass one of these back as section. Table-of-contents entries are "
+        "excluded: a heading only counts when real text follows it."
+    )
+    section_matched: str | None = Field(
+        default=None,
+        description="Heading this response was cut from; empty when the whole "
+        "document was read",
+    )
+    total_characters: int = Field(
+        description="Characters in the selected section, or in the whole "
+        "document when no section was given"
+    )
+    offset: int = Field(description="Where this chunk starts")
+    returned_characters: int = Field(description="Characters in this response")
+    has_more: bool = Field(
+        description="True if text remains after this chunk; call again with "
+        "offset = offset + returned_characters"
+    )
+    text: str
 
 
 class ConceptInfo(BaseModel):
@@ -633,6 +662,130 @@ async def get_concept_series(
         returned=len(ordered),
         has_more=len(tumu) > len(ordered),
         points=ordered,
+    )
+
+
+async def _dosyalama_bul(cik: str, accession: str | None, form_type: str) -> dict:
+    """Erisim numarasindan (ya da form turunden) dosyalama kaydini bulur."""
+    sub = await _c().submissions(cik)
+    r = sub.get("filings", {}).get("recent", {})
+    n = len(r.get("accessionNumber", []))
+    for i in range(n):
+        if accession:
+            if r["accessionNumber"][i] != accession:
+                continue
+        elif r["form"][i] != form_type:
+            continue
+        return {
+            "accession_number": r["accessionNumber"][i],
+            "form": r["form"][i],
+            "filing_date": r["filingDate"][i],
+            "primary_document": r["primaryDocument"][i],
+        }
+    if accession:
+        raise ValueError(
+            f"Accession number {accession} is not in the recent filings feed "
+            "for this company. Call sec_edgar_list_filings to see the "
+            "accession numbers that are available."
+        )
+    raise ValueError(
+        f"No {form_type} filing found for this company in the recent filings "
+        "feed. Call sec_edgar_list_filings without form_type to see which "
+        "forms it has filed."
+    )
+
+
+@mcp.tool(
+    name="sec_edgar_read_filing_text",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
+    description=(
+        "Reads the TEXT of a filing - the parts XBRL does not carry: "
+        "management's discussion, risk factors, the segment note, the income "
+        "tax note, and any other narrative.\n"
+        "Call it without a section first: the response lists the headings this "
+        "filing actually has, so the next call can name one instead of "
+        "guessing. Filings run to millions of characters, so text comes back "
+        "in chunks - use offset with the has_more flag to keep reading.\n"
+        "Use the XBRL tools for figures and this one for the reasons behind "
+        "them."
+    ),
+)
+async def read_filing_text(
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL")],
+    accession_number: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="Exact filing to read, as returned by "
+            "sec_edgar_list_filings. Omit to read the most recent filing of "
+            "form_type.",
+        ),
+    ] = None,
+    form_type: Annotated[
+        str,
+        Field(default="10-K", description="Form type to read when no accession number is given"),
+    ] = "10-K",
+    section: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="Heading to cut out, e.g. 'Item 7' or 'income taxes'. "
+            "Omit to read the document from the start. Match is on the "
+            "headings listed in available_sections.",
+        ),
+    ] = None,
+    offset: Annotated[
+        int,
+        Field(default=0, ge=0, description="Character position to start from"),
+    ] = 0,
+    max_characters: Annotated[
+        int,
+        Field(default=6000, ge=500, le=40000,
+              description="Maximum characters of text to return in one call"),
+    ] = 6000,
+) -> FilingText:
+    cik = await _c().cik_for_ticker(ticker)
+    kayit = await _dosyalama_bul(cik, accession_number, form_type)
+
+    url = (
+        f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
+        f"{kayit['accession_number'].replace('-', '')}/{kayit['primary_document']}"
+    )
+    metin = metne_cevir(await _c().filing_document(url))
+
+    bulunanlar = bolumler(metin)
+    basliklar = [b[0] for b in bulunanlar]
+
+    secilen = None
+    if section:
+        vurus = bolum_sec(bulunanlar, section)
+        if vurus is None:
+            raise ValueError(
+                f"No section matching '{section}' was found in this filing. "
+                f"It has these headings: {'; '.join(basliklar[:25]) or 'none'}. "
+                "Call this tool without section to read from the start."
+            )
+        secilen = vurus[0]
+        metin = metin[vurus[1]:vurus[2]]
+
+    parca = metin[offset:offset + max_characters]
+    return FilingText(
+        accession_number=kayit["accession_number"],
+        form=kayit["form"],
+        filing_date=kayit["filing_date"],
+        document_url=url,
+        available_sections=basliklar,
+        section_matched=secilen,
+        total_characters=len(metin),
+        offset=offset,
+        returned_characters=len(parca),
+        has_more=offset + len(parca) < len(metin),
+        text=parca,
     )
 
 

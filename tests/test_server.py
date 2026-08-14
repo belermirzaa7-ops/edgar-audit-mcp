@@ -91,6 +91,69 @@ SALES_REVENUE = {"label": "Sales Revenue, Net", "units": {"USD": [
     {"start":"2020-09-27","end":"2021-09-25","val":999_000_000_000,"fy":2021,"fp":"FY","form":"10-K","filed":"2021-10-29"},
 ]}}
 
+
+# --------------------------------------------------------- sahte 10-K belgesi
+# Gercek bir 10-K'nin iki ozelligini tasimali, yoksa metin araci sinanmis olmaz:
+# (1) icindekiler tablosu ayni basliklari ONCE kisa baglantilar olarak icerir,
+# (2) mali tablolar HTML tablosudur.
+MDA_ISARET = "OPERATING MARGIN FELL BECAUSE OF PRICING"
+VERGI_ISARET = "valuation allowance release of $5.0 billion"
+
+BELGE_HTML = """<html><head><title>10-K</title>
+<style>.x { color: red; }</style>
+<script>var gizli = "SCRIPT ICERIGI SIZDI";</script></head>
+<body>
+<div>Table of Contents</div>
+<div>Item 1. Business</div>
+<div>Item 1A. Risk Factors</div>
+<div>Item 7. Management's Discussion and Analysis</div>
+<div>Item 8. Financial Statements</div>
+
+<div>Item 1. Business</div>
+<p>We design and sell things. """ + "Business filler. " * 40 + """</p>
+
+<div>Item 1A. Risk Factors</div>
+<p>Demand may fall. """ + "Risk filler. " * 40 + """</p>
+
+<div>Item 7. Management's Discussion and Analysis</div>
+<p>""" + MDA_ISARET + """ and mix. Research &amp; development rose.</p>
+<table><tr><td>Revenue</td><td>391,035</td></tr>
+<tr><td>Net income</td><td>93,736</td></tr></table>
+<p>""" + "MD&A filler. " * 40 + """</p>
+
+<div>Item 8. Financial Statements</div>
+<p>""" + "Statement filler. " * 40 + """</p>
+
+<div>Note 12. Income Taxes</div>
+<p>The benefit includes a """ + VERGI_ISARET + """. """ + "Tax filler. " * 40 + """</p>
+</body></html>"""
+
+
+# Ikinci sahte belge: icindekiler tablosu UZUN, yani esik filtresini gecer.
+# Bu durumda "hangi eslesme?" sorusunu esik degil, uzunluk kurali cozer.
+UZUN_TOC_ISARET = "REAL SECTION SEVEN BODY"
+BELGE_UZUN_TOC = """<html><body>
+<div>Item 7. Management's Discussion and Analysis</div>
+<p>""" + "See page 44 for a summary of results and outlook. " * 20 + """</p>
+<div>Item 8. Financial Statements</div>
+<p>""" + "See page 61 for the audited statements and notes. " * 20 + """</p>
+
+<div>Item 7. Management's Discussion and Analysis</div>
+<p>""" + UZUN_TOC_ISARET + """. """ + "Detailed discussion. " * 200 + """</p>
+</body></html>"""
+
+
+# Ucuncu belge: basliklar TABLO icinde. Gercek 10-K'larin cogu boyle yerlesir;
+# metne cevrilince satir " | " ile basladigi icin satir-basi capasi tutmaz.
+TABLO_ISARET = "TABLE LAYOUT SECTION BODY"
+BELGE_TABLO = """<html><body>
+<table><tr><td>Item 7.</td><td>Management's Discussion and Analysis</td></tr></table>
+<p>""" + TABLO_ISARET + """. """ + "Discussion filler. " * 60 + """</p>
+<table><tr><td>Item 8.</td><td>Financial Statements</td></tr></table>
+<p>""" + "Statements filler. " * 60 + """</p>
+</body></html>"""
+
+
 ISTEK_KAYDI: list[str] = []
 
 
@@ -104,6 +167,15 @@ def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=SUBS)
     if "companyfacts" in u:
         return httpx.Response(200, json=FACTS)
+    if "/Archives/edgar/data/" in u:
+        if "aapl-8k.htm" in u:
+            return httpx.Response(200, text=BELGE_TABLO,
+                                  headers={"Content-Type": "text/html"})
+        if "aapl-20240928.htm" in u:
+            return httpx.Response(200, text=BELGE_UZUN_TOC,
+                                  headers={"Content-Type": "text/html"})
+        return httpx.Response(200, text=BELGE_HTML,
+                              headers={"Content-Type": "text/html"})
     if "companyconcept" in u:
         if "/dei/EntityPublicFloat" in u:
             return httpx.Response(200, json=DEI_FLOAT)
@@ -369,6 +441,7 @@ async def test_arac_isimleri_servis_onekli():
         "sec_edgar_list_filings",
         "sec_edgar_get_concept_series",
         "sec_edgar_get_fact_revisions",
+        "sec_edgar_read_filing_text",
         "sec_edgar_list_available_concepts",
     }, f"beklenmeyen arac isimleri: {isimler}"
 
@@ -877,3 +950,130 @@ async def test_olmayan_taksonomi_eyleme_donusturulebilir_hata_verir(srv):
         await srv.list_available_concepts(ticker="AAPL", taxonomy="tsla")
     mesaj = str(e.value)
     assert "tsla" in mesaj and "us-gaap" in mesaj and "dei" in mesaj
+
+
+# ================== belge metni araci (Tesla raporu bosluk 4 ve 5)
+@pytest.mark.anyio
+async def test_belge_bolumleri_kesfedilebilir(srv):
+    """Model hangi bolumlerin oldugunu tahmin etmemeli; ilk cagri onlari
+    listelemeli (§18)."""
+    b = await srv.read_filing_text(ticker="AAPL")
+    basliklar = " | ".join(b.available_sections).lower()
+    assert "item 7" in basliklar and "item 1a" in basliklar
+    assert "note 12" in basliklar
+    assert b.form == "10-K" and b.accession_number == "0000320193-25-000073"
+
+
+@pytest.mark.anyio
+async def test_icindekiler_tablosu_bolum_sanilmiyor(srv):
+    """ASIL TUZAK: "Item 7. ..." ifadesi belgede EN AZ IKI kez gecer - once
+    icindekiler tablosunda, sonra bolumun kendisinde. Ilk eslesmeyi almak
+    modele iki satirlik bir baglanti listesi dondurur ve bolum bos gorunur."""
+    b = await srv.read_filing_text(ticker="AAPL", section="Item 7")
+
+    assert MDA_ISARET in b.text, "icindekiler tablosu bolum sanilmis"
+    assert "Item 8" not in b.text, "bolum siniri asilmis"
+    assert b.section_matched and "item 7" in b.section_matched.lower()
+    # Icindekiler girisleri liste disi kalmali: her baslik BIR kez gorunmeli
+    yediler = [x for x in b.available_sections if x.lower().startswith("item 7")]
+    assert len(yediler) == 1, f"icindekiler girisi de bolum sayilmis: {yediler}"
+
+
+@pytest.mark.anyio
+async def test_dipnot_basligiyla_da_bolum_secilebiliyor(srv):
+    """Rapordaki 5. bosluk: 2023 vergi kaleminin GEREKCESI dipnotta."""
+    b = await srv.read_filing_text(ticker="AAPL", section="income taxes")
+    assert VERGI_ISARET in b.text
+    assert b.section_matched and "note 12" in b.section_matched.lower()
+
+
+@pytest.mark.anyio
+async def test_belge_metni_sayfalaniyor(srv):
+    """Bir 10-K milyonlarca karakter; kirpilmadan dondurmek modeli bogar."""
+    ilk = await srv.read_filing_text(ticker="AAPL", section="Item 7",
+                                     max_characters=500)
+    assert ilk.returned_characters == 500
+    assert ilk.has_more is True
+    assert ilk.offset == 0
+
+    devam = await srv.read_filing_text(ticker="AAPL", section="Item 7",
+                                       offset=500, max_characters=500)
+    assert devam.offset == 500
+    assert devam.text != ilk.text
+    assert devam.total_characters == ilk.total_characters
+
+    hepsi = await srv.read_filing_text(ticker="AAPL", section="Item 7",
+                                       max_characters=40000)
+    assert hepsi.has_more is False
+    assert hepsi.text.startswith(ilk.text[:200])
+
+
+@pytest.mark.anyio
+async def test_script_ve_stil_metne_karismiyor(srv):
+    """HTML'i duz atmak <script> govdesini metne sokar; model onu belge
+    icerigi sanir."""
+    b = await srv.read_filing_text(ticker="AAPL", max_characters=40000)
+    assert "SCRIPT ICERIGI SIZDI" not in b.text
+    assert "color: red" not in b.text
+    assert "Research & development" in b.text, "HTML varligi cozulmemis"
+    assert "Revenue | 391,035" in b.text, "tablo hucreleri birbirine yapismis"
+
+
+@pytest.mark.anyio
+async def test_olmayan_bolum_eyleme_donusturulebilir_hata_verir(srv):
+    with pytest.raises(ValueError) as e:
+        await srv.read_filing_text(ticker="AAPL", section="Item 99")
+    mesaj = str(e.value)
+    assert "Item 99" in mesaj
+    assert "Item 7" in mesaj, "hata mesaji mevcut bolumleri listelemiyor"
+
+
+@pytest.mark.anyio
+async def test_ayni_belge_iki_kez_indirilmiyor(srv):
+    """Sayfalama ayni belgeyi tekrar tekrar ister; her seferinde 5-15 MB
+    indirmek hem yavas hem SEC hiz sinirini yer."""
+    ISTEK_KAYDI.clear()
+    await srv.read_filing_text(ticker="AAPL", max_characters=500)
+    await srv.read_filing_text(ticker="AAPL", offset=500, max_characters=500)
+    indirme = [u for u in ISTEK_KAYDI if "/Archives/edgar/data/" in u]
+    assert len(indirme) == 1, f"belge {len(indirme)} kez indirilmis"
+
+
+@pytest.mark.anyio
+async def test_erisim_numarasiyla_belirli_dosyalama_okunabiliyor(srv):
+    b = await srv.read_filing_text(ticker="AAPL",
+                                   accession_number="0000320193-24-000123")
+    assert b.accession_number == "0000320193-24-000123"
+    assert b.filing_date == "2024-11-01"
+    assert "000032019324000123/aapl-20240928.htm" in b.document_url
+
+
+@pytest.mark.anyio
+async def test_olmayan_erisim_numarasi_eyleme_donusturulebilir_hata_verir(srv):
+    with pytest.raises(ValueError) as e:
+        await srv.read_filing_text(ticker="AAPL", accession_number="0000-00-000")
+    assert "sec_edgar_list_filings" in str(e.value)
+
+
+@pytest.mark.anyio
+async def test_ayni_baslik_iki_kez_gecerse_ASIL_bolum_secilir(srv):
+    """Esik filtresi icindekiler tablosunu her zaman elemez: bazi dosyalamalarda
+    icindekiler girisleri uzun aciklamalar tasir ve esigi gecer. O durumda
+    ayirt edici olan UZUNLUKTUR - asil bolum daima daha uzundur."""
+    b = await srv.read_filing_text(ticker="AAPL",
+                                   accession_number="0000320193-24-000123",
+                                   section="Item 7", max_characters=40000)
+    assert UZUN_TOC_ISARET in b.text, "kisa icindekiler girisi secilmis"
+    assert "See page 44" not in b.text
+
+
+@pytest.mark.anyio
+async def test_tablo_icindeki_basliklar_da_bulunuyor(srv):
+    """Gercek 10-K'larin cogunda bolum basliklari HTML TABLOSU icinde durur.
+    Metne cevrilince satir " | " ile basladigi icin satir-basi capasi tutmaz ve
+    hicbir bolum bulunamaz - dosyalama "bolumsuz" gorunur."""
+    b = await srv.read_filing_text(ticker="AAPL",
+                                   accession_number="0000320193-25-000041",
+                                   section="Item 7", max_characters=40000)
+    assert TABLO_ISARET in b.text
+    assert b.section_matched and "item 7" in b.section_matched.lower()

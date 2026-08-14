@@ -31,6 +31,7 @@ answers. The interesting part of this project is handling them.
 | `sec_edgar_list_filings` | Recent filings with links, filterable by form type |
 | `sec_edgar_get_concept_series` | Time series for one financial concept |
 | `sec_edgar_get_fact_revisions` | How a reported figure changed across filings — restatements, with the accession number of each change |
+| `sec_edgar_read_filing_text` | The narrative XBRL does not carry: MD&A, risk factors, the tax and segment notes |
 | `sec_edgar_list_available_concepts` | Which tags a company actually reports, in any taxonomy it uses |
 
 Every tool returns a Pydantic model, so MCP `outputSchema` is generated
@@ -48,6 +49,27 @@ float and shares outstanding live in `dei`.
 Every tool is annotated `readOnlyHint: true`. That annotation is a hint,
 not a guarantee — the guarantee is that the package contains no write path at
 all, which a test enforces.
+
+### Reading the filing text
+
+XBRL carries the numbers, not the reasons. `sec_edgar_read_filing_text` reads
+the filing itself and hands back a named section — MD&A, risk factors, the
+income-tax note.
+
+Two things make that harder than it sounds, and both are guarded by tests:
+
+- **The table of contents says the same thing as the section.** "Item 7.
+  Management's Discussion and Analysis" appears at least twice in a 10-K: once
+  as a contents entry, once as the section. Taking the first match hands the
+  model two lines of navigation and an apparently empty section. A heading only
+  counts when real text follows it, and when a heading still appears twice, the
+  longer block wins.
+- **Filings are millions of characters.** Text comes back in bounded chunks
+  with `offset` / `has_more`, and the fetched document is cached, so paging
+  through a section does not re-download several megabytes per call.
+
+Calling the tool without a section returns the headings the filing actually
+has, so the next call names one instead of guessing.
 
 ## Three traps this server handles
 

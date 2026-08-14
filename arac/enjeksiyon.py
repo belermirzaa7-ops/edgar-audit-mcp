@@ -20,6 +20,7 @@ DOSYALAR = [
     "src/edgar_mcp/server.py",
     "src/edgar_mcp/client.py",
     "arac/sir_tarama.py",
+    "src/edgar_mcp/belge.py",
     "Dockerfile",
 ]
 
@@ -243,6 +244,42 @@ ENJEKSIYONLAR = [
   "mcp.run(transport='streamable-http', host='0.0.0.0', stateless_http=True)",
   "mcp.run(transport='streamable-http')",
   "test_dockerfile_loopback_disina_baglaniyor"),
+
+ ("Belge: satir basi isaretlerine izni kaldir (tablo yerlesimi kaybolsun)",
+  "src/edgar_mcp/belge.py",
+  '_ONEK = r"^[\\s|>*\\-–—.]*"',
+  '_ONEK = r"^\\s*"',
+  "test_tablo_icindeki_basliklar_da_bulunuyor"),
+
+ ("Belge: icindekiler tablosu esigini kaldir (TOC bolum sayilsin)",
+  "src/edgar_mcp/belge.py",
+  "BOLUM_ESIGI = 400",
+  "BOLUM_ESIGI = 0",
+  "test_icindekiler_tablosu_bolum_sanilmiyor"),
+
+ ("Belge: ayni baslikta ILK eslesmeyi al (asil bolum yerine ozet)",
+  "src/edgar_mcp/belge.py",
+  "    return max(eslesen, key=lambda b: b[2] - b[1])",
+  "    return eslesen[0]",
+  "test_ayni_baslik_iki_kez_gecerse_ASIL_bolum_secilir"),
+
+ ("Belge: script/style atlamayi kapat (govde metne sizsin)",
+  "src/edgar_mcp/belge.py",
+  "        if tag in _ATLANAN:",
+  "        if False:",
+  "test_script_ve_stil_metne_karismiyor"),
+
+ ("Belge: sayfalamayi kaldir (tum belgeyi don)",
+  "src/edgar_mcp/server.py",
+  "    parca = metin[offset:offset + max_characters]",
+  "    parca = metin[offset:]",
+  "test_belge_metni_sayfalaniyor"),
+
+ ("Belge: onbellegi kapat (her sayfada yeniden indir)",
+  "src/edgar_mcp/client.py",
+  "        if url in self._belge_cache:",
+  "        if False:",
+  "test_ayni_belge_iki_kez_indirilmiyor"),
 
  ("Taksonomi onekini yoksay (her etiketi us-gaap'ta ara)",
   "src/edgar_mcp/server.py",

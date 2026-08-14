@@ -75,7 +75,7 @@ def test_http_tasimasi_araclari_el_sikismasiz_listeler():
     try:
         govde = _tools_list(port)
         assert "sec_edgar_get_concept_series" in govde
-        assert govde.count("sec_edgar_") >= 5, govde[:300]
+        assert govde.count("sec_edgar_") >= 6, govde[:300]
     finally:
         p.terminate()
         try:
@@ -151,5 +151,5 @@ def test_stdio_tasimasi_resmi_istemciyle_araclari_listeliyor():
     # sabitleniyor; burada GERCEK tel uzerinden ayni kumenin geldigi dogrulanir.
     assert "sec_edgar_get_concept_series" in adlar
     assert "sec_edgar_get_fact_revisions" in adlar
-    assert len(adlar) == 5, adlar
+    assert len(adlar) == 6, adlar
     assert all(a.startswith("sec_edgar_") for a in adlar), adlar
