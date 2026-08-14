@@ -447,3 +447,48 @@ dogrudan cagiriyorlar, HTTP tasimasina hic dokunmuyorlardi.
 - Enjeksiyon: Dockerfile'dan acik host kaldirilir, ilgili test kirmiziya doner.
 
 Bkz. PATTERNS.md P-20.
+
+### KK-25: Revizyon gecmisi ayri bir arac, ve revizyon "farkli deger" demektir
+**Tarih:** 14 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §12
+
+Tesla analizinde soyle bir sinir yazildi: "tum degerler en son sunulan
+halleriyle alindi; SEC'e duzeltme sunulursa rakamlar degisir." Bu bilgi zaten
+elimizdeydi - seri araci ayni donemin farkli dosyalamalardaki degerlerini
+cekiyor, sonra dedup edip ATIYORDU. `sec_edgar_get_fact_revisions` artik onu
+atmiyor.
+
+**Iki ayrim testle sabit:**
+1. **Tekrar revizyon degildir.** Bir 10-K uc yillik karsilastirma tasir; ayni
+   deger her dosyalamada tekrar raporlanir. Tekrari revizyon saymak her donemi
+   "revize" gosterir ve arac ise yaramaz olur. Sayilan sey FARKLI degerlerdir;
+   tekrar sayisi `times_repeated` alaninda ayrica durur.
+2. **Etiket farki revizyon degildir.** Ayni donem iki US-GAAP etiketinde farkli
+   degerle gecebilir (takma ad birlestirmesi yuzunden gorunur olur). Ilk
+   surumde bunlar revizyon sayiliyordu; test yakaladi. Gruplama artik
+   `(etiket, donem_sonu, birim)`.
+
+Her satir `accession_number` tasir - degisimin hangi dosyalamada oldugu
+tiklanabilir.
+
+### KK-26: Taksonomi onekli etiketler; `dei` erisimi
+**Tarih:** 14 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §12
+
+Rapordaki "piyasa verisi SEC'de yok" cumlesi tam dogru degildi. Olculdu
+(`arac/tani.py TSLA --envanter`): companyfacts uc taksonomi tasiyor - `dei`,
+`us-gaap`, `ffd`. `dei` icinde `EntityPublicFloat` (halka acik kismin piyasa
+degeri, 10-K kapak sayfasi) ve `EntityCommonStockSharesOutstanding` var.
+Sunucu her istegi `us-gaap` yoluyla kurdugu icin bunlara erisemiyordu.
+
+**Karar:** etiketler `taksonomi:Etiket` seklinde nitelenebilir
+(`dei:EntityPublicFloat`); onek yoksa `us-gaap` varsayilir, yani mevcut tum
+cagrilar aynen calisir. Uc yeni takma ad: `public_float`, `shares_outstanding`,
+`shares_diluted`. `list_available_concepts` artik `taxonomy` parametresi aliyor
+ve yanitta **sirketin fiilen kullandigi taksonomileri** bildiriyor - model
+tahmin etmek zorunda kalmasin. Olmayan taksonomi istenirse hata mevcutlari
+listeler (§18/P-13).
+
+**Olculdu ve CURUTULDU:** envanterde `SalesRevenueEnergyServices` gorununce
+"kismi segment gorunurlugu var" denecekti; canli sorgu etiketin
+**2018-01-31'de emekliye ayrildigini** ve verinin 2014-2018 arasinda bittigini
+gosterdi. Guncel donem icin segment kirilimi companyfacts'te YOK; sirkete ozel
+taksonomi de yok. Rapordaki "segment gorulemiyor" sinirlamasi gecerli.

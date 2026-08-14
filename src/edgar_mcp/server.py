@@ -52,9 +52,27 @@ CONCEPT_ALIASES: dict[str, list[str]] = {
     "operating_cash_flow": ["NetCashProvidedByUsedInOperatingActivities"],
     "rnd_expense": ["ResearchAndDevelopmentExpense"],
     "capex": ["PaymentsToAcquirePropertyPlantAndEquipment"],
+    # `dei` taksonomisi: sirketin kapak sayfasi verisi. Olculdu (14 Agu 2026,
+    # `arac/tani.py TSLA --envanter`): companyfacts'te dei/us-gaap/ffd var,
+    # sirkete ozel taksonomi YOK. Piyasa degerine SEC icinde kalarak
+    # ulasilabilecek tek capa EntityPublicFloat.
+    "public_float": ["dei:EntityPublicFloat"],
+    "shares_outstanding": ["dei:EntityCommonStockSharesOutstanding"],
+    "shares_diluted": ["WeightedAverageNumberOfDilutedSharesOutstanding"],
 }
 
+VARSAYILAN_TAKSONOMI = "us-gaap"
+
 ALIAS_LIST = ", ".join(sorted(CONCEPT_ALIASES))
+
+
+def _bol(tag: str) -> tuple[str, str]:
+    """`dei:EntityPublicFloat` -> ("dei", "EntityPublicFloat").
+    Onek yoksa us-gaap varsayilir; mevcut cagrilarin hepsi oyle."""
+    if ":" in tag:
+        tax, _, ad = tag.partition(":")
+        return tax.strip(), ad.strip()
+    return VARSAYILAN_TAKSONOMI, tag
 
 
 def _gun_farki(start: str, end: str) -> int:
@@ -188,6 +206,69 @@ class ConceptSeries(BaseModel):
     points: list[FactPoint]
 
 
+class RevisionEntry(BaseModel):
+    value: float
+    unit: str
+    first_reported_in: str = Field(
+        description="Form type of the earliest filing that carried this value"
+    )
+    filed: str = Field(description="Date that filing was submitted")
+    accession_number: str | None = Field(
+        default=None, description="Accession number of that filing"
+    )
+    source_tag: str = Field(description="US-GAAP tag the value was reported under")
+    times_repeated: int = Field(
+        description="How many filings carried this same value, including the first"
+    )
+
+
+class FactRevision(BaseModel):
+    source_tag: str = Field(
+        description="US-GAAP tag this period was reported under. Revisions are "
+        "tracked per tag: two tags reporting the same period with different "
+        "values is a tagging difference, not a restatement."
+    )
+    period_end: str
+    period_start: str | None = None
+    days: int | None = None
+    unit: str
+    first_value: float = Field(description="Value as first reported to the SEC")
+    latest_value: float = Field(description="Value as most recently reported")
+    change: float = Field(description="latest_value - first_value")
+    change_percent: float | None = Field(
+        default=None, description="Percent change; empty when the first value is zero"
+    )
+    distinct_values: int = Field(
+        description="How many different values this period has been reported with"
+    )
+    entries: list[RevisionEntry] = Field(
+        description="One row per distinct value, oldest filing first"
+    )
+
+
+class RevisionReport(BaseModel):
+    cik: str
+    requested_concept: str
+    resolved_concepts: list[str]
+    source_endpoint: str = Field(
+        default="companyconcept",
+        description="Which SEC endpoint supplied these facts"
+    )
+    periods_examined: int = Field(
+        description="Periods that had at least one reported value"
+    )
+    periods_revised: int = Field(
+        description="Periods whose reported value changed at least once"
+    )
+    returned: int = Field(description="Periods in this response")
+    has_more: bool = Field(
+        description="True if more periods matched than were returned; raise limit"
+    )
+    revisions: list[FactRevision] = Field(
+        description="Most recent period last"
+    )
+
+
 class ConceptInfo(BaseModel):
     tag: str = Field(description="US-GAAP tag; can be passed verbatim to sec_edgar_get_concept_series")
     label: str | None = Field(default=None, description="Human-readable label as published by the SEC")
@@ -197,6 +278,16 @@ class ConceptInfo(BaseModel):
 
 class ConceptCatalog(BaseModel):
     cik: str
+    taxonomy: str = Field(
+        default="us-gaap",
+        description="Which taxonomy these tags come from",
+    )
+    available_taxonomies: list[str] = Field(
+        default_factory=list,
+        description="Every taxonomy this company reports facts under. us-gaap "
+        "holds the financial statements; dei holds cover-page facts such as "
+        "public float and shares outstanding. Pass one of these as taxonomy.",
+    )
     total_matching: int = Field(description="Total number of tags matching the filter")
     returned: int = Field(description="Number of tags returned in this response")
     has_more: bool = Field(description="True if more tags matched than were returned; narrow with search")
@@ -300,8 +391,9 @@ async def list_recent_filings(
 
 async def _ham_kayitlar(cik: str, tag: str) -> dict | None:
     """Tek etiketin ham companyconcept yaniti. Etiket yoksa None."""
+    taksonomi, ad = _bol(tag)
     try:
-        return await _c().company_concept(cik, tag)
+        return await _c().company_concept(cik, ad, taxonomy=taksonomi)
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             return None
@@ -331,13 +423,31 @@ def _satir_sayisi(veriler: list[tuple[str, dict]]) -> int:
 def _facts_kayit(facts: dict, tag: str) -> dict | None:
     """companyfacts yanitindan tek etiketi companyconcept sekline cevirir.
     Ikisinin satir yapisi ayni (end/start/val/form/filed), sarmalayici farkli."""
-    gaap = (facts.get("facts") or {}).get("us-gaap") or {}
-    kayit = gaap.get(tag)
+    taksonomi, ad = _bol(tag)
+    govde = (facts.get("facts") or {}).get(taksonomi) or {}
+    kayit = govde.get(ad)
     if not kayit:
         return None
     if not any(rows for _, rows in _kullanilabilir_birimler(kayit)):
         return None
     return {"label": kayit.get("label"), "units": kayit.get("units") or {}}
+
+
+def _donem_uyuyor(period: str, days: int | None) -> bool:
+    """Donem filtresi TEK yerde. Seri ve revizyon araclari ayni kurali
+    kullanmali; kopyalanirsa biri duzeltilip oteki unutulur ve ayrica
+    enjeksiyon hedefi benzersiz olmaktan cikar (KK-18).
+
+    Yillik = 300-400 gun, ceyreklik = 60-120 gun. Ani (instant) kayitlarda
+    `days` yoktur: yillik ve 'all' bunlari kabul eder, ceyreklik etmez.
+    """
+    if period == "quarterly" and days is None:
+        return False
+    if period == "all" or days is None:
+        return True
+    if period == "annual":
+        return 300 <= days <= 400
+    return 60 <= days <= 120
 
 
 def _noktalar(veri: dict, tag: str, period: str, kayma: int) -> list[FactPoint]:
@@ -352,12 +462,7 @@ def _noktalar(veri: dict, tag: str, period: str, kayma: int) -> list[FactPoint]:
 
             # SEC'in fy/fp alanlari DOSYALAMANIN donemini gosterir, verinin
             # kendi donemini DEGIL (KK-1). Donem start/end'den belirlenir.
-            if period != "all" and days is not None:
-                if period == "annual" and not (300 <= days <= 400):
-                    continue
-                if period == "quarterly" and not (60 <= days <= 120):
-                    continue
-            if period == "quarterly" and days is None:
+            if not _donem_uyuyor(period, days):
                 continue
 
             out.append(
@@ -376,51 +481,15 @@ def _noktalar(veri: dict, tag: str, period: str, kayma: int) -> list[FactPoint]:
     return out
 
 
-@mcp.tool(
-    name="sec_edgar_get_concept_series",
-    annotations=ToolAnnotations(
-        read_only_hint=True,
-        destructive_hint=False,
-        idempotent_hint=True,
-        open_world_hint=True,
-    ),
-    description=(
-        "Returns the reported time series for one financial concept (revenue, "
-        "net income, total assets, ...). Use this for trend and ratio analysis.\n"
-        "The most reliable way to call it is with one of THESE ALIASES: "
-        f"{ALIAS_LIST}.\n"
-        "An alias merges every US-GAAP tag the company has used for that concept "
-        "over time, so history is not silently truncated when a company switches "
-        "tags after an accounting standard change. A raw US-GAAP tag is also "
-        "accepted. If nothing is found, the error message explains how to "
-        "proceed."
-    ),
-)
-async def get_concept_series(
-    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL")],
-    concept: Annotated[
-        str,
-        Field(
-            description=(
-                "An alias (revenue, net_income, total_assets, ...) or a raw "
-                "US-GAAP tag (e.g. NetIncomeLoss). Call "
-                "sec_edgar_list_available_concepts to discover the tags a "
-                "company actually reports."
-            )
-        ),
-    ],
-    period: Annotated[
-        Literal["annual", "quarterly", "all"],
-        Field(default="annual", description="annual = periods spanning roughly one year; quarterly = roughly one quarter"),
-    ] = "annual",
-    limit: Annotated[
-        int,
-        Field(
-            default=12, ge=1, le=60,
-            description="Maximum number of periods to return, most recent last",
-        ),
-    ] = 12,
-) -> ConceptSeries:
+async def _kavram_verisi(
+    ticker: str, concept: str
+) -> tuple[str, list[str], list[tuple[str, dict]], str]:
+    """Takma ad cozumu + aday etiketlerin cekilmesi + bos yanit yedegi.
+
+    Iki arac da (seri ve revizyon gecmisi) ayni yolu kullanir; ayri ayri
+    yazilirsa biri duzeltilip oteki unutulur. Doner:
+    (cik, aday_etiketler, [(etiket, ham_yanit)], hangi_uc).
+    """
     cik = await _c().cik_for_ticker(ticker)
     anahtar = concept.strip().lower()
     adaylar = CONCEPT_ALIASES.get(anahtar, [concept.strip()])
@@ -474,6 +543,56 @@ async def get_concept_series(
             f"search='{concept[:12]}' to list the tags this company reports."
         )
 
+    return cik, adaylar, veriler, kaynak_uc
+
+
+@mcp.tool(
+    name="sec_edgar_get_concept_series",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
+    description=(
+        "Returns the reported time series for one financial concept (revenue, "
+        "net income, total assets, ...). Use this for trend and ratio analysis.\n"
+        "The most reliable way to call it is with one of THESE ALIASES: "
+        f"{ALIAS_LIST}.\n"
+        "An alias merges every US-GAAP tag the company has used for that concept "
+        "over time, so history is not silently truncated when a company switches "
+        "tags after an accounting standard change. A raw US-GAAP tag is also "
+        "accepted. If nothing is found, the error message explains how to "
+        "proceed."
+    ),
+)
+async def get_concept_series(
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL")],
+    concept: Annotated[
+        str,
+        Field(
+            description=(
+                "An alias (revenue, net_income, total_assets, ...) or a raw "
+                "US-GAAP tag (e.g. NetIncomeLoss). Call "
+                "sec_edgar_list_available_concepts to discover the tags a "
+                "company actually reports."
+            )
+        ),
+    ],
+    period: Annotated[
+        Literal["annual", "quarterly", "all"],
+        Field(default="annual", description="annual = periods spanning roughly one year; quarterly = roughly one quarter"),
+    ] = "annual",
+    limit: Annotated[
+        int,
+        Field(
+            default=12, ge=1, le=60,
+            description="Maximum number of periods to return, most recent last",
+        ),
+    ] = 12,
+) -> ConceptSeries:
+    cik, adaylar, veriler, kaynak_uc = await _kavram_verisi(ticker, concept)
+
     # H-1 (KK-7): mali yil adi tum kayitlardan turetilir, tahmin edilmez.
     tum_satirlar = [
         r for _, v in veriler for _, rows in _kullanilabilir_birimler(v) for r in rows
@@ -482,7 +601,7 @@ async def get_concept_series(
 
     noktalar: list[FactPoint] = []
     for tag, v in veriler:
-        noktalar.extend(_noktalar(v, tag, period, kayma))
+        noktalar.extend(_noktalar(v, _bol(tag)[1], period, kayma))
 
     # Ayni donem hem birden fazla dosyalamada hem birden fazla etikette gecer.
     # En son SUNULAN kayit kazanir; esitlikte takma ad sirasi belirler.
@@ -507,13 +626,141 @@ async def get_concept_series(
         requested_concept=concept,
         resolved_concepts=[t for t, _ in veriler],
         fiscal_year_derived=turetildi,
-        taxonomy="us-gaap",
+        taxonomy=", ".join(dict.fromkeys(_bol(t)[0] for t, _ in veriler)),
         label=veriler[0][1].get("label"),
         source_endpoint=kaynak_uc,
         total_periods=len(tumu),
         returned=len(ordered),
         has_more=len(tumu) > len(ordered),
         points=ordered,
+    )
+
+
+@mcp.tool(
+    name="sec_edgar_get_fact_revisions",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
+    description=(
+        "Shows how a reported figure CHANGED across filings. Companies restate: "
+        "the same period is reported again in later filings, sometimes with a "
+        "different number, and the revised value silently replaces the original "
+        "in most data sources.\n"
+        "Use this to answer 'was this number restated, when, and by how much', "
+        "to check whether a trend rests on revised figures, or before quoting a "
+        "historical value in an analysis. Takes the same aliases and raw tags as "
+        "sec_edgar_get_concept_series."
+    ),
+)
+async def get_fact_revisions(
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL")],
+    concept: Annotated[
+        str,
+        Field(
+            description=(
+                "An alias (revenue, net_income, total_assets, ...) or a raw "
+                "US-GAAP tag, exactly as in sec_edgar_get_concept_series"
+            )
+        ),
+    ],
+    period: Annotated[
+        Literal["annual", "quarterly", "all"],
+        Field(default="annual", description="annual = periods spanning roughly one year; quarterly = roughly one quarter"),
+    ] = "annual",
+    only_revised: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="True returns only periods whose value changed. Set to "
+            "False to also see periods that were never revised.",
+        ),
+    ] = True,
+    limit: Annotated[
+        int,
+        Field(default=12, ge=1, le=60,
+              description="Maximum number of periods to return, most recent last"),
+    ] = 12,
+) -> RevisionReport:
+    cik, adaylar, veriler, kaynak_uc = await _kavram_verisi(ticker, concept)
+
+    # Seri aracindan farki: burada dedup YAPILMAZ. Ayni donemin farkli
+    # dosyalamalardaki tum degerleri korunur - revizyonun kendisi cikti.
+    gruplar: dict[tuple[str, str, str], list[dict]] = {}
+    for tag, v in veriler:
+        for birim, satirlar in _kullanilabilir_birimler(v):
+            for row in satirlar:
+                end = row.get("end")
+                if not end:
+                    continue
+                start = row.get("start")
+                days = _gun_farki(start, end) if start else None
+                if not _donem_uyuyor(period, days):
+                    continue
+                gruplar.setdefault((tag, end, birim), []).append(
+                    {**row, "_tag": tag, "_start": start, "_days": days}
+                )
+
+    revizyonlar: list[FactRevision] = []
+    for (tag, end, birim), satirlar in gruplar.items():
+        satirlar.sort(key=lambda r: (str(r.get("filed", "")), str(r.get("accn", ""))))
+
+        # Ayni deger bircok dosyalamada tekrarlanir (karsilastirma yillari).
+        # Tekrar revizyon degildir; bu yuzden FARKLI degerler sayilir.
+        gorulen: dict[float, RevisionEntry] = {}
+        sirali_degerler: list[float] = []
+        for r in satirlar:
+            deger = float(r["val"])
+            if deger in gorulen:
+                gorulen[deger].times_repeated += 1
+                continue
+            sirali_degerler.append(deger)
+            gorulen[deger] = RevisionEntry(
+                value=deger,
+                unit=birim,
+                first_reported_in=str(r.get("form", "")),
+                filed=str(r.get("filed", "")),
+                accession_number=r.get("accn"),
+                source_tag=r["_tag"],
+                times_repeated=1,
+            )
+
+        ilk, son = sirali_degerler[0], sirali_degerler[-1]
+        revizyonlar.append(
+            FactRevision(
+                source_tag=tag,
+                period_end=end,
+                period_start=satirlar[0]["_start"],
+                days=satirlar[0]["_days"],
+                unit=birim,
+                first_value=ilk,
+                latest_value=son,
+                change=son - ilk,
+                change_percent=((son - ilk) / abs(ilk) * 100) if ilk else None,
+                distinct_values=len(sirali_degerler),
+                entries=[gorulen[d] for d in sirali_degerler],
+            )
+        )
+
+    incelenen = len(revizyonlar)
+    revize = sum(1 for r in revizyonlar if r.distinct_values > 1)
+    if only_revised:
+        revizyonlar = [r for r in revizyonlar if r.distinct_values > 1]
+    revizyonlar.sort(key=lambda r: (r.period_end, r.source_tag))
+    kirpik = revizyonlar[-limit:]
+
+    return RevisionReport(
+        cik=cik,
+        requested_concept=concept,
+        resolved_concepts=[t for t, _ in veriler],
+        source_endpoint=kaynak_uc,
+        periods_examined=incelenen,
+        periods_revised=revize,
+        returned=len(kirpik),
+        has_more=len(revizyonlar) > len(kirpik),
+        revisions=kirpik,
     )
 
 
@@ -536,6 +783,15 @@ async def get_concept_series(
 )
 async def list_available_concepts(
     ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL")],
+    taxonomy: Annotated[
+        str,
+        Field(
+            default="us-gaap",
+            description="Which taxonomy to list. us-gaap is the financial "
+            "statements; dei is cover-page data. The response names every "
+            "taxonomy this company actually reports under.",
+        ),
+    ] = "us-gaap",
     search: Annotated[
         str | None,
         Field(default=None, description="Substring to match against tag names and labels, e.g. 'revenue'"),
@@ -550,7 +806,15 @@ async def list_available_concepts(
 ) -> ConceptCatalog:
     cik = await _c().cik_for_ticker(ticker)
     facts = await _c().company_facts(cik)
-    gaap = facts.get("facts", {}).get("us-gaap", {})
+    tumu = facts.get("facts", {}) or {}
+    mevcut = list(tumu)
+    gaap = tumu.get(taxonomy)
+    if gaap is None:
+        raise ValueError(
+            f"{ticker} reports no facts under the taxonomy '{taxonomy}'. "
+            f"This company uses: {', '.join(mevcut)}. Call this tool again "
+            "with one of those."
+        )
 
     q = (search or "").strip().lower()
     eslesen: list[ConceptInfo] = []
@@ -568,6 +832,8 @@ async def list_available_concepts(
     eslesen.sort(key=lambda c: (-c.data_points, c.tag))
     return ConceptCatalog(
         cik=cik,
+        taxonomy=taxonomy,
+        available_taxonomies=mevcut,
         total_matching=len(eslesen),
         returned=min(limit, len(eslesen)),
         has_more=len(eslesen) > limit,

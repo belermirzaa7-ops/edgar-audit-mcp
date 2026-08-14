@@ -5,6 +5,7 @@ Cokmeye dayanikli: yedekler once diske yazilir, calisma basinda artik yedek
 varsa once o geri yuklenir, sinyal ve istisna durumunda finally ile geri alinir.
 `git checkout` KULLANILMAZ - commit edilmemis isi silerdi.
 """
+import ast
 import atexit
 import hashlib
 import os
@@ -76,8 +77,8 @@ ENJEKSIYONLAR = [
 
  ("Donem uzunlugu filtresini kaldir (ceyreklik sizsin)",
   "src/edgar_mcp/server.py",
-  "if period == \"annual\" and not (300 <= days <= 400):",
-  "if False:",
+  "        return 300 <= days <= 400",
+  "        return True",
   "test_ceyreklik_yillik_seriye_sizmaz"),
 
  ("Dedup anahtarina source_tag ekle (ayni donem cift sayilsin)",
@@ -243,6 +244,36 @@ ENJEKSIYONLAR = [
   "mcp.run(transport='streamable-http')",
   "test_dockerfile_loopback_disina_baglaniyor"),
 
+ ("Taksonomi onekini yoksay (her etiketi us-gaap'ta ara)",
+  "src/edgar_mcp/server.py",
+  '        tax, _, ad = tag.partition(":")',
+  '        tax, _, ad = "us-gaap", None, tag',
+  "test_takma_ad_dei_taksonomisine_gidebiliyor"),
+
+ ("Kesif araci: mevcut taksonomileri sabit us-gaap raporla",
+  "src/edgar_mcp/server.py",
+  "    mevcut = list(tumu)",
+  '    mevcut = ["us-gaap"]',
+  "test_kesif_araci_taksonomileri_kendisi_bildiriyor"),
+
+ ("Revizyon: ayni donemin eski degerlerini at (seri gibi dedup et)",
+  "src/edgar_mcp/server.py",
+  "                gruplar.setdefault((tag, end, birim), []).append(",
+  "                gruplar.__setitem__((tag, end, birim), []) or gruplar[(tag, end, birim)].append(",
+  "test_revizyon_degisen_degeri_yakalar"),
+
+ ("Revizyon: tekrarlanan ayni degeri de farkli deger say",
+  "src/edgar_mcp/server.py",
+  "            if deger in gorulen:",
+  "            if False:",
+  "test_revizyon_ayni_degerin_tekrari_revizyon_sayilmaz"),
+
+ ("Revizyon: only_revised filtresini etkisiz birak",
+  "src/edgar_mcp/server.py",
+  "        revizyonlar = [r for r in revizyonlar if r.distinct_values > 1]",
+  "        revizyonlar = list(revizyonlar)",
+  "test_revizyon_varsayilan_olarak_sadece_revize_donemleri_verir"),
+
  ("Kullanilamaz birim govdesini (SEC'in {} yaniti) normal say",
   "src/edgar_mcp/server.py",
   "        if isinstance(satirlar, list)",
@@ -275,8 +306,8 @@ ENJEKSIYONLAR = [
 
  ("Parametre aciklamasini Turkceye cevir (disa bakan yuzey)",
   "src/edgar_mcp/server.py",
-  '"An alias (revenue, net_income, total_assets, ...) or a raw "',
-  '"Takma ad (revenue, net_income, total_assets, ...) veya ham "',
+  '"US-GAAP tag (e.g. NetIncomeLoss). Call "',
+  '"US-GAAP etiketi (orn. NetIncomeLoss). Cagir "',
   "test_arac_tanimlari_ingilizce"),
 
  ("Donus semasi alan aciklamasini Turkceye cevir",
@@ -291,6 +322,24 @@ ENJEKSIYONLAR = [
   'str(row["cik_str"])',
   "test_profile"),
 ]
+
+
+def sozdizimi_gecerli(yol: str, kaynak: str) -> bool:
+    """Enjekte edilmis metin hala derlenebiliyor mu.
+
+    Neden (14 Agu 2026): bir enjeksiyonun degistirme metni parantezi bozdu.
+    Dosya artik import edilemedigi icin ILGISIZ testler kirmiziya dondu ve
+    harness bunu "KORUMASIZ" diye raporladi - yani "koruma yok" ile "enjeksiyon
+    hatali" ayni gorunuyordu. Ikisi cok farkli sey; ayirt edilmeleri gerekir.
+    Python disi dosyalar (orn. Dockerfile) bu kontrolden muaf.
+    """
+    if not yol.endswith(".py"):
+        return True
+    try:
+        ast.parse(kaynak)
+        return True
+    except SyntaxError:
+        return False
 
 
 def main() -> int:
@@ -321,7 +370,13 @@ def main() -> int:
             if eski not in metin:
                 sonuc.append((ad, "ENJEKSIYON UYGULANAMADI", False))
                 continue
-            (KOK / dosya).write_text(metin.replace(eski, yeni_metin, 1))
+            bozuk = metin.replace(eski, yeni_metin, 1)
+            if not sozdizimi_gecerli(dosya, bozuk):
+                # Enjeksiyon dizgisi hatali yazilmis: dosya derlenmiyor.
+                # Bu bir koruma eksigi DEGIL, harness hatasidir.
+                sonuc.append((ad, "ENJEKSIYON SOZDIZIMI BOZDU", False))
+                continue
+            (KOK / dosya).write_text(bozuk)
             k = testler()
             (KOK / dosya).write_text(metin)
             sonuc.append((ad, ", ".join(k) or "hicbiri", beklenen in k))

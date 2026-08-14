@@ -23,6 +23,7 @@ Kullanim:
     python arac/tani.py KO Assets --matris     # sebep ayirt etme
     python arac/tani.py AAPL Assets --matris   # calisan referans
     python arac/tani.py --tarama               # kac sirket etkileniyor
+    python arac/tani.py TSLA --envanter        # companyfacts'te NE VAR (taksonomiler)
 """
 from __future__ import annotations
 
@@ -190,6 +191,71 @@ async def _matris(c: EdgarClient, cik: str, tag: str, url: str) -> int:
     return 1
 
 
+ILGINC = ("segment", "automotive", "energy", "vehicle", "deliver", "production",
+          "storage", "regulatorycredit", "leas", "publicfloat", "sharesoutstanding")
+
+
+async def _envanter(c: EdgarClient, ticker: str) -> int:
+    """companyfacts'te GERCEKTEN ne var: hangi taksonomiler, kac etiket, kac
+    veri noktasi. Sunucu bugun yalnizca `us-gaap` okuyor; segment/birim satis
+    gibi kalemlerin sirketin KENDI taksonomisinde (orn. `tsla`) durup durmadigi
+    ancak boyle olculebilir - tahmin edilerek degil."""
+    cik = await c.cik_for_ticker(ticker)
+    r = await _iste(c, f"{SEC_DATA}/api/xbrl/companyfacts/CIK{cik}.json")
+    if r.status_code != 200:
+        print(f"companyfacts HTTP {r.status_code}")
+        return 1
+    d = r.json()
+    facts = d.get("facts") or {}
+    print(f"{ticker} (CIK {cik}) - {d.get('entityName')}")
+    print(f"companyfacts govdesi: {len(r.content):,} bayt")
+    print(f"taksonomiler: {list(facts)}")
+    print("-" * 74)
+
+    for tax, etiketler in facts.items():
+        toplam = sum(
+            len(v)
+            for k in etiketler.values()
+            for v in (k.get("units") or {}).values()
+            if isinstance(v, list)
+        )
+        print(f"\n### {tax}: {len(etiketler)} etiket, {toplam:,} veri noktasi")
+        sirali = sorted(
+            etiketler.items(),
+            key=lambda kv: -sum(
+                len(v) for v in (kv[1].get("units") or {}).values() if isinstance(v, list)
+            ),
+        )
+        for ad, kayit in sirali[:8]:
+            n = sum(
+                len(v) for v in (kayit.get("units") or {}).values() if isinstance(v, list)
+            )
+            print(f"    {n:>6}  {ad}")
+        if len(sirali) > 8:
+            print(f"    ... ({len(sirali) - 8} etiket daha)")
+
+    print("-" * 74)
+    print("ILGINC ETIKETLER (segment / birim / piyasa degeri arayan filtre):")
+    bulundu = 0
+    for tax, etiketler in facts.items():
+        for ad, kayit in etiketler.items():
+            if any(x in ad.lower() for x in ILGINC):
+                n = sum(
+                    len(v)
+                    for v in (kayit.get("units") or {}).values()
+                    if isinstance(v, list)
+                )
+                birimler = list(kayit.get("units") or {})
+                print(f"    {tax:<10} {n:>5} nokta  birim={birimler}  {ad}")
+                bulundu += 1
+    if not bulundu:
+        print("    (yok - bu sirket bu kalemleri companyfacts'e tagliyor degil)")
+    print("-" * 74)
+    print(f"SONUC: {len(facts)} taksonomi, {bulundu} ilginc etiket.")
+    print("Sunucu su an yalnizca 'us-gaap' okuyor; digerleri erisilemez durumda.")
+    return 0
+
+
 TARAMA_TICKERLARI = ["AAPL", "MSFT", "JNJ", "PEP", "KO", "WMT", "TGT", "NVDA",
                      "JPM", "NKE", "XOM", "PG", "INTC", "CSCO", "DIS"]
 
@@ -241,7 +307,7 @@ async def _tarama(c: EdgarClient, tag: str) -> int:
 async def main() -> int:
     argv = [a for a in sys.argv[1:] if not a.startswith("--")]
     bayraklar = {a for a in sys.argv[1:] if a.startswith("--")}
-    if bayraklar - {"--matris", "--tarama"}:
+    if bayraklar - {"--matris", "--tarama", "--envanter"}:
         print(__doc__)
         return 2
 
@@ -252,6 +318,16 @@ async def main() -> int:
         c = EdgarClient()
         try:
             return await _tarama(c, argv[0] if argv else "Assets")
+        finally:
+            await c.aclose()
+
+    if "--envanter" in bayraklar:
+        if len(argv) != 1:
+            print(__doc__)
+            return 2
+        c = EdgarClient()
+        try:
+            return await _envanter(c, argv[0])
         finally:
             await c.aclose()
 

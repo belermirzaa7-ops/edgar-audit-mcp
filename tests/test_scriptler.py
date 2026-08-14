@@ -92,7 +92,7 @@ def test_tani_dolu_yaniti_ozetliyor(monkeypatch, capsys):
     cikti = capsys.readouterr().out
     assert kod == 0, cikti
     assert "HTTP       : 200" in cikti
-    assert "USD: 5 satir" in cikti
+    assert "USD: 6 satir" in cikti
     assert "'end' eksik: 0" in cikti
 
 
@@ -188,7 +188,7 @@ def test_matris_farki_yaratan_degiskeni_gosteriyor(monkeypatch, capsys):
     cikti = capsys.readouterr().out
     assert kod == 1, cikti
     assert "temel=0" in cikti and "tekrar=0" in cikti
-    assert "onbellek-bypass=5" in cikti
+    assert "onbellek-bypass=6" in cikti
     assert "'onbellek-bypass'" in cikti, "farki yaratan kosul adiyla anilmali"
     assert "age           : 51231" in cikti, "onbellek basliklari yazilmali"
 
@@ -241,3 +241,58 @@ def test_tarama_etkilenen_sirketleri_sayiyor(monkeypatch, capsys):
     assert "yedek uc gerekli" in cikti
     assert "ticker cozulemedi" in cikti
     assert "1/1 sirkette" in cikti, "cozulemeyen ticker paydaya girmis"
+
+
+def test_envanter_taksonomileri_ve_ilginc_etiketleri_listeliyor(monkeypatch, capsys):
+    """Envanter modu, sunucunun BUGUN okumadigi taksonomileri gorunur kilmali -
+    Tesla raporunda segment kirilimina ulasamamamizin sebebi tam olarak buydu.
+    Sahte veride ikinci bir taksonomi ve segment etiketi var."""
+    import asyncio
+
+    from test_server import FACTS
+
+    monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@example.com")
+
+    ZENGIN = {
+        "entityName": "Apple Inc.",
+        "facts": {
+            "us-gaap": FACTS["facts"]["us-gaap"],
+            "dei": {"EntityPublicFloat": {"label": "Entity Public Float",
+                                          "units": {"USD": [{"end": "2025-06-30",
+                                                             "val": 1}]}}},
+            "aapl": {"SegmentRevenueAutomotive": {"label": "Segment Revenue",
+                                                  "units": {"USD": [{"end": "2025-12-31",
+                                                                     "val": 2}]}}},
+        },
+    }
+
+    def h(request: httpx.Request) -> httpx.Response:
+        if "companyfacts" in str(request.url):
+            return httpx.Response(200, json=ZENGIN)
+        return handler(request)
+
+    mod = _tani_modulu()
+    monkeypatch.setattr(mod, "EdgarClient", _istemci_ile(h))
+    monkeypatch.setattr(sys, "argv", ["tani.py", "AAPL", "--envanter"])
+
+    kod = asyncio.run(mod.main())
+    cikti = capsys.readouterr().out
+    assert kod == 0, cikti
+    assert "'us-gaap'" in cikti and "'dei'" in cikti and "'aapl'" in cikti
+    assert "SegmentRevenueAutomotive" in cikti
+    assert "EntityPublicFloat" in cikti
+    assert "2 ilginc etiket" in cikti
+
+
+def test_enjeksiyon_bozuk_sozdizimini_koruma_eksigi_sanmiyor():
+    """14 Agu 2026: bir enjeksiyonun degistirme metni parantezi bozdu; dosya
+    import edilemedi, ilgisiz testler kirmiziya dondu ve harness bunu
+    'KORUMASIZ' diye raporladi. 'Koruma yok' ile 'enjeksiyon hatali' ayni
+    gorunmemeli."""
+    import importlib
+
+    mod = importlib.import_module("arac.enjeksiyon")
+    assert mod.sozdizimi_gecerli("src/x.py", "def f():\n    return 1\n")
+    assert not mod.sozdizimi_gecerli("src/x.py", "def f():\n    return [1\n")
+    # Python olmayan dosyalar muaf: Dockerfile da enjeksiyon hedefi
+    assert mod.sozdizimi_gecerli("Dockerfile", "CMD [\"python\", \"-c\", \"x(\"]")

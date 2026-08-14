@@ -28,14 +28,21 @@ tuzak barındırıyor. Bu projenin asıl kısmı o tuzakları ele alması.
 | `sec_edgar_get_company_profile` | Ticker → CIK, resmi unvan, SIC sektörü, mali yıl sonu |
 | `sec_edgar_list_filings` | Son dosyalamalar, form türüne göre filtrelenebilir |
 | `sec_edgar_get_concept_series` | Tek bir finansal kalemin zaman serisi |
-| `sec_edgar_list_available_concepts` | Şirketin fiilen raporladığı US-GAAP etiketleri |
+| `sec_edgar_get_fact_revisions` | Bir rakamın dosyalamalar arasında nasıl değiştiği — yeniden düzenlemeler, her değişimin erişim numarasıyla |
+| `sec_edgar_list_available_concepts` | Şirketin fiilen raporladığı etiketler, kullandığı her taksonomide |
 
 Her araç Pydantic modeli döndürür; MCP `outputSchema` otomatik üretilir ve
 istemci sonuçları tip güvenli tüketir. Liste döndüren araçlar
 `total_matching` / `returned` / `has_more` bildirir; böylece model tam bir
 cevapla kırpılmış bir cevabı ayırt edebilir.
 
-Dört araç da `readOnlyHint: true` ilan eder. Bu bir **ipucudur**, garanti
+Kalemler takma adla (`revenue`, `net_income`, `public_float`, ...) ya da ham
+etiketle çağrılır. Etiket taksonomisiyle nitelenebilir — `dei:EntityPublicFloat`
+— önek yoksa `us-gaap` varsayılır. `sec_edgar_list_available_concepts` şirketin
+fiilen kullandığı taksonomileri bildirir, böylece model tahmin etmez: mali
+tablolar `us-gaap` içinde, halka açıklık oranı ve hisse adedi `dei` içindedir.
+
+Her araç `readOnlyHint: true` ilan eder. Bu bir **ipucudur**, garanti
 değil — garanti, pakette hiçbir yazma yolunun bulunmaması ve bunu bir testin
 zorunlu tutmasıdır.
 

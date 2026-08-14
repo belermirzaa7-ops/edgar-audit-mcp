@@ -75,7 +75,7 @@ def test_http_tasimasi_araclari_el_sikismasiz_listeler():
     try:
         govde = _tools_list(port)
         assert "sec_edgar_get_concept_series" in govde
-        assert govde.count("sec_edgar_") >= 4, govde[:300]
+        assert govde.count("sec_edgar_") >= 5, govde[:300]
     finally:
         p.terminate()
         try:
@@ -147,6 +147,9 @@ def test_stdio_tasimasi_resmi_istemciyle_araclari_listeliyor():
             return [t.name for t in (await oturum.list_tools()).tools]
 
     adlar = asyncio.run(calistir())
+    # Arac kumesi test_server.py'deki test_arac_isimleri_servis_onekli ile
+    # sabitleniyor; burada GERCEK tel uzerinden ayni kumenin geldigi dogrulanir.
     assert "sec_edgar_get_concept_series" in adlar
-    assert len(adlar) == 4, adlar
+    assert "sec_edgar_get_fact_revisions" in adlar
+    assert len(adlar) == 5, adlar
     assert all(a.startswith("sec_edgar_") for a in adlar), adlar

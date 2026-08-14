@@ -30,14 +30,22 @@ answers. The interesting part of this project is handling them.
 | `sec_edgar_get_company_profile` | Ticker → CIK, registrant name, SIC industry, fiscal year end |
 | `sec_edgar_list_filings` | Recent filings with links, filterable by form type |
 | `sec_edgar_get_concept_series` | Time series for one financial concept |
-| `sec_edgar_list_available_concepts` | Which US-GAAP tags a company actually reports |
+| `sec_edgar_get_fact_revisions` | How a reported figure changed across filings — restatements, with the accession number of each change |
+| `sec_edgar_list_available_concepts` | Which tags a company actually reports, in any taxonomy it uses |
 
 Every tool returns a Pydantic model, so MCP `outputSchema` is generated
 automatically and clients consume the results type-safely. List-returning tools
 report `total_matching` / `returned` / `has_more` so the model can tell a
 complete answer from a truncated one.
 
-All four tools are annotated `readOnlyHint: true`. That annotation is a hint,
+Concepts are addressed by alias (`revenue`, `net_income`, `public_float`, ...)
+or by raw tag. A tag may be qualified with its taxonomy — `dei:EntityPublicFloat`
+— and defaults to `us-gaap` when it is not. `sec_edgar_list_available_concepts`
+reports which taxonomies a company actually files under, so the model discovers
+them instead of guessing: financial statements live in `us-gaap`, while public
+float and shares outstanding live in `dei`.
+
+Every tool is annotated `readOnlyHint: true`. That annotation is a hint,
 not a guarantee — the guarantee is that the package contains no write path at
 all, which a test enforces.
 

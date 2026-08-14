@@ -22,15 +22,19 @@ SUBS = {"name": "Apple Inc.", "sicDescription": "Electronic Computers",
                                 "aapl-20240928.htm","xslF345X05/form4.xml"],
         }}}
 
+# Gercek companyconcept satirlari `accn` (erisim numarasi) tasir; revizyon
+# gecmisi aracinin izlenebilirligi ona dayaniyor, o yuzden sahte veride de var.
 CONCEPT = {"label": "Revenues", "units": {"USD": [
     # 2023 10-K: uc yillik karsilastirma, UCUNUN DE fy'si 2023 (SEC boyle veriyor)
-    {"start":"2020-09-27","end":"2021-09-25","val":365_817_000_000,"fy":2023,"fp":"FY","form":"10-K","filed":"2023-11-03"},
-    {"start":"2021-09-26","end":"2022-09-24","val":394_328_000_000,"fy":2023,"fp":"FY","form":"10-K","filed":"2023-11-03"},
-    {"start":"2022-09-25","end":"2023-09-30","val":383_285_000_000,"fy":2023,"fp":"FY","form":"10-K","filed":"2023-11-03"},
+    {"start":"2020-09-27","end":"2021-09-25","val":365_817_000_000,"fy":2023,"fp":"FY","form":"10-K","filed":"2023-11-03","accn":"0000320193-23-000106"},
+    {"start":"2021-09-26","end":"2022-09-24","val":394_328_000_000,"fy":2023,"fp":"FY","form":"10-K","filed":"2023-11-03","accn":"0000320193-23-000106"},
+    {"start":"2022-09-25","end":"2023-09-30","val":383_285_000_000,"fy":2023,"fp":"FY","form":"10-K","filed":"2023-11-03","accn":"0000320193-23-000106"},
+    # AYNI donem, AYNI deger, sonraki dosyalamada tekrar: bu revizyon DEGIL
+    {"start":"2021-09-26","end":"2022-09-24","val":394_328_000_000,"fy":2024,"fp":"FY","form":"10-K","filed":"2024-11-01","accn":"0000320193-24-000123"},
     # ayni donem 2024 10-K'sinda tekrar raporlanmis (revize deger)
-    {"start":"2022-09-25","end":"2023-09-30","val":383_290_000_000,"fy":2024,"fp":"FY","form":"10-K","filed":"2024-11-01"},
+    {"start":"2022-09-25","end":"2023-09-30","val":383_290_000_000,"fy":2024,"fp":"FY","form":"10-K","filed":"2024-11-01","accn":"0000320193-24-000123"},
     # ceyreklik veri ayni listede
-    {"start":"2023-04-02","end":"2023-07-01","val": 81_797_000_000,"fy":2023,"fp":"Q3","form":"10-Q","filed":"2023-08-04"},
+    {"start":"2023-04-02","end":"2023-07-01","val": 81_797_000_000,"fy":2023,"fp":"Q3","form":"10-Q","filed":"2023-08-04","accn":"0000320193-23-000077"},
 ]}}
 
 # Apple gerçekte "Revenues" DEGIL bunu kullanir; ilk aday 404 vermeli ki
@@ -53,7 +57,22 @@ def _satirlar(n: int) -> list[dict]:
     ]
 
 
-FACTS = {"facts": {"us-gaap": {
+DEI_FLOAT = {"label": "Entity Public Float", "units": {"USD": [
+    {"end": "2024-03-29", "val": 2_600_000_000_000, "fy": 2024, "fp": "FY",
+     "form": "10-K", "filed": "2024-11-01", "accn": "0000320193-24-000123"},
+    {"end": "2025-03-28", "val": 2_900_000_000_000, "fy": 2025, "fp": "FY",
+     "form": "10-K", "filed": "2025-10-31", "accn": "0000320193-25-000079"},
+]}}
+
+FACTS = {"facts": {"dei": {
+    "EntityPublicFloat": DEI_FLOAT,
+    "EntityCommonStockSharesOutstanding": {
+        "label": "Entity Common Stock, Shares Outstanding",
+        "units": {"shares": [{"end": "2025-10-17", "val": 14_840_000_000,
+                              "fy": 2025, "fp": "FY", "form": "10-K",
+                              "filed": "2025-10-31"}]},
+    },
+}, "us-gaap": {
     GERCEK_GELIR_ETIKETI: {"label": "Revenue from Contract with Customer",
                            "units": {"USD": _satirlar(3)}},
     "NetIncomeLoss":      {"label": "Net Income (Loss)", "units": {"USD": _satirlar(2)}},
@@ -86,6 +105,10 @@ def handler(request: httpx.Request) -> httpx.Response:
     if "companyfacts" in u:
         return httpx.Response(200, json=FACTS)
     if "companyconcept" in u:
+        if "/dei/EntityPublicFloat" in u:
+            return httpx.Response(200, json=DEI_FLOAT)
+        if "/dei/" in u:
+            return httpx.Response(404)      # dei'de olmayan etiket
         if GERCEK_GELIR_ETIKETI in u:
             return httpx.Response(200, json=CONCEPT)
         if "NetIncomeLoss" in u:
@@ -345,6 +368,7 @@ async def test_arac_isimleri_servis_onekli():
         "sec_edgar_get_company_profile",
         "sec_edgar_list_filings",
         "sec_edgar_get_concept_series",
+        "sec_edgar_get_fact_revisions",
         "sec_edgar_list_available_concepts",
     }, f"beklenmeyen arac isimleri: {isimler}"
 
@@ -742,3 +766,114 @@ async def test_karisik_birim_sekli_gecerli_satirlari_korur(monkeypatch):
     assert seri.source_endpoint == "companyconcept", "gereksiz yere yedege dusuldu"
     assert seri.total_periods > 0
     assert all(p.unit == "USD" for p in seri.points)
+
+
+# ==================================== revizyon gecmisi (Tesla raporu bosluk 6)
+@pytest.mark.anyio
+async def test_revizyon_degisen_degeri_yakalar(srv):
+    """Ayni donem sonraki dosyalamada FARKLI bir degerle raporlanmissa, bu bir
+    revizyondur ve gorunmelidir. Seri araci bunu bilerek gizler (en guncel
+    degeri verir); revizyon araci tam tersini yapar."""
+    r = await srv.get_fact_revisions(ticker="AAPL", concept="revenue")
+
+    donemler = {(x.source_tag, x.period_end): x for x in r.revisions}
+    anahtar = (GERCEK_GELIR_ETIKETI, "2023-09-30")
+    assert anahtar in donemler, f"revize donem yok: {list(donemler)}"
+    rev = donemler[anahtar]
+    assert rev.distinct_values == 2
+    assert rev.first_value == 383_285_000_000
+    assert rev.latest_value == 383_290_000_000
+    assert rev.change == 5_000_000
+    assert [e.filed for e in rev.entries] == ["2023-11-03", "2024-11-01"], "sira eski->yeni degil"
+    assert all(e.accession_number for e in rev.entries), "erisim numarasi tasinmiyor"
+
+
+@pytest.mark.anyio
+async def test_revizyon_ayni_degerin_tekrari_revizyon_sayilmaz(srv):
+    """Bir 10-K uc yillik karsilastirma tasir; ayni deger her yil tekrar
+    raporlanir. Tekrari revizyon saymak, her donemi 'revize edilmis' gosterir
+    ve arac ise yaramaz hale gelir."""
+    r = await srv.get_fact_revisions(ticker="AAPL", concept="revenue", only_revised=False)
+
+    donemler = {(x.source_tag, x.period_end): x for x in r.revisions}
+    tekrar = donemler[(GERCEK_GELIR_ETIKETI, "2022-09-24")]   # iki dosyalamada AYNI deger
+    assert tekrar.distinct_values == 1, "ayni deger revizyon sayilmis"
+    assert tekrar.entries[0].times_repeated == 2, "tekrar sayisi kaydedilmemis"
+    assert tekrar.change == 0
+    assert r.periods_revised == 1, f"beklenmeyen revize donem sayisi: {r.periods_revised}"
+    assert r.periods_examined > r.periods_revised
+
+
+@pytest.mark.anyio
+async def test_revizyon_varsayilan_olarak_sadece_revize_donemleri_verir(srv):
+    """Varsayilan cikti sinyal olmali: revize edilmemis donemler gurultudur."""
+    sadece = await srv.get_fact_revisions(ticker="AAPL", concept="revenue")
+    hepsi = await srv.get_fact_revisions(ticker="AAPL", concept="revenue", only_revised=False)
+    assert len(sadece.revisions) < len(hepsi.revisions)
+    assert all(x.distinct_values > 1 for x in sadece.revisions)
+
+
+@pytest.mark.anyio
+async def test_revizyon_ve_seri_ayni_gercekte_ayni_seyi_soyluyor(srv):
+    """Iki arac ayni veriyi farkli amacla sunuyor; celismemeleri gerekir.
+    Serideki deger, revizyon gecmisindeki EN SON degerle ayni olmali."""
+    seri = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=60)
+    rev = await srv.get_fact_revisions(ticker="AAPL", concept="revenue", only_revised=False)
+
+    # Ayni donem birden fazla ETIKETTE olabilir; seri bunlardan birini secer.
+    # Karsilastirma etiket bazinda yapilmali, yoksa test yanlis yerden kirilir.
+    seri_degerleri = {(p.source_tag, p.period_end): p.value for p in seri.points}
+    eslesen = 0
+    for x in rev.revisions:
+        anahtar = (x.source_tag, x.period_end)
+        if anahtar in seri_degerleri:
+            eslesen += 1
+            assert seri_degerleri[anahtar] == x.latest_value, (
+                f"{anahtar}: seri {seri_degerleri[anahtar]}, "
+                f"revizyon {x.latest_value}"
+            )
+    assert eslesen >= 3, f"karsilastirma bos kalmis ({eslesen} eslesme)"
+
+
+# ============================ dei taksonomisi (Tesla raporu bosluk 3, kismi)
+@pytest.mark.anyio
+async def test_takma_ad_dei_taksonomisine_gidebiliyor(srv):
+    """Olculdu (14 Agu 2026): companyfacts'te dei/us-gaap/ffd var. Piyasa
+    degerine SEC icinde kalarak ulasilabilecek tek capa dei:EntityPublicFloat;
+    sunucu us-gaap disina cikamadigi icin erisilemiyordu."""
+    ISTEK_KAYDI.clear()
+    seri = await srv.get_concept_series(ticker="AAPL", concept="public_float",
+                                        period="all")
+    assert seri.taxonomy == "dei"
+    assert seri.resolved_concepts == ["dei:EntityPublicFloat"]
+    assert seri.total_periods == 2
+    assert seri.points[-1].value == 2_900_000_000_000
+    assert seri.points[-1].source_tag == "EntityPublicFloat", "etiket adi nitelikli kalmis"
+    assert any("/dei/EntityPublicFloat.json" in u for u in ISTEK_KAYDI), \
+        "istek us-gaap yoluna gitmis"
+
+
+@pytest.mark.anyio
+async def test_ham_nitelikli_etiket_de_kabul_ediliyor(srv):
+    seri = await srv.get_concept_series(ticker="AAPL",
+                                        concept="dei:EntityPublicFloat",
+                                        period="all")
+    assert seri.taxonomy == "dei" and seri.total_periods == 2
+
+
+@pytest.mark.anyio
+async def test_kesif_araci_taksonomileri_kendisi_bildiriyor(srv):
+    """Model hangi taksonomilerin oldugunu tahmin etmemeli; yanit soylemeli."""
+    k = await srv.list_available_concepts(ticker="AAPL", taxonomy="dei")
+    assert k.taxonomy == "dei"
+    assert set(k.available_taxonomies) == {"dei", "us-gaap"}
+    assert any(c.tag == "EntityPublicFloat" for c in k.concepts)
+
+
+@pytest.mark.anyio
+async def test_olmayan_taksonomi_eyleme_donusturulebilir_hata_verir(srv):
+    """P-13: hata mesaji modelin bir sonraki hamlesini icermeli."""
+    with pytest.raises(ValueError) as e:
+        await srv.list_available_concepts(ticker="AAPL", taxonomy="tsla")
+    mesaj = str(e.value)
+    assert "tsla" in mesaj and "us-gaap" in mesaj and "dei" in mesaj

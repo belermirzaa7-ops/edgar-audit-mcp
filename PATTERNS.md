@@ -33,6 +33,7 @@ can verify rather than remember.
 | [P-18](#p-18) | Is the live client running the code I just changed? | **none — manual step** |
 | [P-19](#p-19) | Does a 200 from upstream actually carry rows, and did I check the second endpoint? | `test_bos_companyconcept_yanitinda_companyfacts_e_dusulur`, `test_iki_uc_da_bossa_sessiz_basari_yerine_hata` |
 | [P-20](#p-20) | Have I actually run the deployment path the README promises? | `test_http_tasimasi_araclari_el_sikismasiz_listeler`, `test_stdio_tasimasi_resmi_istemciyle_araclari_listeliyor`, `test_dockerfile_loopback_disina_baglaniyor`, CI job `docker` |
+| [P-21](#p-21) | Did my fault injection actually compile, or did it just break the import? | `test_enjeksiyon_bozuk_sozdizimini_koruma_eksigi_sanmiyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -506,6 +507,32 @@ wire requires, so it fails the test rather than the server.
 **Incident.** 13 Aug 2026. Found while auditing what in this repository is
 claimed but unverified — not by a failure, because nobody had ever run it. The
 `Dockerfile` now passes `host='0.0.0.0', stateless_http=True` explicitly.
+
+---
+
+<a id="p-21"></a>
+### P-21 · A broken injection looks exactly like a missing guard
+
+**Symptom.** The fault-injection harness reports a protection as **KORUMASIZ**
+(unguarded) and names two unrelated tests as the ones that turned red.
+
+**Root cause.** The injected replacement text was malformed - it left an
+unbalanced bracket. The module no longer parsed, so importing it failed and
+every test that touches the server failed with it, while the test that was
+supposed to catch the injection never got the chance to run. The harness only
+asks "did the expected test turn red", so "there is no guard here" and "my
+injection is broken" produce the same output.
+
+**Detection.** Parse the mutated source before running the suite. If it does
+not compile, report it as a broken injection, not as a missing guard - the two
+call for opposite actions: one means write a test, the other means fix the
+injection string. Non-Python targets (the `Dockerfile`) are exempt.
+
+**Incident.** 14 Aug 2026, while adding the revision-history tool. The
+injection meant to strip a period's older values replaced
+`gruplar.setdefault(...).append(` with a line that opened a bracket it never
+closed. The harness said the new tool had no guard; it had two, and neither had
+run.
 
 ---
 
