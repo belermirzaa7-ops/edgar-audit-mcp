@@ -42,15 +42,23 @@ _KAPANMAYAN = {"area", "base", "br", "col", "embed", "hr", "img", "input",
 # `<td>` birincisini kapatir. Tarayicilar bunu "implied end tag" diye uygular.
 # Gercek EDGAR dosyalamalari bu bicimde HTML uretiyor; uygulamazsak ayni ada
 # sahip elemanlar yigin uzerinde birikir.
+# DEMET, kume DEGIL - ve hepsi kapatilir, ilkinde durulmaz.
+# 15 Agu 2026'da olculdu: bunlar kume olunca iterasyon sirasi CPython'un
+# surec basina rastgelelesen string hash'ine bagli kaliyordu. `<tr>` bir `<td>`
+# aciken geldiginde tarayici IKISINI de kapatir; kumeden once `td` gelirse ve
+# ilk eslesmede durulursa disaridaki `tr` yiginda ASILI kalir. O `tr` gizliyse
+# `_atla` bir daha sifirlanmaz ve tablonun geri kalani yutulur.
+# Sonuc: ayni dosyalama, ayni kod, farkli SURECTE farkli cevap -
+# PYTHONHASHSEED=0/2'de mali tablo geliyor, 1/3'te bos donuyordu.
 _ORTULU_KAPANIS = {
-    "p": {"p"},
-    "li": {"li"},
-    "tr": {"td", "th", "tr"},
-    "td": {"td", "th"},
-    "th": {"td", "th"},
-    "option": {"option"},
-    "dd": {"dd", "dt"},
-    "dt": {"dd", "dt"},
+    "p": ("p",),
+    "li": ("li",),
+    "tr": ("td", "th", "tr"),
+    "td": ("td", "th"),
+    "th": ("td", "th"),
+    "option": ("option",),
+    "dd": ("dd", "dt"),
+    "dt": ("dd", "dt"),
 }
 
 
@@ -113,12 +121,17 @@ class _MetinToplayici(HTMLParser):
         for kapanacak in _ORTULU_KAPANIS.get(tag, ()):
             if any(a == kapanacak for a, _ in self._yigin):
                 self._kapat(kapanacak)
-                break
 
         gizli = tag in _ATLANAN or (self._gizliyi_atla and _gizli_mi(attrs))
         self._yigin.append((tag, gizli))
         if gizli:
             self._atla += 1
+        # Ayirici de gizli blogun ICINDE uretilmemeli: `handle_endtag` bunu
+        # kontrol ediyordu, `handle_starttag` etmiyordu. Yutulan bir tablo yine
+        # de tum `|` iskeletini yaziyor, cikti uzun kaliyor ve `metne_cevir`
+        # icindeki yutma emniyet agi HIC devreye girmiyordu (15 Agu 2026).
+        elif self._atla:
+            pass
         elif tag in ("td", "th"):
             self.parcalar.append(" | ")
         elif tag in _BLOK:

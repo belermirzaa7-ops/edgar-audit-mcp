@@ -17,6 +17,16 @@ SEC_DATA = "https://data.sec.gov"
 SEC_WWW = "https://www.sec.gov"
 
 
+# SEC'in engel sayfasindaki degismeyen ifade. Kisa ve genis tutulmadi:
+# gercek bir dosyalama metninde "undeclared automated tool" gecmesi
+# beklenmiyor, ama emin olmak icin govde kisaligi da araniyor.
+_ENGEL_IZI = "undeclared automated tool"
+
+
+def _engel_sayfasi_mi(govde: str) -> bool:
+    return len(govde) < 20000 and _ENGEL_IZI in govde.lower()
+
+
 def _durum_mesaji(kod: int, url: str) -> str:
     if kod == 403:
         return (
@@ -88,6 +98,24 @@ class EdgarClient:
         await self._http.aclose()
 
     @staticmethod
+    def _durumu_kontrol_et(r: httpx.Response, url: str) -> None:
+        """HTTP durumu -> ya sessizce gec, ya 404'u istisna birak, ya eyleme
+        donusturulebilir hata.
+
+        Ayri fonksiyon olmasinin sebebi 15 Agu 2026'da olculdu: bu mantik
+        `_get` icinde gomuluydu ve `filing_document` onu ATLIYORDU. Oysa
+        `filing_document` `www.sec.gov/Archives`'e giden TEK yol - yani SEC'in
+        "Undeclared Automated Tool" 403 engel sayfasini gorecek en olasi yer -
+        ve orada model cig bir `HTTPStatusError` aliyordu.
+        """
+        if r.status_code == 404:
+            # 404 kontrol akisi: cagiran taraf "bu etiket/cerceve yok" diye
+            # okuyor. Istisna turu korunuyor.
+            r.raise_for_status()
+        if r.status_code >= 400:
+            raise ValueError(_durum_mesaji(r.status_code, url))
+
+    @staticmethod
     def _sinirla(onbellek: dict, anahtar: str, deger, sinir: int) -> None:
         if anahtar not in onbellek and len(onbellek) >= sinir:
             onbellek.pop(next(iter(onbellek)))
@@ -106,13 +134,7 @@ class EdgarClient:
         await self._limiter.acquire()
         r = await self._http.get(url)
 
-        if r.status_code == 404:
-            # 404 kontrol akisi: cagiran taraf "bu etiket/cerceve yok" diye
-            # okuyor. Istisna turu korunuyor.
-            r.raise_for_status()
-
-        if r.status_code >= 400:
-            raise ValueError(_durum_mesaji(r.status_code, url))
+        self._durumu_kontrol_et(r, url)
 
         try:
             return r.json()
@@ -193,8 +215,19 @@ class EdgarClient:
         """
         await self._limiter.acquire()
         r = await self._http.get(url)
-        r.raise_for_status()
-        return r.text
+        self._durumu_kontrol_et(r, url)
+        govde = r.text or ""
+        # HTTP 200 + HTML engel sayfasi: SEC kisitlamayi bazen 200 ile de
+        # yapiyor. Dosyalama belgesi olmayan bir govdeyi metne cevirip
+        # dondurmek, modele "dosyalama bu kadarmis" dedirtir (P-19).
+        if _engel_sayfasi_mi(govde):
+            raise ValueError(
+                f"SEC returned a block page instead of the document at {url}. "
+                "The body says the request looks like an undeclared automated "
+                "tool. Check that SEC_USER_AGENT names a real contact email, "
+                "wait a few seconds, and retry."
+            )
+        return govde
 
     async def filing_index(self, dizin_url: str) -> dict:
         """Bir dosyalamanin dosya listesi (SEC her klasor icin index.json verir).

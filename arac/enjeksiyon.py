@@ -583,8 +583,8 @@ ENJEKSIYONLAR = [
 
  ("C: eksen verilmeden de mutabakat hesapla",
   "src/edgar_mcp/server.py",
-  "        reconciliation=_mutabakat(inst, cozulen_etiket, tumu) if axis else [],",
-  "        reconciliation=_mutabakat(inst, cozulen_etiket, tumu),",
+  "        reconciliation=_mutabakat(inst, cozulen_etiket, eksen_kumesi) if axis else [],",
+  "        reconciliation=_mutabakat(inst, cozulen_etiket, eksen_kumesi),",
   "test_eksen_verilmezse_mutabakat_hesaplanmiyor"),
 
  ("C: linkbase dosyasini instance sanmayi engelleyen filtreyi kaldir",
@@ -638,7 +638,7 @@ ENJEKSIYONLAR = [
 
  ("D: mutabakati yine sayfa uzerinden hesapla",
   "src/edgar_mcp/server.py",
-  "        reconciliation=_mutabakat(inst, cozulen_etiket, tumu) if axis else [],",
+  "        reconciliation=_mutabakat(inst, cozulen_etiket, eksen_kumesi) if axis else [],",
   "        reconciliation=_mutabakat(inst, cozulen_etiket, secilen) if axis else [],",
   "test_mutabakat_sayfalama_sinirindan_etkilenmiyor"),
 
@@ -653,12 +653,6 @@ ENJEKSIYONLAR = [
   '        son = float(satirlar[-1]["val"])',
   "        son = sirali_degerler[-1]",
   "test_revizyon_geri_alinan_degerde_seriyle_celismiyor"),
-
- ("D: ceyreklik mali yili yine bitis yilindan al",
-  "src/edgar_mcp/server.py",
-  "            temel = _yil(end) if (yillik or ay_gun is None) \\\n                else _fy_sonuna_gore_yil(end, ay_gun)",
-  "            temel = _yil(end)",
-  "test_ceyreklik_mali_yil_etiketi_sirketin_kendi_yiliyla_ayni"),
 
  ("D: anlik kayitlari yillik filtreden oldugu gibi gecir",
   "src/edgar_mcp/server.py",
@@ -725,6 +719,49 @@ ENJEKSIYONLAR = [
   '    await _ilerleme(ctx, 1, 3, f"Downloading {ad}")',
   "    pass",
   "test_uzun_suren_araclar_ilerleme_bildiriyor"),
+
+ # ---- Ikinci denetim turu (15 Agu 2026 aksami)
+ ("F: ortulu kapanislari yine kume yap + ilkinde dur",
+  "src/edgar_mcp/belge.py",
+  '    "tr": ("td", "th", "tr"),',
+  '    "tr": ("td",),',
+  "test_metin_cikarimi_surecten_surece_ayni_sonucu_veriyor"),
+
+ ("F: gizli blok icinde ayirici uret",
+  "src/edgar_mcp/belge.py",
+  "        elif self._atla:\n            pass\n        elif tag in (\"td\", \"th\"):",
+  "        elif tag in (\"td\", \"th\"):",
+  "test_gizli_blok_icinde_ayirici_uretilmiyor"),
+
+ ("F: anlik sinirini yine takvim yilinda kur",
+  "src/edgar_mcp/server.py",
+  "            sinir = date(_fy_sonuna_gore_yil(end, ay_gun), ay, gun)",
+  "            sinir = date(_yil(end), ay, gun)",
+  "test_yil_sonu_aralik_ocak_arasinda_oynayan_takvim"),
+
+ ("F: yillik satirda yine bitis yilini kullan",
+  "src/edgar_mcp/server.py",
+  "            temel = _yil(end) if ay_gun is None else _fy_sonuna_gore_yil(end, ay_gun)",
+  "            temel = _yil(end)",
+  "test_yil_sonu_aralik_ocak_arasinda_oynayan_takvim"),
+
+ ("F: mutabakati yine uye-filtreli kume uzerinden hesapla",
+  "src/edgar_mcp/server.py",
+  "        reconciliation=_mutabakat(inst, cozulen_etiket, eksen_kumesi) if axis else [],",
+  "        reconciliation=_mutabakat(inst, cozulen_etiket, tumu) if axis else [],",
+  "test_uye_filtresi_mutabakati_bozmuyor"),
+
+ ("F: belge indirmede durum kontrolunu atla",
+  "src/edgar_mcp/client.py",
+  "        self._durumu_kontrol_et(r, url)\n        govde = r.text or \"\"",
+  '        r.raise_for_status()\n        govde = r.text or ""',
+  "test_belge_indirmede_403_eyleme_donusturulebilir"),
+
+ ("F: 200 ile gelen engel sayfasini dosyalama metni say",
+  "src/edgar_mcp/client.py",
+  "        if _engel_sayfasi_mi(govde):",
+  "        if False:",
+  "test_200_ile_gelen_engel_sayfasi_dosyalama_metni_sanilmiyor"),
 ]
 
 

@@ -619,11 +619,18 @@ def _donem_uyuyor(
             return True
         if ay_gun is None or not end:
             return True          # capa yok: eleyecek olcut de yok
+        # Sinir, donemin TAKVIM yilinda degil AIT OLDUGU mali yilda kurulur.
+        # 52/53 haftalik takvimlerde yil sonu yil basi ile yil sonu arasinda
+        # gidip gelir (Kellanova: 2022-12-31, sonraki yil 2024-01-04) ve
+        # `_mali_yil_sonu` tek bir (ay, gun) turetir - Ocak. Sinir donemin kendi
+        # takvim yilinda kurulursa Aralik'ta biten her yil sona ~360 gun uzak
+        # cikar ve tolerans HIC tutmaz: yil sonu bilancolarinin yarisi sessizce
+        # elenirdi (15 Agu 2026'da olculdu).
         ay, gun = ay_gun
         try:
-            sinir = date(_yil(end), ay, gun)
+            sinir = date(_fy_sonuna_gore_yil(end, ay_gun), ay, gun)
         except ValueError:
-            sinir = date(_yil(end), ay, 28)
+            sinir = date(_fy_sonuna_gore_yil(end, ay_gun), ay, 28)
         bu = date(*(int(x) for x in end.split("-")))
         return abs((bu - sinir).days) <= FY_SONU_TOLERANSI
     if period == "all":
@@ -652,9 +659,11 @@ def _noktalar(veri: dict, tag: str, period: str, kayma: int,
             # Yillik satirda donemin bitis yili mali yila esittir; ceyreklik ve
             # ani satirlarda DEGILDIR - hangi mali yila dustugu, sirketin yil
             # sonu tarihine gore bulunur.
-            yillik = days is not None and 300 <= days <= 400
-            temel = _yil(end) if (yillik or ay_gun is None) \
-                else _fy_sonuna_gore_yil(end, ay_gun)
+            # Yillik satirlar da ayni esleme kuralindan gecer. "Yillik donemin
+            # bitis yili = mali yil" kisayolu, yil sonu Aralik/Ocak arasinda
+            # oynayan takvimlerde IKI ARDISIK yila ayni etiketi veriyordu
+            # (olculdu: 2022-12-31 ve 2022-01-01 ikisi de FY2021).
+            temel = _yil(end) if ay_gun is None else _fy_sonuna_gore_yil(end, ay_gun)
 
             out.append(
                 FactPoint(
@@ -1970,12 +1979,19 @@ async def get_dimensional_facts(
                                   if _etiket_uyuyor(o.tag, [aday]))
             break
 
+    # Iki ayri liste: `tumu` cagirana donen (axis VE member filtreli) kume,
+    # `eksen_kumesi` mutabakata giren (yalnizca AXIS filtreli) kume.
+    # P-27 sayfalama siniri icin duzeltilmisti; `member` ayni yoldan sizmaya
+    # devam ediyordu: tek bir uye istendiginde o uyenin degeri tuzel kisi
+    # geneli toplamiyla karsilastiriliyor ve tam tutan bir dosyalama "20,7
+    # milyar dolarlik fark var" diyordu (15 Agu 2026'da uretildi).
     tumu: list[DimensionalFact] = []
+    eksen_kumesi: list[DimensionalFact] = []
     for o in inst.boyutlu():
         if not cozulen_etiket or o.tag != cozulen_etiket:
             continue
         baglam, birim = _olcu(inst, o)
-        if (axis or member) and not any(eksen_uyuyor(b) for b in baglam.boyutlar):
+        if axis and not any(_son(b.axis) == _son(axis) for b in baglam.boyutlar):
             continue
         tumu.append(DimensionalFact(
             tag=o.tag,
@@ -1992,6 +2008,9 @@ async def get_dimensional_facts(
             fact_id=o.fact_id,
             is_nil=o.nil,
         ))
+        eksen_kumesi.append(tumu[-1])
+        if member and not any(eksen_uyuyor(b) for b in baglam.boyutlar):
+            tumu.pop()
 
     eslesen = len(tumu)
     # Sayfalama mutabakati BOZMAMALI (15 Agu 2026'da bulundu): mutabakat
@@ -2025,7 +2044,7 @@ async def get_dimensional_facts(
         returned=len(secilen),
         has_more=eslesen > len(secilen),
         facts=secilen,
-        reconciliation=_mutabakat(inst, cozulen_etiket, tumu) if axis else [],
+        reconciliation=_mutabakat(inst, cozulen_etiket, eksen_kumesi) if axis else [],
     )
 
 

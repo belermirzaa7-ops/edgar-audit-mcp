@@ -836,3 +836,53 @@ onu HIC gormez - bu depoda hicbir yerde kullanilmiyor, kullanilmamali.
 
 Uc test sabitliyor: ilerleme gercekten bildiriliyor mu, baglam yokken arac
 calisiyor mu, ve `ctx` hicbir aracin semasinda gorunuyor mu.
+
+### KK-34: Ikinci denetim turu - dun geceki duzeltmelerin ICINDE dort kusur
+**Tarih:** 15 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §2, §3
+
+KK-32'deki denetim dokuz kusur bulmustu ve hepsi ayni gece duzeltilmisti.
+Videodan once ikinci bir denetim yapildi, bu kez **yalnizca o duzeltmelere**
+bakildi. Dort kusur daha cikti, ikisi kritik - yani duzeltmelerin kendisi yeni
+hata uretmisti. Ders acik: en taze kod en riskli koddur, ve bir duzeltmeyi
+"bitti" saymak icin ayrica denetlemek gerekiyor.
+
+**Kritik 1 - metin cikarimi SURECTEN SURECE farkli sonuc veriyordu (P-28).**
+`_ORTULU_KAPANIS` degerleri kume yazilmisti ve dongu ilk eslesmede duruyordu.
+CPython string hash'ini surec basina rastgelelestirdigi icin kumenin iterasyon
+sirasi her calistirmada degisiyor: `<tr>` bir `<td>` aciken geldiginde
+tarayici IKISINI de kapatir, kod hangisi once gelirse onu kapatiyordu. `td`
+once gelirse disaridaki gizli `tr` yiginda asili kaliyor ve tablonun geri
+kalani yutuluyordu. **Olculdu: PYTHONHASHSEED 0/2'de mali tablo geliyor, 1/3'te
+bos.** Ustelik ikinci bir hata bunu gizliyordu: baslangic etiketleri gizli blok
+ICINDE de ayirici yaziyordu, cikti uzun kaliyor ve dun gece eklenen "yutma
+emniyet agi" HIC devreye girmiyordu. Sunucunun kendi tanimi "deterministic tool
+calls" diyor; dort surecten birinde dogru degildi.
+
+**Kritik 2 - 52/53 haftalik takvimlerde yil sonu Aralik/Ocak arasinda oynar.**
+Dun eklenen `_fy_sonuna_gore_yil` dogruydu ama iki cagri yeri onu kullanmiyordu:
+sinir donemin KENDI takvim yilinda kuruluyordu. Aralik'ta biten bir yil, Ocak'a
+turetilmis bir yil sonuna ~360 gun uzak dusuyor, tolerans hic tutmuyor. Sonuc
+(Kellanova'nin gercek donem sonlariyla uretildi): iki ardisik mali yil AYNI
+etiketi aliyor (`fiscal_year=2021` iki kez) ve yil sonu bilancolarinin yarisi
+sessizce eleniyordu - `total_periods: 3, has_more: false`, yani KK-23'un
+yasakladigi "kirpilmis basari".
+
+**Iki kusur daha:**
+1. **`member` filtresi mutabakata siziyordu** - P-27 `limit` icin
+   duzeltilmisti, kardes parametre ayni yoldan giriyordu. Tek bir uye
+   istendiginde o uyenin degeri tuzel kisi geneli toplamiyla karsilastiriliyor
+   ve tam tutan bir dosyalama "20,7 milyar dolarlik fark" bildiriyordu - ayni
+   sayi, ayni buyukluk, farkli yol. Artik iki liste var: cagirana donen
+   (axis+member filtreli) ve mutabakata giren (yalnizca axis filtreli).
+2. **`filing_document` yeni hata yolunu ATLIYORDU.** KK-32 §5'te `_get`
+   duzeltilmisti ama `www.sec.gov/Archives`'e giden tek metot bu ve SEC'in
+   "Undeclared Automated Tool" engel sayfasini gorecek en olasi yer orasi.
+   Model cig `HTTPStatusError` aliyordu. Durum kontrolu ortak bir metoda
+   tasindi. Ayrica SEC kisitlamayi bazen HTTP **200** ile de yapiyor; engel
+   sayfasini metne cevirip dondurmek "dosyalama bu kadarmis" demek olurdu, o da
+   ayri bir kontrolle yakalaniyor.
+
+Yedi yeni enjeksiyon dogruluyor. Determinizm testi digerlerinden farkli
+calisiyor: bes ayri ALT SUREC baslatip farkli `PYTHONHASHSEED` degerleriyle
+ayni girdiyi cevirtiyor ve bes ciktinin ayni olmasini sart kosuyor - bu hata
+sinifi tek surecin icinden gorunmuyor.

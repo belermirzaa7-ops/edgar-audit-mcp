@@ -40,6 +40,7 @@ can verify rather than remember.
 | [P-25](#p-25) | Does my tooling recognise the test names pytest actually prints? | `test_enjeksiyon_parametreli_testi_de_taniyor` |
 | [P-26](#p-26) | Am I treating a breakdown and its total as arithmetic that must agree? | `test_tutmayan_toplam_gizlenmiyor`, `test_raporlanmayan_toplam_sifir_sanilmiyor` |
 | [P-27](#p-27) | Does a bound I added for display leak into a number I compute? | `test_mutabakat_sayfalama_sinirindan_etkilenmiyor` |
+| [P-28](#p-28) | Does any behaviour depend on the iteration order of a set? | `test_metin_cikarimi_surecten_surece_ayni_sonucu_veriyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -723,6 +724,47 @@ discrepancy between a breakdown and its total. The tool then invented one
 itself, by a different route. Worth remembering: the guard and the bug were
 written by the same person in the same afternoon, so knowing the failure class
 is not the same as being immune to it.
+
+
+<a id="p-28"></a>
+### P-28 · A set has no order, so anything that iterates one is not deterministic
+
+**Symptom.** The same filing, read by the same code, produced different text in
+different server processes. In one process a financial table came back with its
+numbers; in another the whole table was gone and the section vanished from
+`available_sections`. Nothing in the input, the code or the environment
+differed — only the process.
+
+**Root cause.** The HTML extractor's implied-end-tag table mapped a tag to a
+**set** of tags it closes, and the loop stopped at the first match. CPython
+randomises string hashing per process, so the iteration order of a small set of
+short strings changes from run to run. When `<tr>` arrived while both a `<td>`
+and its enclosing `<tr>` were open — the ordinary state in EDGAR HTML, which
+omits closing tags — the code closed whichever the set happened to yield first.
+Half the time that was `td`, leaving a hidden `<tr>` on the stack forever and
+swallowing the rest of the table. Measured: content present under
+`PYTHONHASHSEED` 0 and 2, absent under 1 and 3.
+
+A second bug hid the first. Start tags emitted their `|` and newline separators
+without checking whether they were inside a hidden block, so a swallowed table
+still produced a full skeleton of empty cells. The output stayed long, and the
+"the filter swallowed the document" safety net — which compares output length
+against input length — never fired.
+
+**Detection.** Ordered containers wherever order is part of the behaviour, and
+close every applicable tag rather than the first. A test runs the extractor in
+five subprocesses with different `PYTHONHASHSEED` values and requires the five
+outputs to be identical, which is the only way this class of bug is visible at
+all from inside one process. Guards:
+`test_metin_cikarimi_surecten_surece_ayni_sonucu_veriyor`,
+`test_gizli_blok_icinde_ayirici_uretilmiyor`.
+
+**Incident.** 15 Aug 2026, in code written the previous night to fix P-19 — the
+fix reintroduced the very failure it was written to remove, through a path
+nobody thought to look at, and with a coin flip attached. The server's own
+description says "deterministic tool calls"; for one process in four it was not
+true. Worth generalising: a set literal is a claim that order does not matter.
+If order does matter, the container is wrong, not the loop.
 
 ---
 

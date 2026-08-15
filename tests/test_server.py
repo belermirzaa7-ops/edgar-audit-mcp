@@ -1,4 +1,5 @@
 """SEC'e canli cikmadan sunucuyu dogrular: HTTP katmani mock'lanir."""
+import os
 import pathlib
 import re
 import sys
@@ -6,12 +7,14 @@ import sys
 import httpx
 import pytest
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
+KOK = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(KOK / "src"))
 
 TICKERS = {"0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."},
            "1": {"cik_str": 789019, "ticker": "MSFT", "title": "Microsoft Corp"},
            "2": {"cik_str": 1318605, "ticker": "TSLA", "title": "Tesla, Inc."},
-           "3": {"cik_str": 104169, "ticker": "WMT", "title": "Walmart Inc."}}
+           "3": {"cik_str": 104169, "ticker": "WMT", "title": "Walmart Inc."},
+           "4": {"cik_str": 55067, "ticker": "K", "title": "Kellanova"}}
 SUBS = {"name": "Apple Inc.", "sicDescription": "Electronic Computers",
         "fiscalYearEnd": "0927",
         # Gercek SEC submissions verisi karisik form turleri icerir; sahte veri de icermeli.
@@ -459,6 +462,33 @@ GERI_ALINAN = {"cik": 789019, "taxonomy": "us-gaap", "tag": "Revenues",
 ]}}
 
 
+# 52/53 haftalik takvim: yil sonu Aralik ile Ocak arasinda gidip geliyor.
+# Kellanova'nin gercek 10-K donem sonlari (dei `fy` degerleriyle birlikte).
+YIL_SONU_OYNAK = {"cik": 55067, "taxonomy": "us-gaap", "tag": "Revenues",
+                  "label": "Revenues", "entityName": "KELLANOVA", "units": {"USD": [
+    {"start": "2021-01-03", "end": "2022-01-01", "val": 14181, "fy": 2021, "fp": "FY",
+     "form": "10-K", "filed": "2022-02-22", "accn": "k-1"},
+    {"start": "2022-01-02", "end": "2022-12-31", "val": 15315, "fy": 2022, "fp": "FY",
+     "form": "10-K", "filed": "2023-02-21", "accn": "k-2"},
+    {"start": "2023-01-01", "end": "2023-12-30", "val": 13122, "fy": 2023, "fp": "FY",
+     "form": "10-K", "filed": "2024-02-20", "accn": "k-3"},
+    {"start": "2023-12-31", "end": "2025-01-04", "val": 12749, "fy": 2024, "fp": "FY",
+     "form": "10-K", "filed": "2025-02-18", "accn": "k-4"},
+]}}
+
+YIL_SONU_OYNAK_ANLIK = {"cik": 55067, "taxonomy": "us-gaap", "tag": "Assets",
+                        "label": "Assets", "entityName": "KELLANOVA", "units": {"USD": [
+    {"end": "2022-01-01", "val": 18178, "fy": 2021, "fp": "FY",
+     "form": "10-K", "filed": "2022-02-22", "accn": "k-1"},
+    {"end": "2022-12-31", "val": 18496, "fy": 2022, "fp": "FY",
+     "form": "10-K", "filed": "2023-02-21", "accn": "k-2"},
+    {"end": "2023-12-30", "val": 15621, "fy": 2023, "fp": "FY",
+     "form": "10-K", "filed": "2024-02-20", "accn": "k-3"},
+    {"end": "2025-01-04", "val": 15282, "fy": 2024, "fp": "FY",
+     "form": "10-K", "filed": "2025-02-18", "accn": "k-4"},
+]}}
+
+
 ISTEK_KAYDI: list[str] = []
 
 
@@ -507,6 +537,9 @@ def handler(request: httpx.Request) -> httpx.Response:
                                   headers={"Content-Type": "text/html"})
         return httpx.Response(200, text=BELGE_HTML,
                               headers={"Content-Type": "text/html"})
+    if "companyconcept" in u and "CIK0000055067" in u:
+        return httpx.Response(200, json=YIL_SONU_OYNAK_ANLIK if "/Assets" in u
+                              else YIL_SONU_OYNAK)
     if "companyconcept" in u and "CIK0000789019" in u:
         return httpx.Response(200, json=GERI_ALINAN)
     if "companyconcept" in u and "CIK0000104169" in u:
@@ -2227,3 +2260,137 @@ def test_hicbir_arac_protokol_hatasi_firlatmiyor():
                 or getattr(getattr(cagri, "func", cagri), "attr", None)
             assert ad not in ("MCPError", "McpError"), (
                 f"{f.name}: protokol hatasi firlatiliyor, model mesaji gormez")
+
+
+# ============ Ikinci denetim turu (15 Agu 2026 aksami)
+def test_metin_cikarimi_surecten_surece_ayni_sonucu_veriyor():
+    """`_ORTULU_KAPANIS` degerleri KUME oldugunda iterasyon sirasi CPython'un
+    surec basina rastgelelesen string hash'ine baglanıyordu: `<tr>` bir `<td>`
+    aciken geldiginde hangisinin kapatildigi seed'e gore degisiyor, gizli bir
+    `<tr>` yiginda asili kaliyor ve tablonun geri kalani yutuluyordu.
+    PYTHONHASHSEED=0/2'de mali tablo geliyor, 1/3'te bos donuyordu - ayni
+    dosyalama, ayni kod. Sunucunun kendi tanimi "deterministic tool calls"."""
+    import subprocess
+    import sys
+
+    kod = (
+        "import sys; sys.path.insert(0, 'src')\n"
+        "from edgar_mcp.belge import metne_cevir\n"
+        "h = '<table><tr style=\"display:none\"><td>GIZLI<tr><td>Revenue"
+        "<td>391035</table><div>Item 8.</div><p>' + 'Govde. ' * 80\n"
+        "print(metne_cevir(h))\n"
+    )
+    ciktilar = set()
+    for seed in ("0", "1", "2", "3", "5"):
+        r = subprocess.run([sys.executable, "-c", kod],
+                           cwd=str(KOK), capture_output=True, text=True,
+                           env={**os.environ, "PYTHONHASHSEED": seed})
+        assert r.returncode == 0, r.stderr
+        ciktilar.add(r.stdout)
+    assert len(ciktilar) == 1, f"{len(ciktilar)} farkli cikti uretildi"
+    (tek,) = ciktilar
+    assert "391035" in tek and "GIZLI" not in tek
+
+
+def test_gizli_blok_icinde_ayirici_uretilmiyor():
+    """Yutulan bir tablo yine de tum `|` iskeletini yaziyordu; cikti uzun
+    kaldigi icin `metne_cevir` icindeki yutma emniyet agi HIC devreye
+    girmiyordu. Emniyet agini kor eden sey buydu."""
+    from edgar_mcp.belge import metne_cevir
+
+    m = metne_cevir('<div style="display:none"><table><tr><td>a<td>b</table></div><p>X</p>')
+    assert m.strip() == "X", repr(m)
+
+
+@pytest.mark.anyio
+async def test_yil_sonu_aralik_ocak_arasinda_oynayan_takvim(srv):
+    """52/53 haftalik takvimlerde yil sonu yil basi ile yil sonu arasinda gidip
+    geliyor (2022-12-31, sonraki yil 2024-01-04). Sinir donemin kendi TAKVIM
+    yilinda kurulunca Aralik'ta biten her yil sona ~360 gun uzak dusuyor:
+    yillik bilancolarin yarisi eleniyor ve iki ardisik mali yil ayni etiketi
+    aliyordu."""
+    y = await srv.get_concept_series(ticker="K", concept="revenue", period="annual")
+    etiketler = {p.period_end: p.fiscal_year for p in y.points}
+    assert etiketler == {"2022-01-01": 2021, "2022-12-31": 2022,
+                         "2023-12-30": 2023, "2025-01-04": 2024}, etiketler
+    assert len(set(etiketler.values())) == len(etiketler), "ayni yil iki kez"
+
+    b = await srv.get_concept_series(ticker="K", concept="total_assets",
+                                     period="annual")
+    assert b.total_periods == 4, f"{b.total_periods} yil sonu bilancosu dondu"
+
+
+@pytest.mark.anyio
+async def test_uye_filtresi_mutabakati_bozmuyor(srv):
+    """P-27 `limit` icin duzeltilmisti; `member` ayni yoldan siziyordu: tek bir
+    uye istendiginde o uyenin degeri tuzel kisi geneli toplamiyla
+    karsilastiriliyor ve tam tutan bir dosyalama fark uyduruyordu."""
+    hepsi = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
+    tek = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis",
+        member="tsla:AutomotiveSegmentMember")
+    # Iki fact: uyenin tek basina oldugu context ve segment+cografya kesisimi.
+    assert tek.total_matching == 2, "uye filtresi uygulanmamis"
+    assert all(any(d.member == "tsla:AutomotiveSegmentMember" for d in f.dimensions)
+               for f in tek.facts)
+    assert tek.reconciliation[0].members_sum == hepsi.reconciliation[0].members_sum
+    assert tek.reconciliation[0].agrees is True
+
+
+@pytest.mark.anyio
+async def test_belge_indirmede_403_eyleme_donusturulebilir(srv):
+    """`filing_document` `www.sec.gov/Archives`'e giden TEK yol, yani SEC'in
+    "Undeclared Automated Tool" engel sayfasini gorecek en olasi yer - ve
+    hata yolu duzeltildiginde bu metot atlanmisti."""
+    import httpx as _h
+
+    from edgar_mcp.client import EdgarClient
+
+    def engelli(request: _h.Request) -> _h.Response:
+        u = str(request.url)
+        if "company_tickers" in u:
+            return _h.Response(200, json=TICKERS)
+        if "/submissions/" in u:
+            return _h.Response(200, json=SUBS)
+        if u.endswith("/index.json"):
+            return _h.Response(200, json=DIZIN_JSON)
+        return _h.Response(403, text="<html>Undeclared Automated Tool</html>")
+
+    c = EdgarClient()
+    c._http = _h.AsyncClient(transport=_h.MockTransport(engelli),
+                             headers={"User-Agent": "Test Runner test@example.com"})
+    srv._client = c
+    with pytest.raises(ValueError) as e:
+        await srv.read_filing_text(ticker="AAPL", max_characters=200)
+    assert "403" in str(e.value) and "SEC_USER_AGENT" in str(e.value)
+
+
+@pytest.mark.anyio
+async def test_200_ile_gelen_engel_sayfasi_dosyalama_metni_sanilmiyor(srv):
+    """SEC kisitlamayi bazen HTTP 200 ile de yapiyor. Engel sayfasini metne
+    cevirip dondurmek, modele "dosyalama bu kadarmis" dedirtir (P-19)."""
+    import httpx as _h
+
+    from edgar_mcp.client import EdgarClient
+
+    def iki_yuz(request: _h.Request) -> _h.Response:
+        u = str(request.url)
+        if "company_tickers" in u:
+            return _h.Response(200, json=TICKERS)
+        if "/submissions/" in u:
+            return _h.Response(200, json=SUBS)
+        if u.endswith("/index.json"):
+            return _h.Response(200, json=DIZIN_JSON)
+        return _h.Response(200, text="<html><body>Your Request Originates from "
+                                     "an Undeclared Automated Tool</body></html>")
+
+    c = EdgarClient()
+    c._http = _h.AsyncClient(transport=_h.MockTransport(iki_yuz),
+                             headers={"User-Agent": "Test Runner test@example.com"})
+    srv._client = c
+    with pytest.raises(ValueError) as e:
+        await srv.read_filing_text(ticker="AAPL", max_characters=200)
+    assert "block page" in str(e.value)
