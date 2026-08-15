@@ -97,8 +97,8 @@ def testler():
 ENJEKSIYONLAR = [
  ("Mali yili SEC'in fy alanindan al (ESKI HATAM)",
   "src/edgar_mcp/server.py",
-  "fiscal_year=_yil(end) + kayma,",
-  "fiscal_year=row.get('fy') or (_yil(end) + kayma),",
+  "fiscal_year=temel + kayma,",
+  "fiscal_year=row.get('fy') or (temel + kayma),",
   "test_donem_yili_bitis_tarihinden_gelir"),
 
  ("Donem uzunlugu filtresini kaldir (ceyreklik sizsin)",
@@ -242,7 +242,7 @@ ENJEKSIYONLAR = [
 
  ("list_filings: has_more'u sabit False yap",
   'src/edgar_mcp/server.py',
-  '        has_more=len(dosyalamalar) > limit,',
+  '        has_more=len(dosyalamalar) > limit or daha_eski,',
   '        has_more=False,',
   'test_filings_sayfalama_bilgisi_verir'),
 
@@ -296,8 +296,8 @@ ENJEKSIYONLAR = [
 
  ("Belge: gizli iXBRL blogunu metne al (ad alani gurultusu)",
   "src/edgar_mcp/belge.py",
-  "        if tag in _ATLANAN or _gizli_mi(attrs):",
-  "        if tag in _ATLANAN:",
+  "        gizli = tag in _ATLANAN or (self._gizliyi_atla and _gizli_mi(attrs))",
+  "        gizli = tag in _ATLANAN",
   "test_gizli_ixbrl_blogu_metne_girmiyor"),
 
  ("Belge: icindekiler tablosu esigini kaldir (TOC bolum sayilsin)",
@@ -314,8 +314,8 @@ ENJEKSIYONLAR = [
 
  ("Belge: script/style atlamayi kapat (govde metne sizsin)",
   "src/edgar_mcp/belge.py",
-  "        if tag in _ATLANAN or _gizli_mi(attrs):",
-  "        if _gizli_mi(attrs):",
+  "        gizli = tag in _ATLANAN or (self._gizliyi_atla and _gizli_mi(attrs))",
+  "        gizli = (self._gizliyi_atla and _gizli_mi(attrs))",
   "test_script_ve_stil_metne_karismiyor"),
 
  ("Belge: sayfalamayi kaldir (tum belgeyi don)",
@@ -453,9 +453,9 @@ ENJEKSIYONLAR = [
   "test_olmayan_belge_adi_eyleme_donusturulebilir_hata_verir"),
 
  ("Dizin listesi onbellegini kapat (her cagride yeniden iste)",
-  "src/edgar_mcp/server.py",
-  "    if dizin_url in _DIZIN_LISTESI:",
-  "    if False:",
+  "src/edgar_mcp/client.py",
+  "        if url not in self._index_cache:",
+  "        if True:",
   "test_ayni_belge_iki_kez_indirilmiyor"),
 
  # ---- B2: dosyalama ici arama
@@ -486,8 +486,8 @@ ENJEKSIYONLAR = [
 
  ("B3: cercevede olmayan tickeri sessizce dusur",
   "src/edgar_mcp/server.py",
-  "            ad for cik, ad in istenen.items() if cik not in gorulen",
-  "            ad for cik, ad in istenen.items() if False",
+  "            ad for cik, adlar in istenen.items() if cik not in gorulen",
+  "            ad for cik, adlar in istenen.items() if False",
   "test_cerceve_istenen_ticker_yoksa_sessizce_dusmuyor"),
 
  ("B3: donem araligini tek noktaya cokert",
@@ -571,20 +571,20 @@ ENJEKSIYONLAR = [
 
  ("C: cok boyutlu fact'i de toplama kat (cift sayim)",
   "src/edgar_mcp/server.py",
-  "        if f.value is None or f.is_nil or len(f.dimensions) != 1:",
-  "        if f.value is None or f.is_nil:",
+  "        if len(f.dimensions) != 1:",
+  "        if False:",
   "test_cok_boyutlu_fact_toplamaya_girmiyor"),
 
  ("C: nil fact'i toplama kat",
   "src/edgar_mcp/server.py",
-  "        if not _etiket_uyuyor(o.tag, adaylar) or not sayi_mi(o.deger) or o.nil:",
-  "        if not _etiket_uyuyor(o.tag, adaylar):",
+  "        if o.tag != etiket or not sayi_mi(o.deger) or o.nil:",
+  "        if o.tag != etiket:",
   "test_raporlanmayan_toplam_sifir_sanilmiyor"),
 
  ("C: eksen verilmeden de mutabakat hesapla",
   "src/edgar_mcp/server.py",
-  "        reconciliation=_mutabakat(inst, adaylar, secilen) if axis else [],",
-  "        reconciliation=_mutabakat(inst, adaylar, secilen),",
+  "        reconciliation=_mutabakat(inst, cozulen_etiket, tumu) if axis else [],",
+  "        reconciliation=_mutabakat(inst, cozulen_etiket, tumu),",
   "test_eksen_verilmezse_mutabakat_hesaplanmiyor"),
 
  ("C: linkbase dosyasini instance sanmayi engelleyen filtreyi kaldir",
@@ -610,6 +610,109 @@ ENJEKSIYONLAR = [
   "    except ET.ParseError as e:",
   "    except ZeroDivisionError as e:",
   "test_bozuk_instance_cig_traceback_yerine_eyleme_donusturulebilir_hata"),
+
+ # ---- 15 Agu 2026 denetimi
+ ("D: gizli yigini eski (tepe-eslesme) haline dondur",
+  "src/edgar_mcp/belge.py",
+  "        if self._kapat(tag) and not self._atla and tag in _BLOK:",
+  "        if self._yigin and self._yigin[-1][0] == tag and self._atla:\n            self._yigin.pop()\n            self._atla -= 1\n        elif tag in _BLOK:",
+  "test_gizli_blok_kapanmayan_etikette_belgeyi_yutmuyor"),
+
+ ("D: kapanmayan elemanlari da yigina koy",
+  "src/edgar_mcp/belge.py",
+  "        if tag in _KAPANMAYAN:\n            if tag == \"br\" and not self._atla:",
+  "        if False:\n            if tag == \"br\" and not self._atla:",
+  "test_gizli_blok_kapanmayan_etikette_belgeyi_yutmuyor"),
+
+ ("D: ortulu kapanislari uygulama",
+  "src/edgar_mcp/belge.py",
+  "        for kapanacak in _ORTULU_KAPANIS.get(tag, ()):",
+  "        for kapanacak in ():",
+  "test_gizli_blok_kapanmayan_etikette_belgeyi_yutmuyor"),
+
+ ("D: yutma emniyet agini kaldir",
+  "src/edgar_mcp/belge.py",
+  "    if (gizliyi_atla and len(govde) >= _YUTMA_TABANI",
+  "    if (False and len(govde) >= _YUTMA_TABANI",
+  "test_gizli_filtresi_belgeyi_yutarsa_filtresiz_donuyor"),
+
+ ("D: mutabakati yine sayfa uzerinden hesapla",
+  "src/edgar_mcp/server.py",
+  "        reconciliation=_mutabakat(inst, cozulen_etiket, tumu) if axis else [],",
+  "        reconciliation=_mutabakat(inst, cozulen_etiket, secilen) if axis else [],",
+  "test_mutabakat_sayfalama_sinirindan_etkilenmiyor"),
+
+ ("D: disarida birakilanlari raporlama",
+  "src/edgar_mcp/server.py",
+  "            excluded_from_sum=disarida.get(k, {}),",
+  "            excluded_from_sum={},",
+  "test_mutabakat_disarida_biraktiklarini_sayiyor"),
+
+ ("D: en son degeri yine ilk-gorulme sirasindan al",
+  "src/edgar_mcp/server.py",
+  '        son = float(satirlar[-1]["val"])',
+  "        son = sirali_degerler[-1]",
+  "test_revizyon_geri_alinan_degerde_seriyle_celismiyor"),
+
+ ("D: ceyreklik mali yili yine bitis yilindan al",
+  "src/edgar_mcp/server.py",
+  "            temel = _yil(end) if (yillik or ay_gun is None) \\\n                else _fy_sonuna_gore_yil(end, ay_gun)",
+  "            temel = _yil(end)",
+  "test_ceyreklik_mali_yil_etiketi_sirketin_kendi_yiliyla_ayni"),
+
+ ("D: anlik kayitlari yillik filtreden oldugu gibi gecir",
+  "src/edgar_mcp/server.py",
+  "        if ay_gun is None or not end:\n            return True          # capa yok: eleyecek olcut de yok",
+  "        return True\n        if ay_gun is None or not end:\n            return True",
+  "test_yillik_seri_ceyrek_sonu_bakiyeleri_icermiyor"),
+
+ ("D: ceyreklik filtresinde anlik kayitlari yine ele",
+  "src/edgar_mcp/server.py",
+  "    if days is None:\n        if period != \"annual\":\n            return True",
+  "    if days is None:\n        if period == \"quarterly\":\n            return False\n        if period != \"annual\":\n            return True",
+  "test_ceyreklik_seri_anlik_kalemi_bos_dondurmuyor"),
+
+ ("D: ust-kaynak hata mesajini cig birak",
+  "src/edgar_mcp/client.py",
+  "        if r.status_code >= 400:\n            raise ValueError(_durum_mesaji(r.status_code, url))",
+  "        if r.status_code >= 400:\n            r.raise_for_status()",
+  "test_ust_kaynak_hatasi_eyleme_donusturulebilir"),
+
+ ("D: JSON olmayan govdeyi cig JSONDecodeError birak",
+  "src/edgar_mcp/client.py",
+  "        except ValueError as e:\n            bas = (r.text or \"\").lstrip()[:60].replace(\"\\n\", \" \")",
+  "        except ZeroDivisionError as e:\n            bas = (r.text or \"\").lstrip()[:60].replace(\"\\n\", \" \")",
+  "test_json_yerine_html_gelirse_soyleniyor"),
+
+ ("D: ayni CIK'te ikinci sembolu yine ez",
+  "src/edgar_mcp/server.py",
+  "            istenen.setdefault(await _c().cik_for_ticker(t), []).append(t.upper())",
+  "            istenen[await _c().cik_for_ticker(t)] = [t.upper()]",
+  "test_ayni_cik_iki_sembol_tasiyorsa_ikisi_de_gorunuyor"),
+
+ ("D: recent disindaki dosyalamalari yok say",
+  "src/edgar_mcp/server.py",
+  '    daha_eski = bool(sub.get("filings", {}).get("files"))',
+  "    daha_eski = False",
+  "test_recent_akisinin_disindaki_dosyalamalar_bildiriliyor"),
+
+ ("D: sunucu ortam degiskeni olmadan da acilsin",
+  "src/edgar_mcp/server.py",
+  "    _c()\n    mcp.run(transport=\"stdio\")",
+  '    mcp.run(transport="stdio")',
+  "test_main_kullanici_ajani_olmadan_baslamayi_reddediyor"),
+
+ ("D: companyfacts onbellegini yine sinirsiz birak",
+  "src/edgar_mcp/client.py",
+  "            self._sinirla(self._facts_cache, cik, await self._get(\n                f\"{SEC_DATA}/api/xbrl/companyfacts/CIK{cik}.json\"), 2)",
+  "            self._facts_cache[cik] = await self._get(\n                f\"{SEC_DATA}/api/xbrl/companyfacts/CIK{cik}.json\")",
+  "test_onbellekler_sinirli"),
+
+ ("D: takma adin tum etiketlerini yine kabul et (cift sayim)",
+  "src/edgar_mcp/server.py",
+  "        if not cozulen_etiket or o.tag != cozulen_etiket:",
+  "        if not _etiket_uyuyor(o.tag, adaylar):",
+  "test_takma_ad_boyutlu_fact_te_cift_saymiyor"),
 ]
 
 

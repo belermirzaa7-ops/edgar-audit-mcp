@@ -39,6 +39,7 @@ can verify rather than remember.
 | [P-24](#p-24) | Did I edit the working tree by hand to test an idea, and is that edit still there? | `arac/enjeksiyon.py` refuses to start while any test is red |
 | [P-25](#p-25) | Does my tooling recognise the test names pytest actually prints? | `test_enjeksiyon_parametreli_testi_de_taniyor` |
 | [P-26](#p-26) | Am I treating a breakdown and its total as arithmetic that must agree? | `test_tutmayan_toplam_gizlenmiyor`, `test_raporlanmayan_toplam_sifir_sanilmiyor` |
+| [P-27](#p-27) | Does a bound I added for display leak into a number I compute? | `test_mutabakat_sayfalama_sinirindan_etkilenmiyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -693,6 +694,35 @@ a concept with only dimensional facts returned nothing, one where dimensional
 rows overwrote the total — surfaced the failure class before any of it was
 written. Recorded here because the assumption is the natural one to make, and
 the arithmetic looks right often enough to be trusted.
+
+
+<a id="p-27"></a>
+### P-27 · A limit meant for display leaked into the arithmetic
+
+**Symptom.** A segment breakdown that ties to the cent reported as off by
+20.7 billion dollars. Same filing, same tool, same day — the only thing that
+changed was `limit`.
+
+**Root cause.** The reconciliation summed the facts that were about to be
+*returned*, after truncation to the page size, while the entity-wide total came
+from the whole filing. Two numbers from two different populations, subtracted.
+The default page of 40 is smaller than a real segment query on a 10-K — three
+comparative years across segments and product members — so the fabricated
+discrepancy was not an edge case, it was the normal path. `has_more: true` was
+present in the response, and nothing connected it to the reconciliation.
+
+**Detection.** Anything computed is computed over the full matched set; the
+page bound applies only to what is displayed. A test asks the same question at
+`limit=1` and `limit=40` and requires the sums to be identical, which is the
+property that actually matters and is cheap to assert anywhere a page bound
+meets an aggregate. Guard: `test_mutabakat_sayfalama_sinirindan_etkilenmiyor`.
+
+**Incident.** 15 Aug 2026, found by an adversarial review of code written hours
+earlier — the same session that added P-26 to stop a tool from inventing a
+discrepancy between a breakdown and its total. The tool then invented one
+itself, by a different route. Worth remembering: the guard and the bug were
+written by the same person in the same afternoon, so knowing the failure class
+is not the same as being immune to it.
 
 ---
 

@@ -17,6 +17,28 @@ SEC_DATA = "https://data.sec.gov"
 SEC_WWW = "https://www.sec.gov"
 
 
+def _durum_mesaji(kod: int, url: str) -> str:
+    if kod == 403:
+        return (
+            f"SEC refused the request with HTTP 403 for {url}. SEC blocks "
+            "clients it considers undeclared automated tools: check that "
+            "SEC_USER_AGENT names a real person or company and a working "
+            "contact email, then retry. A burst of requests can also trigger "
+            "this even with a valid header."
+        )
+    if kod in (429, 503):
+        return (
+            f"SEC is throttling or temporarily unavailable (HTTP {kod}) for "
+            f"{url}. This server already self-limits to 8 requests per second; "
+            "wait a few seconds and retry the same call."
+        )
+    return (
+        f"SEC returned HTTP {kod} for {url}. This is an upstream failure, not "
+        "a missing value: retrying shortly is reasonable, and a persistent "
+        "failure means the endpoint or the identifier in the URL is wrong."
+    )
+
+
 class RateLimiter:
     """SEC'in 10 istek/sn sinirini asmayan basit token-bucket."""
 
@@ -54,16 +76,54 @@ class EdgarClient:
             follow_redirects=True,
         )
         self._ticker_cache: dict[str, str] | None = None
+        # Onbelleklerin hepsi SINIRLI. companyfacts en buyuk nesne (olculdu:
+        # 11 MB JSON -> 45 MB yerlesik, 4,1 kat); sinirsiz birakmak, stdio
+        # surecinin masaustu istemci acik kaldigi surece yasadigi bir ortamda
+        # yirmi sirket taranınca ~1 GB demekti (15 Agu 2026'da bulundu).
         self._facts_cache: dict[str, dict] = {}
+        self._subs_cache: dict[str, dict] = {}
+        self._index_cache: dict[str, dict] = {}
 
     async def aclose(self) -> None:
         await self._http.aclose()
 
+    @staticmethod
+    def _sinirla(onbellek: dict, anahtar: str, deger, sinir: int) -> None:
+        if anahtar not in onbellek and len(onbellek) >= sinir:
+            onbellek.pop(next(iter(onbellek)))
+        onbellek[anahtar] = deger
+
     async def _get(self, url: str) -> dict:
+        """SEC'ten JSON. Hata durumlari MODELE ANLAMLI mesaj dondurur.
+
+        Neden (15 Agu 2026'da bulundu): yalnizca 404 ele aliniyordu; 403, 429,
+        5xx ve "JSON yerine HTML hata sayfasi" durumlari cig `HTTPStatusError`
+        ya da `JSONDecodeError` olarak modele gidiyordu. SEC'in gercek
+        kisitlama yaniti HTTP 403 + HTML govde ("Your Request Originates from
+        an Undeclared Automated Tool") - yani en olasi hata, en anlamsiz mesaji
+        uretiyordu. §18/P-13: hata mesaji ne yapilacagini soylemeli.
+        """
         await self._limiter.acquire()
         r = await self._http.get(url)
-        r.raise_for_status()
-        return r.json()
+
+        if r.status_code == 404:
+            # 404 kontrol akisi: cagiran taraf "bu etiket/cerceve yok" diye
+            # okuyor. Istisna turu korunuyor.
+            r.raise_for_status()
+
+        if r.status_code >= 400:
+            raise ValueError(_durum_mesaji(r.status_code, url))
+
+        try:
+            return r.json()
+        except ValueError as e:
+            bas = (r.text or "").lstrip()[:60].replace("\n", " ")
+            raise ValueError(
+                f"SEC returned a body that is not JSON for {url}. It began "
+                f"with: {bas!r}. An HTML body here is usually SEC's throttling "
+                "or block page rather than data; wait a few seconds and retry, "
+                "and check that SEC_USER_AGENT names a real contact email."
+            ) from e
 
     async def cik_for_ticker(self, ticker: str) -> str:
         """Ticker -> 10 haneli sifir dolgulu CIK."""
@@ -111,7 +171,12 @@ class EdgarClient:
             raise
 
     async def submissions(self, cik: str) -> dict:
-        return await self._get(f"{SEC_DATA}/submissions/CIK{cik}.json")
+        """1-2 MB, dokuz aracin besi kullaniyor. Onbelleksiz birakmak her
+        cagride yeniden indirmek demekti."""
+        if cik not in self._subs_cache:
+            self._sinirla(self._subs_cache, cik,
+                          await self._get(f"{SEC_DATA}/submissions/CIK{cik}.json"), 4)
+        return self._subs_cache[cik]
 
     async def company_concept(self, cik: str, concept: str, taxonomy: str = "us-gaap") -> dict:
         return await self._get(
@@ -139,12 +204,14 @@ class EdgarClient:
         birincil belgesinde degil `exhibit...htm` ekinde, ve arac yalnizca
         birincil belgeyi okuyordu.
         """
-        return await self._get(dizin_url.rstrip("/") + "/index.json")
+        url = dizin_url.rstrip("/") + "/index.json"
+        if url not in self._index_cache:
+            self._sinirla(self._index_cache, url, await self._get(url), 4)
+        return self._index_cache[url]
 
     async def company_facts(self, cik: str) -> dict:
         """companyfacts yaniti birkac MB olabilir; CIK basina bir kez cekilir."""
         if cik not in self._facts_cache:
-            self._facts_cache[cik] = await self._get(
-                f"{SEC_DATA}/api/xbrl/companyfacts/CIK{cik}.json"
-            )
+            self._sinirla(self._facts_cache, cik, await self._get(
+                f"{SEC_DATA}/api/xbrl/companyfacts/CIK{cik}.json"), 2)
         return self._facts_cache[cik]

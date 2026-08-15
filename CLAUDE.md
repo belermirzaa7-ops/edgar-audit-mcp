@@ -284,7 +284,7 @@ faydasina degmedigi icin risk BILINCLI OLARAK kabul edildi. Yeni commit'ler
 ### KK-16: Annotations ipucudur, garanti testle saglanir
 **Tarih:** 13 Agustos 2026 · **Durum:** yururlukte · **Standart:** §19
 
-Dort arac da `read_only_hint=True, destructive_hint=False, idempotent_hint=True,
+Araclarin tamami `read_only_hint=True, destructive_hint=False, idempotent_hint=True,
 open_world_hint=True` ilan ediyor. Standart §19 acikca soyluyor: bunlar
 IPUCUDUR, guvenlik garantisi degil. Istemci bunlara bakip karar vermemeli.
 
@@ -721,3 +721,76 @@ toplaniyordu ve `id=` niteligi birimlerde de var - `fsdsubscription` fact
 sanildi. Sonucu degistirmedi ama arac, olctugunu iddia ettigi seyi tam
 olcmuyordu. Artik instance ayristirilip yalnizca `fact_id` tasiyan olgular
 sayiliyor: olculen sey, aracin GERCEKTEN dondurdugu id'ler.
+
+### KK-32: Dusman gozle denetim - dokuz kusur, ikisi kritik
+**Tarih:** 15 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §2, §3, §11
+
+Loom videosundan once repo, "musterinin kidemli muhendisi" rolunde bir ajana
+okutuldu: iddia edilen ozeni cürüten seyler bul. Dokuz gecerli kusur cikti,
+ikisi kritik, ve hicbiri sema/tip/lint duzeyinde gorunur degildi. Hepsi
+duzeltildi, hepsi testli, hepsi enjeksiyonla dogrulandi (17 yeni enjeksiyon).
+
+**Kritik 1 - gizli blok filtresi belgeyi yutuyordu.** `belge.py` gizli
+elemanlari bir yigina koyuyor ve kapanis etiketini YALNIZCA yiginin tepesiyle
+esleserse cikariyordu. Gercek EDGAR HTML'inde `<td>`/`<tr>` kapanislari
+atlanir ve `<img>` gibi kapanmayan elemanlar vardir; ikisinde de sayac bir daha
+sifirlanmiyor ve belgenin GERI KALANI gizli sayiliyordu. Uretildi: 2,4 MB'lik
+bir belge **3 karaktere** dusuyor, arac HTTP 200 ile `available_sections: []`
+donduruyordu - "bu dosyalama bos". Bu tam olarak P-19. Ic ice ayni ad
+(`<div><div>`) ise ters yonde caliyordu: yigin erken bosaliyor ve gizli iXBRL
+basligi metne SIZIYORDU.
+**Karar:** tarayicilarin yaptigi - yigin (ad, gizli) ciftleri tutar, kapanis
+geriye dogru aranir, kapanmayan elemanlar yigina hic girmez, `<td>a<td>b` gibi
+ortulu kapanislar uygulanir. Ustune bir emniyet agi: filtre belgenin 1/200'unden
+azini birakiyorsa filtre yaniliyordur, metin FILTRESIZ yeniden uretilir.
+Gurultulu ama dolu metin, sessizce bos metinden iyidir.
+
+**Kritik 2 - sayfalama siniri mutabakata sizmisti (P-27).** Uye toplami
+dondurulen SAYFA uzerinden, konsolide deger dosyalamanin TAMAMI uzerinden
+hesaplaniyordu. `limit=1` ile ayni dosyalama "20,7 milyar dolarlik fark var"
+diyordu; varsayilan 40 satir gercek bir 10-K segment sorgusu icin zaten yetmez,
+yani bu uydurma fark sahada gorulurdu. Hesaplanan her sey artik TUM eslesen
+kume uzerinden; sayfa siniri yalnizca gosterimi etkiliyor.
+
+**Yedi kusur daha:**
+1. **Ceyreklik mali yil etiketi bir yil kayiyordu.** Kayma yillik capalardan
+   turetilip her satira uygulaniyordu; Ocak/Subat'ta biten mali yillarda
+   ceyrekler onceki takvim yilinda biter. WMT'nin FY2026'si icin arac yila
+   FY2026, KENDI ilk ceyregine FY2025 diyordu. Artik donem sonu, sirketin yil
+   sonu tarihine gore hangi mali yila dustugu hesaplanarak etiketleniyor
+   (52/53 haftalik takvimler icin ±10 gun tolerans).
+2. **Anlik (bilanco) kayitlar donem filtresinden yanlis geciyordu.**
+   `total_assets` + `annual` her CEYREK sonu bakiyeyi donduruyor, ayni mali yil
+   dort kez tekrarlaniyordu; `public_float` + `quarterly` ise HTTP 200 ile BOS
+   liste donduruyordu - KK-23'un tam olarak yasaklandigi durum.
+3. **Revizyonda "en son deger" yanlisti.** Farkli degerlerin ILK GORULME
+   sirasindaki sonuncusu aliniyordu; 100 -> 90 -> 100 gibi geri alinan bir
+   revizyonda arac "en son 90" derken seri araci 100 gosteriyordu. Iki arac,
+   ayni gercek, iki cevap. Artik en son DOSYALANAN satirdan okunuyor.
+4. **Boyutlu fact'lerde takma ad cift sayiyordu.** Aday etiketlerin hepsi kabul
+   ediliyordu; bir dosyalama ayni segmenti iki etiket altinda tasirsa uye
+   toplami konsolidenin iki katina cikiyordu. Seri aracinda birlestirme DOGRU
+   (KK-8), burada cift sayim; tek etikete kilitlendi.
+5. **Ust-kaynak hatalari cig gidiyordu.** Yalnizca 404 ele aliniyordu; SEC'in
+   gercek kisitlama yaniti (HTTP 403 + HTML govde) `HTTPStatusError` ya da
+   `JSONDecodeError` olarak modele ulasiyordu. Artik ne yapilacagini soyleyen
+   mesajlar var (§18/P-13). Dil kapisi bunlari GORMUYORDU - mesajlar bir
+   yardimci fonksiyona tasininca `raise` dugumunu gezen tarayicinin disinda
+   kaldilar; tarayici bir seviye dolayli cagriyi da kapsayacak sekilde
+   genisletildi (P-17'nin ucuncu tekrari).
+6. **`companyfacts` onbellegi sinirsizdi.** Olculdu: 11 MB JSON -> 45 MB
+   yerlesik. Diger her onbellek gerekcesiyle sinirliydi; en buyugu tek sinirsiz
+   olandi. `submissions` ise hic onbelleklenmiyor, her cagride yeniden
+   iniyordu; `index.json` cagri basina IKI kez isteniyordu. Ucu de duzeltildi.
+7. **Uc dokuman iddiasi kodda yoktu:** "refuses to start without
+   SEC_USER_AGENT" (istemci TEMBEL kuruluyordu - konteyner ortam degiskeni
+   olmadan aciliyor ve dokuz araci ilan ediyordu), "says which facts it
+   excluded" (hicbir alan soylemiyordu), ve iki README de "on soru" diyordu
+   (on sekiz). Ilki kodla, ikincisi alanlarla, ucuncusu iki yeni testle
+   kapatildi - README artik soru sayisi ve takma ad listesi icin testli.
+
+**Ders:** bunlarin hicbiri yeni bir sinif degil; hepsi kendi `PATTERNS.md`
+listemizdeki bir maddenin tekrari (P-4 fixture'lar, P-19 bos basari, P-14
+dokuman, P-17 yuzey). Kontrol listesini yazmis olmak, ona uymak degil - ve
+denetimi bir baskasina yaptirmak, listeyi kendi kendine okumaktan daha etkili
+oldu.

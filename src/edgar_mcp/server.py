@@ -124,6 +124,58 @@ def _fy_kaymasi(rows: list[dict]) -> tuple[int, bool]:
     kayma = sorted(set(kaymalar), key=lambda k: (-kaymalar.count(k), k))[0]
     return kayma, True
 
+
+def _mali_yil_sonu(rows: list[dict]) -> tuple[int, int] | None:
+    """Sirketin mali yilinin bittigi (ay, gun). Capalardan turetilir.
+
+    52/53 haftalik takvimlerde tarih her yil birkac gun kayar (AAPL: 09-27,
+    09-28, 10-01), bu yuzden EN SIK gorulen ay aliniyor ve gun o ayin
+    ortalamasi degil, o aydaki en gec gun olarak birakiliyor - karsilastirmalar
+    zaten toleransli yapiliyor.
+    """
+    capalar: dict[int, str] = {}
+    for r in rows:
+        if r.get("fp") != "FY" or not str(r.get("form", "")).startswith("10-K"):
+            continue
+        end, start, fy = r.get("end"), r.get("start"), r.get("fy")
+        if not end or fy is None:
+            continue
+        if start and not (300 <= _gun_farki(start, end) <= 400):
+            continue
+        if fy not in capalar or end > capalar[fy]:
+            capalar[fy] = end
+    if not capalar:
+        return None
+    aylar = [int(e[5:7]) for e in capalar.values()]
+    ay = max(set(aylar), key=aylar.count)
+    gunler = [int(e[8:10]) for e in capalar.values() if int(e[5:7]) == ay]
+    return ay, max(gunler)
+
+
+# 52/53 haftalik mali takvimlerde yil sonu birkac gun oynar; esitlik aramak
+# yerine pencere kullaniliyor.
+FY_SONU_TOLERANSI = 10
+
+
+def _fy_sonuna_gore_yil(end: str, ay_gun: tuple[int, int]) -> int:
+    """Bir donem sonu, hangi mali yila ait? (kayma UYGULANMADAN, takvim yili)
+
+    Neden gerekli (15 Agu 2026'da bulunan hata): kayma YILLIK capalardan
+    turetiliyordu ama her satira, ceyrekliklere de, oldugu gibi uygulaniyordu.
+    Ocak/Subat'ta biten mali yillarda ceyrekler bir onceki takvim yilinda biter,
+    dolayisiyla etiket bir yil geri kayardi: WMT'nin FY2026'si icin arac yila
+    FY2026, KENDI ilk ceyregine FY2025 diyordu. Ayni araç, ayni sirket, iki ayri
+    cevap.
+    """
+    ay, gun = ay_gun
+    yil = _yil(end)
+    try:
+        sinir = date(yil, ay, gun)
+    except ValueError:                      # 29 Subat gibi
+        sinir = date(yil, ay, 28)
+    bu = date(*(int(x) for x in end.split("-")))
+    return yil if (bu - sinir).days <= FY_SONU_TOLERANSI else yil + 1
+
 _client: EdgarClient | None = None
 
 
@@ -158,8 +210,15 @@ class FilingPage(BaseModel):
     )
     returned: int = Field(description="Number of filings in this response")
     has_more: bool = Field(
-        description="True if more filings matched than were returned; raise limit "
-        "or narrow with form_type"
+        description="True if more filings matched than were returned; raise "
+        "limit, narrow with form_type, or see older_filings_exist"
+    )
+    older_filings_exist: bool = Field(
+        default=False,
+        description="True when SEC keeps further filings outside the recent "
+        "feed, which it caps at about a thousand entries. This tool reads only "
+        "that feed, so a company with a long history has filings it cannot see "
+        "here - treat the list as recent filings, not as all of them",
     )
     filings: list[Filing]
 
@@ -451,11 +510,19 @@ async def list_recent_filings(
     # §16: limit tek basina yetmez. Model, gordugu listenin tamami mi yoksa
     # kirpilmis mi oldugunu bilmeden "sirketin N dosyalamasi var" diye
     # sonuclandirabilir.
+    # SEC `filings.recent` alanini yaklasik 1000 dosyalamada kesip gerisini
+    # `filings.files[]` altindaki ayri JSON dosyalarina koyar. Aktif bir
+    # dosyalayanda bu bir-iki yillik gecmis demek. Bunu okumadan `has_more:
+    # false` demek, "sirketin baska 10-K'si yok" iddiasi olurdu - oysa otuz
+    # yillik gecmisi olabilir (15 Agu 2026'da bulundu). Eski dosyalamalar
+    # okunmuyor ama SUSULMUYOR: yanit onlarin varligini bildiriyor.
+    daha_eski = bool(sub.get("filings", {}).get("files"))
     return FilingPage(
         ticker=ticker.upper(),
         total_matching=len(dosyalamalar),
         returned=min(limit, len(dosyalamalar)),
-        has_more=len(dosyalamalar) > limit,
+        older_filings_exist=daha_eski,
+        has_more=len(dosyalamalar) > limit or daha_eski,
         filings=dosyalamalar[:limit],
     )
 
@@ -504,24 +571,49 @@ def _facts_kayit(facts: dict, tag: str) -> dict | None:
     return {"label": kayit.get("label"), "units": kayit.get("units") or {}}
 
 
-def _donem_uyuyor(period: str, days: int | None) -> bool:
+def _donem_uyuyor(
+    period: str, days: int | None, end: str | None = None,
+    ay_gun: tuple[int, int] | None = None,
+) -> bool:
     """Donem filtresi TEK yerde. Seri ve revizyon araclari ayni kurali
     kullanmali; kopyalanirsa biri duzeltilip oteki unutulur ve ayrica
     enjeksiyon hedefi benzersiz olmaktan cikar (KK-18).
 
-    Yillik = 300-400 gun, ceyreklik = 60-120 gun. Ani (instant) kayitlarda
-    `days` yoktur: yillik ve 'all' bunlari kabul eder, ceyreklik etmez.
+    Sureli kayitlar: yillik = 300-400 gun, ceyreklik = 60-120 gun.
+
+    ANI (instant) kayitlar - bilanco kalemleri, `Assets`, `StockholdersEquity`,
+    `dei:*` - bir SUREYE degil bir ANA aittir, `days` tasimazlar. Ilk surumde
+    bunlar "yillik" filtresinden oldugu gibi geciyor, "ceyreklik" filtresinde
+    tamamen eleniyordu; iki ayri sessiz yanlislik (15 Agu 2026'da bulundu):
+      - `total_assets` + `annual` her CEYREK sonu bakiyeyi dondururdu; ayni
+        `fiscal_year` dort kez tekrar ederdi.
+      - `public_float` + `quarterly` HTTP 200 ile BOS liste dondururdu - tam
+        olarak KK-23'un "bos basari gercek 'veri yok'tan ayirt edilemez"
+        dedigi durum.
+    Dogrusu: ani bir kayit yillik seride ancak MALI YIL SONUNA denk geliyorsa
+    yer alir; ceyreklik seride her ceyrek sonu bakiye zaten bir gozlemdir.
     """
-    if period == "quarterly" and days is None:
-        return False
-    if period == "all" or days is None:
+    if days is None:
+        if period != "annual":
+            return True
+        if ay_gun is None or not end:
+            return True          # capa yok: eleyecek olcut de yok
+        ay, gun = ay_gun
+        try:
+            sinir = date(_yil(end), ay, gun)
+        except ValueError:
+            sinir = date(_yil(end), ay, 28)
+        bu = date(*(int(x) for x in end.split("-")))
+        return abs((bu - sinir).days) <= FY_SONU_TOLERANSI
+    if period == "all":
         return True
     if period == "annual":
         return 300 <= days <= 400
     return 60 <= days <= 120
 
 
-def _noktalar(veri: dict, tag: str, period: str, kayma: int) -> list[FactPoint]:
+def _noktalar(veri: dict, tag: str, period: str, kayma: int,
+              ay_gun: tuple[int, int] | None = None) -> list[FactPoint]:
     out: list[FactPoint] = []
     for unit, rows in _kullanilabilir_birimler(veri):
         for row in rows:
@@ -533,12 +625,19 @@ def _noktalar(veri: dict, tag: str, period: str, kayma: int) -> list[FactPoint]:
 
             # SEC'in fy/fp alanlari DOSYALAMANIN donemini gosterir, verinin
             # kendi donemini DEGIL (KK-1). Donem start/end'den belirlenir.
-            if not _donem_uyuyor(period, days):
+            if not _donem_uyuyor(period, days, end, ay_gun):
                 continue
+
+            # Yillik satirda donemin bitis yili mali yila esittir; ceyreklik ve
+            # ani satirlarda DEGILDIR - hangi mali yila dustugu, sirketin yil
+            # sonu tarihine gore bulunur.
+            yillik = days is not None and 300 <= days <= 400
+            temel = _yil(end) if (yillik or ay_gun is None) \
+                else _fy_sonuna_gore_yil(end, ay_gun)
 
             out.append(
                 FactPoint(
-                    fiscal_year=_yil(end) + kayma,
+                    fiscal_year=temel + kayma,
                     source_tag=tag,
                     period_start=start,
                     period_end=end,
@@ -669,10 +768,11 @@ async def get_concept_series(
         r for _, v in veriler for _, rows in _kullanilabilir_birimler(v) for r in rows
     ]
     kayma, turetildi = _fy_kaymasi(tum_satirlar)
+    ay_gun = _mali_yil_sonu(tum_satirlar)
 
     noktalar: list[FactPoint] = []
     for tag, v in veriler:
-        noktalar.extend(_noktalar(v, _bol(tag)[1], period, kayma))
+        noktalar.extend(_noktalar(v, _bol(tag)[1], period, kayma, ay_gun))
 
     # Ayni donem hem birden fazla dosyalamada hem birden fazla etikette gecer.
     # En son SUNULAN kayit kazanir; esitlikte takma ad sirasi belirler.
@@ -736,9 +836,6 @@ ARAMA_VURGU_SINIRI = 8
 # dosya" siralamasinin basina o geciyor.
 _URETILEN_RAPOR = re.compile(r"^R\d+\.html?$", re.IGNORECASE)
 
-_DIZIN_LISTESI: dict[str, list[FilingDocument]] = {}
-
-
 async def _okunabilir_belgeler(dizin_url: str, birincil: str) -> list[FilingDocument]:
     """Dosyalamadaki okunabilir dosyalar, buyukten kucuge.
 
@@ -750,8 +847,11 @@ async def _okunabilir_belgeler(dizin_url: str, birincil: str) -> list[FilingDocu
     degil, hangi dosyanin BIRINCIL oldugu: 8-K'da birincil belge kapaktir,
     govde ektedir (bkz. FilingDocument.is_primary).
     """
-    if dizin_url in _DIZIN_LISTESI:
-        return _DIZIN_LISTESI[dizin_url]
+    # Onbellek ISTEMCIDE (`EdgarClient._index_cache`). Burada ikinci bir
+    # katman tutmak, 15 Agu 2026 denetiminde olu koruma cikti: sunucu
+    # onbellegini kapatmak hicbir testi kirmiziya dondurmuyordu, cunku istemci
+    # zaten ikinci istegi engelliyordu. Iki katmanli onbellek, hangisinin
+    # koruma sagladigini da belirsizlestiriyor.
     veri = await _c().filing_index(dizin_url)
     out: list[FilingDocument] = []
     for x in (veri.get("directory") or {}).get("item", []):
@@ -769,9 +869,6 @@ async def _okunabilir_belgeler(dizin_url: str, birincil: str) -> list[FilingDocu
             is_primary=(ad == birincil),
         ))
     out.sort(key=lambda b: (b.size_bytes or 0), reverse=True)
-    if len(_DIZIN_LISTESI) >= BELGE_METNI_SINIRI:
-        _DIZIN_LISTESI.pop(next(iter(_DIZIN_LISTESI)))
-    _DIZIN_LISTESI[dizin_url] = out
     return out
 
 
@@ -1004,6 +1101,9 @@ async def get_fact_revisions(
     ] = 12,
 ) -> RevisionReport:
     cik, adaylar, veriler, kaynak_uc = await _kavram_verisi(ticker, concept)
+    ay_gun = _mali_yil_sonu([r for _, v in veriler
+                             for _, satirlar in _kullanilabilir_birimler(v)
+                             for r in satirlar])
 
     # Seri aracindan farki: burada dedup YAPILMAZ. Ayni donemin farkli
     # dosyalamalardaki tum degerleri korunur - revizyonun kendisi cikti.
@@ -1016,7 +1116,7 @@ async def get_fact_revisions(
                     continue
                 start = row.get("start")
                 days = _gun_farki(start, end) if start else None
-                if not _donem_uyuyor(period, days):
+                if not _donem_uyuyor(period, days, end, ay_gun):
                     continue
                 gruplar.setdefault((tag, end, birim), []).append(
                     {**row, "_tag": tag, "_start": start, "_days": days}
@@ -1046,7 +1146,15 @@ async def get_fact_revisions(
                 times_repeated=1,
             )
 
-        ilk, son = sirali_degerler[0], sirali_degerler[-1]
+        # `sirali_degerler` FARKLI degerleri ILK GORULME sirasinda tutar;
+        # sonuncusu "en son sunulan deger" DEGILDIR. Bir rakam 100 -> 90 -> 100
+        # diye once revize edilip sonra geri alinirsa, sonuncu farkli deger 90
+        # olur ve arac "en son 90" der - oysa en son dosyalanan deger 100'dur ve
+        # seri araci 100 gosterir. Iki arac ayni gercek hakkinda celisirdi
+        # (15 Agu 2026'da bulundu). En son deger, en son DOSYALANAN satirdan
+        # okunur; `satirlar` zaten `filed` ile sirali.
+        ilk = sirali_degerler[0]
+        son = float(satirlar[-1]["val"])
         revizyonlar.append(
             FactRevision(
                 source_tag=tag,
@@ -1263,6 +1371,11 @@ class CompanyComparison(BaseModel):
     )
     frame_kind: Literal["duration", "instant"]
     total_companies: int = Field(description="How many companies the frame holds")
+    matching_request: int = Field(
+        default=0,
+        description="How many of those match this request after any ticker "
+        "filter; equal to total_companies when no filter was given",
+    )
     returned: int
     has_more: bool = Field(description="True if the frame holds more than was returned")
     period_end_earliest: str = Field(
@@ -1385,10 +1498,14 @@ async def compare_companies(
     ters = order == "value_desc"
     sirali = sorted(satirlar, key=lambda r: float(r.get("val") or 0), reverse=ters)
 
-    istenen: dict[str, str] = {}
+    # Bir CIK birden fazla sembol tasiyabilir (GOOG/GOOGL, FOX/FOXA, BRK-A/B).
+    # CIK'i anahtar yapan ilk surumde ikinci sembol birinciyi eziyor ve istenen
+    # sirket ne `companies`'te ne `missing_tickers`'ta goruluyordu - alanin
+    # kendi vaadi "dusurulmez" derken (15 Agu 2026'da bulundu).
+    istenen: dict[str, list[str]] = {}
     if tickers:
         for t in tickers:
-            istenen[await _c().cik_for_ticker(t)] = t.upper()
+            istenen.setdefault(await _c().cik_for_ticker(t), []).append(t.upper())
 
     secilenler: list[CompanyValue] = []
     gorulen: set[str] = set()
@@ -1403,7 +1520,8 @@ async def compare_companies(
             CompanyValue(
                 rank=i,
                 cik=cik,
-                ticker=istenen.get(cik) or await _c().ticker_for_cik(cik),
+                ticker=(", ".join(istenen[cik]) if cik in istenen
+                        else await _c().ticker_for_cik(cik)),
                 company=str(r.get("entityName", "")).strip(),
                 location=r.get("loc"),
                 value=float(r.get("val") or 0),
@@ -1413,7 +1531,12 @@ async def compare_companies(
             )
         )
 
-    eslesen_sayisi = len(gorulen) if istenen else len(sirali)
+    # `total_companies` alanin kendi tanimi: "cercevenin kac sirket tasidigi".
+    # Ticker filtresi uygulaninca bunu filtrelenmis sayiyla degistirmek, 2.543
+    # sirketlik bir cerceve icin "total_companies: 1" demek olurdu - ve `rank`
+    # tum cerceveye gore verildiginden model "1 sirketin 12.'si" gorurdu.
+    eslesen_sayisi = len(sirali)
+    gosterilen_sayisi = len(gorulen) if istenen else len(sirali)
     bitisler = sorted(str(r.get("end", "")) for r in satirlar if r.get("end"))
     return CompanyComparison(
         concept=concept,
@@ -1425,13 +1548,15 @@ async def compare_companies(
         frame_requested=cerceve,
         frame_kind="instant" if kullanilan.endswith("I") else "duration",
         total_companies=eslesen_sayisi,
+        matching_request=gosterilen_sayisi,
         returned=len(secilenler),
-        has_more=eslesen_sayisi > len(secilenler),
+        has_more=gosterilen_sayisi > len(secilenler),
         period_end_earliest=bitisler[0] if bitisler else "",
         period_end_latest=bitisler[-1] if bitisler else "",
         companies=secilenler,
         missing_tickers=sorted(
-            ad for cik, ad in istenen.items() if cik not in gorulen
+            ad for cik, adlar in istenen.items() if cik not in gorulen
+            for ad in adlar
         ),
     )
 
@@ -1590,7 +1715,19 @@ class Reconciliation(BaseModel):
         "period. None means the filing reports no such total",
     )
     members_sum: float | None = Field(
-        default=None, description="Sum of the member values returned for this period"
+        default=None,
+        description="Sum of the member values for this period. Computed over "
+        "EVERY matching fact in the filing, not only the ones returned in this "
+        "page, so raising or lowering limit never moves it",
+    )
+    members_counted: int = Field(
+        default=0, description="How many facts went into members_sum"
+    )
+    excluded_from_sum: dict[str, int] = Field(
+        default_factory=dict,
+        description="Facts deliberately left out of members_sum, by reason: "
+        "multi_axis (qualified by more than one axis, so an intersection rather "
+        "than a share), nil (reported as xsi:nil), non_numeric",
     )
     difference: float | None = Field(
         default=None, description="consolidated_value - members_sum, when both exist"
@@ -1783,20 +1920,28 @@ async def get_dimensional_facts(
             return False
         return not (member and _son(b.member) != _son(member))
 
-    secilen: list[DimensionalFact] = []
-    eslesen = 0
+    # Takma ad TEK etikete kilitlenir. Aday etiketlerin hepsini kabul etmek
+    # (15 Agu 2026'da bulundu) mukerrer sayim uretiyordu: bir dosyalama ayni
+    # segmenti hem `Revenues` hem `SalesRevenueNet` altinda tasiyorsa ikisi de
+    # toplama giriyor ve uye toplami konsolidenin iki katina cikiyordu. Seri
+    # aracinda etiketleri BIRLESTIRMEK dogru (KK-8: tarihsel gecmis kirpilmasin);
+    # burada tek bir dosyalama okundugu icin tarihsel birlesme sorusu yok ve
+    # birlestirme yalnizca cift sayim demek.
     cozulen_etiket = ""
+    for aday in adaylar:
+        if any(_etiket_uyuyor(o.tag, [aday]) for o in inst.boyutlu()):
+            cozulen_etiket = next(o.tag for o in inst.boyutlu()
+                                  if _etiket_uyuyor(o.tag, [aday]))
+            break
+
+    tumu: list[DimensionalFact] = []
     for o in inst.boyutlu():
-        if not _etiket_uyuyor(o.tag, adaylar):
+        if not cozulen_etiket or o.tag != cozulen_etiket:
             continue
         baglam, birim = _olcu(inst, o)
         if (axis or member) and not any(eksen_uyuyor(b) for b in baglam.boyutlar):
             continue
-        eslesen += 1
-        cozulen_etiket = cozulen_etiket or o.tag
-        if len(secilen) >= limit:
-            continue
-        secilen.append(DimensionalFact(
+        tumu.append(DimensionalFact(
             tag=o.tag,
             dimensions=[DimensionValue(axis=b.axis, member=b.member,
                                        typed_value=b.typed_value)
@@ -1811,6 +1956,14 @@ async def get_dimensional_facts(
             fact_id=o.fact_id,
             is_nil=o.nil,
         ))
+
+    eslesen = len(tumu)
+    # Sayfalama mutabakati BOZMAMALI (15 Agu 2026'da bulundu): mutabakat
+    # dondurulen SAYFA uzerinden hesaplaniyordu, konsolide deger ise dosyalamanin
+    # tamami uzerinden. limit=1 ile ayni dosyalama "20,7 milyar dolarlik fark
+    # var" diyordu; oysa tam olarak tutuyor. Toplam her zaman TUM eslesen
+    # fact'ler uzerinden hesaplanir, kirpma yalnizca gosterimi etkiler.
+    secilen = tumu[:limit]
 
     if not eslesen:
         mevcut = sorted({o.tag for o in inst.boyutlu()})[:15]
@@ -1836,12 +1989,12 @@ async def get_dimensional_facts(
         returned=len(secilen),
         has_more=eslesen > len(secilen),
         facts=secilen,
-        reconciliation=_mutabakat(inst, adaylar, secilen) if axis else [],
+        reconciliation=_mutabakat(inst, cozulen_etiket, tumu) if axis else [],
     )
 
 
 def _mutabakat(
-    inst: Instance, adaylar: list[str], secilen: list[DimensionalFact]
+    inst: Instance, etiket: str, tum_fact: list[DimensionalFact]
 ) -> list[Reconciliation]:
     """Uye toplami ile tuzel kisi geneli toplami YAN YANA koyar.
 
@@ -1857,18 +2010,32 @@ def _mutabakat(
     Bu yuzden arac hangisinin dogru oldugunu SECMEZ; ikisini de gosterir.
     """
     toplamlar: dict[tuple[str, str | None], float] = {}
-    for f in secilen:
+    sayilar: dict[tuple[str, str | None], int] = {}
+    disarida: dict[tuple[str, str | None], dict[str, int]] = {}
+
+    def _dis(k: tuple[str, str | None], sebep: str) -> None:
+        disarida.setdefault(k, {})[sebep] = disarida.setdefault(k, {}).get(sebep, 0) + 1
+
+    for f in tum_fact:
+        k = (f.period_end or "", f.unit)
         # Cok boyutlu fact toplama girmez: segment VE cografya ile nitelenmis
         # bir rakam, segment kiriliminin bir parcasi degil kesisimidir; toplama
         # katmak cift sayar.
-        if f.value is None or f.is_nil or len(f.dimensions) != 1:
+        if len(f.dimensions) != 1:
+            _dis(k, "multi_axis")
             continue
-        k = (f.period_end or "", f.unit)
+        if f.is_nil:
+            _dis(k, "nil")
+            continue
+        if f.value is None:
+            _dis(k, "non_numeric")
+            continue
         toplamlar[k] = toplamlar.get(k, 0.0) + f.value
+        sayilar[k] = sayilar.get(k, 0) + 1
 
     genel: dict[tuple[str, str | None], float] = {}
     for o in inst.boyutsuz():
-        if not _etiket_uyuyor(o.tag, adaylar) or not sayi_mi(o.deger) or o.nil:
+        if o.tag != etiket or not sayi_mi(o.deger) or o.nil:
             continue
         baglam, birim = _olcu(inst, o)
         genel[(baglam.end or "", birim or None)] = float(o.deger or 0)
@@ -1877,18 +2044,32 @@ def _mutabakat(
     for (donem, birim), toplam in sorted(toplamlar.items()):
         gen = genel.get((donem, birim))
         fark = None if gen is None else gen - toplam
+        k = (donem, birim)
+        # Esik mutlak degil GORECELI: 1 dolarlik tolerans milyarlik kalemlerde
+        # anlamsiz derecede dar, kurus kalemlerde anlamsiz derecede genis.
+        # `decimals` zaten "sunlarin altini yuvarladim" diyor; milyona
+        # yuvarlanmis iki sayinin farki milyonun yarisi kadar olabilir.
+        esik = max(1.0, abs(gen or 0) * 1e-6)
         out.append(Reconciliation(
             period_end=donem,
             unit=birim,
             consolidated_value=gen,
             members_sum=toplam,
+            members_counted=sayilar.get(k, 0),
+            excluded_from_sum=disarida.get(k, {}),
             difference=fark,
-            agrees=None if fark is None else abs(fark) < 1.0,
+            agrees=None if fark is None else abs(fark) <= esik,
         ))
     return out
 
 
 def main() -> None:
+    # README "refuses to start without SEC_USER_AGENT" diyor; ilk surumde
+    # istemci TEMBEL kuruluyordu, yani sunucu aciliyor, dokuz araci ilan ediyor
+    # ve ancak ilk cagride patliyordu. Ortam degiskeni eksik bir konteyner her
+    # canlilik kontrolunu geciyordu (15 Agu 2026'da bulundu). Iddia edilen
+    # davranis burada gercek oluyor.
+    _c()
     mcp.run(transport="stdio")
 
 

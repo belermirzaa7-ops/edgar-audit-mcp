@@ -133,8 +133,11 @@ iddiadır**, ve bu araç ikisini tek denkleme çevirmeyi reddediyor:
 - `xsi:nil` işaretli bir toplam sıfır değildir.
 
 Bu yüzden sessizce toplama yapılmıyor. Tek eksen istendiğinde yanıt üye
-toplamını ve tüzel kişi geneli toplamı farkıyla birlikte yan yana veriyor,
-hangi fact'leri toplamın dışında bıraktığını söylüyor. Hangi rakamın doğru
+toplamını ve tüzel kişi geneli toplamı farkıyla birlikte yan yana veriyor;
+neyi neden dışarıda bıraktığını `members_counted` ve `excluded_from_sum`
+alanlarında sayıyla söylüyor. Toplam, dönen SAYFA üzerinden değil dosyalamadaki
+TÜM eşleşen fact'ler üzerinden hesaplanıyor — `limit` değiştirmek toplamı
+oynatmıyor. Hangi rakamın doğru
 olduğuna karar vermek okuyucuya bırakılıyor — buna karar verebilecek tek kişi o.
 
 Kaynak hakkında bir not: okunan dosya `<ad>_htm.xml`, SEC'in dosyalayanın
@@ -303,7 +306,7 @@ yılı, bitiş yılı ve başlangıç yılı geleneklerini kullanan şirketlerle
 ### Değerlendirme seti
 
 [`evaluation/questions.xml`](evaluation/questions.xml), yalnızca araçlar
-çağrılarak cevaplanabilecek on soru tutuyor: şirketler arası mali yıl
+çağrılarak cevaplanabilecek on sekiz soru tutuyor: şirketler arası mali yıl
 adlandırması, muhasebe standardı değişiminde etiket birleştirme, iki seri
 gerektiren oranlar ve sayfalama alanları. Her cevap araçlar canlı SEC verisine
 karşı çalıştırılarak üretildi — hiçbiri ezberden yazılmadı — ve her soru hangi
@@ -334,7 +337,7 @@ src/edgar_mcp/client.py   SEC HTTP istemcisi, hız sınırlayıcı, önbellek
 tests/                    mock'lu birim testleri
 tests/dil.py              dışa bakan yüzey için dil kontrolü
 tests/test_http_tasima.py belgelenen HTTP ve stdio taşımalarını çalıştırır
-evaluation/questions.xml  ölçülmüş on soru ve hangi çağrılarla ölçüldükleri
+evaluation/questions.xml  ölçülmüş on sekiz soru ve hangi çağrılarla ölçüldükleri
 arac/enjeksiyon.py        hata enjeksiyonu harness'ı
 arac/sir_tarama.py        sır tarayıcı
 arac/tani.py              tek bir SEC yanıtını ham haliyle ölçen tanı aracı

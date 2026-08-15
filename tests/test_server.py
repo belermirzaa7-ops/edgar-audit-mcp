@@ -10,7 +10,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
 TICKERS = {"0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."},
            "1": {"cik_str": 789019, "ticker": "MSFT", "title": "Microsoft Corp"},
-           "2": {"cik_str": 1318605, "ticker": "TSLA", "title": "Tesla, Inc."}}
+           "2": {"cik_str": 1318605, "ticker": "TSLA", "title": "Tesla, Inc."},
+           "3": {"cik_str": 104169, "ticker": "WMT", "title": "Walmart Inc."}}
 SUBS = {"name": "Apple Inc.", "sicDescription": "Electronic Computers",
         "fiscalYearEnd": "0927",
         # Gercek SEC submissions verisi karisik form turleri icerir; sahte veri de icermeli.
@@ -23,7 +24,13 @@ SUBS = {"name": "Apple Inc.", "sicDescription": "Electronic Computers",
             "reportDate":      ["2025-09-27","2025-06-28","2025-06-09","2024-09-28",""],
             "primaryDocument": ["aapl-20250927.htm","aapl-20250628.htm","aapl-8k.htm",
                                 "aapl-20240928.htm","xslF345X05/form4.xml"],
-        }}}
+        },
+        # SEC `recent` akisini ~1000 dosyalamada keser ve gerisini AYRI JSON
+        # dosyalarina koyar. Sahte veri bunu tasimadigi surece "bu sirketin
+        # baska dosyalamasi yok" iddiasini hicbir test yakalayamaz (P-4).
+        "files": [{"name": "CIK0000320193-submissions-001.json",
+                   "filingCount": 1103, "filingFrom": "1994-01-01",
+                   "filingTo": "2015-12-31"}]}}
 
 # Gercek companyconcept satirlari `accn` (erisim numarasi) tasir; revizyon
 # gecmisi aracinin izlenebilirligi ona dayaniyor, o yuzden sahte veride de var.
@@ -371,6 +378,8 @@ INSTANCE_XML = """<?xml version="1.0" encoding="utf-8"?>
   <us-gaap:Revenues contextRef="c-4" unitRef="usd" decimals="-6" id="f-3">20690000000</us-gaap:Revenues>
   <us-gaap:Revenues contextRef="c-5" unitRef="usd" decimals="-6" id="f-4">41000000000</us-gaap:Revenues>
   <us-gaap:Revenues contextRef="c-8" unitRef="usd" decimals="-6" id="f-5">10100000000</us-gaap:Revenues>
+  <us-gaap:SalesRevenueNet contextRef="c-3" unitRef="usd" decimals="-6" id="f-16">77000000000</us-gaap:SalesRevenueNet>
+  <us-gaap:SalesRevenueNet contextRef="c-4" unitRef="usd" decimals="-6" id="f-17">20690000000</us-gaap:SalesRevenueNet>
   <us-gaap:GrossProfit contextRef="c-1" unitRef="usd" decimals="-6" id="f-6">17094000000</us-gaap:GrossProfit>
   <us-gaap:GrossProfit contextRef="c-6" unitRef="usd" decimals="-6" id="f-7">4000000000</us-gaap:GrossProfit>
   <us-gaap:OperatingIncomeLoss contextRef="c-1" unitRef="usd" xsi:nil="true" id="f-13"/>
@@ -403,6 +412,50 @@ DIZIN_ESKI_JSON = {"directory": {"item": [
 DIZIN_XBRLSIZ_JSON = {"directory": {"item": [
     {"name": "aapl-8k.htm", "type": "text.gif", "size": "2400"},
     {"name": "report.css", "type": "text.gif", "size": "100"},
+]}}
+
+
+# WMT tipi: mali yil 31 Ocak'ta biter, yani KENDI ceyrekleri onceki takvim
+# yilinda biter. Ceyreklik satirlar ve ANLIK (bilanco) satirlar birlikte -
+# ikisi de 15 Agu 2026'da bulunan iki ayri sessiz yanlisligin fixture'i.
+OCAK_SONU = {"cik": 104169, "taxonomy": "us-gaap", "tag": "Revenues",
+             "label": "Revenues", "entityName": "WALMART INC.", "units": {"USD": [
+    {"start": "2025-02-01", "end": "2026-01-31", "val": 700000, "fy": 2026,
+     "fp": "FY", "form": "10-K", "filed": "2026-03-20", "accn": "a-1"},
+    {"start": "2024-02-01", "end": "2025-01-31", "val": 650000, "fy": 2025,
+     "fp": "FY", "form": "10-K", "filed": "2025-03-20", "accn": "a-0"},
+    # FY2026'nin ilk ceyregi: 2025 takvim yilinda bitiyor
+    {"start": "2025-02-01", "end": "2025-04-30", "val": 165000, "fy": 2026,
+     "fp": "Q1", "form": "10-Q", "filed": "2025-05-15", "accn": "a-2"},
+    {"start": "2025-05-01", "end": "2025-07-31", "val": 169000, "fy": 2026,
+     "fp": "Q2", "form": "10-Q", "filed": "2025-08-15", "accn": "a-3"},
+]}}
+
+# Bilanco kalemi: yalnizca ANLIK satirlar, hem yil sonu hem ceyrek sonlari
+ANLIK = {"cik": 104169, "taxonomy": "us-gaap", "tag": "Assets", "label": "Assets",
+         "entityName": "WALMART INC.", "units": {"USD": [
+    {"end": "2026-01-31", "val": 260000, "fy": 2026, "fp": "FY",
+     "form": "10-K", "filed": "2026-03-20", "accn": "a-1"},
+    {"end": "2025-01-31", "val": 250000, "fy": 2025, "fp": "FY",
+     "form": "10-K", "filed": "2025-03-20", "accn": "a-0"},
+    {"end": "2025-04-30", "val": 253000, "fy": 2026, "fp": "Q1",
+     "form": "10-Q", "filed": "2025-05-15", "accn": "a-2"},
+    {"end": "2025-07-31", "val": 256000, "fy": 2026, "fp": "Q2",
+     "form": "10-Q", "filed": "2025-08-15", "accn": "a-3"},
+]}}
+
+
+# Revize edilip GERI ALINAN deger: 100 -> 90 -> 100. Farkli degerlerin
+# sonuncusu 90'dir ama EN SON DOSYALANAN deger 100'dur. Bu ayrimi tasimayan
+# sahte veri, "latest_value" hatasini yakalayamaz (P-4).
+GERI_ALINAN = {"cik": 789019, "taxonomy": "us-gaap", "tag": "Revenues",
+               "label": "Revenues", "entityName": "MICROSOFT CORP", "units": {"USD": [
+    {"start": "2024-07-01", "end": "2025-06-30", "val": 100, "fy": 2025, "fp": "FY",
+     "form": "10-K", "filed": "2025-07-30", "accn": "m-1"},
+    {"start": "2024-07-01", "end": "2025-06-30", "val": 90, "fy": 2026, "fp": "Q2",
+     "form": "10-Q", "filed": "2026-01-30", "accn": "m-2"},
+    {"start": "2024-07-01", "end": "2025-06-30", "val": 100, "fy": 2026, "fp": "FY",
+     "form": "10-K", "filed": "2026-07-30", "accn": "m-3"},
 ]}}
 
 
@@ -454,6 +507,10 @@ def handler(request: httpx.Request) -> httpx.Response:
                                   headers={"Content-Type": "text/html"})
         return httpx.Response(200, text=BELGE_HTML,
                               headers={"Content-Type": "text/html"})
+    if "companyconcept" in u and "CIK0000789019" in u:
+        return httpx.Response(200, json=GERI_ALINAN)
+    if "companyconcept" in u and "CIK0000104169" in u:
+        return httpx.Response(200, json=ANLIK if "/Assets" in u else OCAK_SONU)
     if "companyconcept" in u:
         if "/dei/EntityPublicFloat" in u:
             return httpx.Response(200, json=DEI_FLOAT)
@@ -480,7 +537,7 @@ def srv(monkeypatch):
     # Belge metni onbellegi modul duzeyinde: testler arasi sizarsa bir test
     # otekinin onbellegini kullanir ve "indirildi mi" olcumu anlamsizlasir.
     s._BELGE_METNI.clear()
-    s._DIZIN_LISTESI.clear()
+    s._client._index_cache.clear()
     s._CERCEVE.clear()
     s._INSTANCE.clear()
     return s
@@ -526,7 +583,11 @@ async def test_filings_sayfalama_bilgisi_verir(srv):
     tam = await srv.list_recent_filings(ticker="AAPL", limit=50)
     assert tam.total_matching == 5
     assert tam.returned == 5
-    assert tam.has_more is False
+    # Sayfa tamamlandi ama SEC'in `recent` akisi disinda dosyalamalar var:
+    # `has_more` yine True, sebebi ayri alanda. "Hepsini gordum" sonucuna
+    # varmak, otuz yillik gecmisi olan bir sirkette yanlis olurdu.
+    assert tam.has_more is True
+    assert tam.older_filings_exist is True
 
 
 @pytest.mark.anyio
@@ -926,17 +987,10 @@ def test_kelime_dagarcigi_kullanilmayan_kelime_biriktirmiyor():
             out += [m for _, m in _disa_bakan_yuzey(t)]
         return out
 
-    import ast
-    import pathlib
 
     hepsi = " ".join(asyncio.run(metinler()))
-    kok = pathlib.Path(__file__).resolve().parents[1] / "src" / "edgar_mcp"
-    for f in kok.glob("*.py"):
-        for dugum in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
-            if isinstance(dugum, ast.Raise):
-                for alt in ast.walk(dugum):
-                    if isinstance(alt, ast.Constant) and isinstance(alt.value, str):
-                        hepsi += " " + alt.value
+    for _, m in _hata_metinleri():
+        hepsi += " " + m
 
     import re as _re
 
@@ -949,30 +1003,52 @@ def test_kelime_dagarcigi_kullanilmayan_kelime_biriktirmiyor():
     assert not olu, f"kelime dagarciginda artik kullanilmayan kelimeler var: {olu}"
 
 
-def test_hata_mesajlari_ingilizce():
-    """Hata mesajlari semada gorunmez ama modele ve musteriye AYNEN gider.
-    Sema taramasi bunlari kacirir; bu yuzden kaynak agacindan `raise`
-    ifadelerinin icindeki dizgiler ayrica taranir. 13 Agu 2026'da bu tarama
-    `client.py` icinde "Ticker bulunamadi: ..." mesajini yakaladi."""
-    import ast
-    import pathlib
+def _hata_metinleri() -> list[tuple[str, str]]:
+    """Modele giden hata metinleri: `raise` icindeki dizgiler ARTI bir raise
+    tarafindan CAGRILAN fonksiyonlarin dondurdugu dizgiler.
 
-    kok = pathlib.Path(__file__).resolve().parents[1] / "src" / "edgar_mcp"
-    bakilan = 0
+    Ikinci kisim 15 Agu 2026'da eklendi: HTTP durum mesajlari `_durum_mesaji()`
+    yardimcisina tasininca `raise ValueError(_durum_mesaji(...))` oldular ve
+    yalnizca `raise` dugumunu gezen tarayici onlari GORMEZ hale geldi. Yeni
+    yazilan sekiz mesajin hicbiri dil kapisindan gecmemisti. P-17'nin tekrari:
+    disa bakan yuzey, tarayicinin baktigi yerden daha genis.
+    """
+    import ast
+    import pathlib as _p
+
+    kok = _p.Path(__file__).resolve().parents[1] / "src" / "edgar_mcp"
+    out: list[tuple[str, str]] = []
     for f in sorted(kok.glob("*.py")):
         agac = ast.parse(f.read_text(encoding="utf-8"))
+        dolayli: set[str] = set()
         for dugum in ast.walk(agac):
             if not isinstance(dugum, ast.Raise):
                 continue
             for alt in ast.walk(dugum):
                 if isinstance(alt, ast.Constant) and isinstance(alt.value, str):
-                    bakilan += 1
-                    izler = yabanci_izler(alt.value)
-                    assert not izler, (
-                        f"{f.name}: hata mesaji Ingilizce degil {izler} -> "
-                        f"{alt.value!r}"
-                    )
-    assert bakilan >= 5, f"hata mesaji taramasi bos donuyor ({bakilan} dizge)"
+                    out.append((f.name, alt.value))
+                elif isinstance(alt, ast.Call) and isinstance(alt.func, ast.Name):
+                    dolayli.add(alt.func.id)
+        for dugum in ast.walk(agac):
+            if isinstance(dugum, ast.FunctionDef) and dugum.name in dolayli:
+                for alt in ast.walk(dugum):
+                    if isinstance(alt, ast.Constant) and isinstance(alt.value, str) \
+                            and len(alt.value) > 20:
+                        out.append((f.name, alt.value))
+    return out
+
+
+def test_hata_mesajlari_ingilizce():
+    """Hata mesajlari semada gorunmez ama modele ve musteriye AYNEN gider.
+    Sema taramasi bunlari kacirir; bu yuzden kaynak agacindan `raise`
+    ifadeleri VE onlarin cagirdigi yardimcilar ayrica taranir. 13 Agu 2026'da
+    bu tarama `client.py` icinde "Ticker bulunamadi: ..." mesajini yakaladi;
+    15 Agu 2026'da dolayli mesajlarin hic taranmadigi ortaya cikti."""
+    metinler = _hata_metinleri()
+    assert len(metinler) > 20, "hata metni taramasi coktu"
+    for dosya, metin in metinler:
+        izler = yabanci_izler(metin)
+        assert not izler, f"{dosya}: hata mesaji Ingilizce degil {izler} -> {metin!r}"
 
 
 @pytest.mark.anyio
@@ -1569,7 +1645,8 @@ async def test_cerceve_istenen_ticker_yoksa_sessizce_dusmuyor(srv):
                                     tickers=["AAPL", "MSFT", "TSLA"])
     assert [c.ticker for c in b.companies] == ["AAPL"]
     assert b.missing_tickers == ["MSFT", "TSLA"]
-    assert b.total_companies == 1, "toplam, istenen kumeye gore raporlanmali"
+    assert b.total_companies == 4, "total_companies cercevenin tamamini saymali"
+    assert b.matching_request == 1, "istege uyan sayi ayri alanda olmali"
 
 
 @pytest.mark.anyio
@@ -1848,3 +1925,228 @@ async def test_bozuk_instance_cig_traceback_yerine_eyleme_donusturulebilir_hata(
     mesaj = str(e.value)
     assert "could not be parsed as XML" in mesaj
     assert "<html>" in mesaj, "hata mesaji ne geldigini gostermiyor"
+
+
+# ============ Ceyreklik mali yil etiketi ve ANLIK kayitlar (15 Agu 2026)
+@pytest.mark.anyio
+async def test_ceyreklik_mali_yil_etiketi_sirketin_kendi_yiliyla_ayni(srv):
+    """WMT'nin mali yili 31 Ocak'ta biter, yani KENDI ceyrekleri bir onceki
+    takvim yilinda biter. Kayma yillik capalardan turetilip ceyrekliklere
+    oldugu gibi uygulanirsa etiket bir yil geri kayar: arac yila FY2026,
+    o yilin ilk ceyregine FY2025 derdi. Ayni arac, ayni sirket, iki cevap."""
+    yillik = await srv.get_concept_series(ticker="WMT", concept="revenue",
+                                          period="annual")
+    assert {p.fiscal_year for p in yillik.points} == {2025, 2026}
+
+    ceyrek = await srv.get_concept_series(ticker="WMT", concept="revenue",
+                                          period="quarterly")
+    etiketler = {p.period_end: p.fiscal_year for p in ceyrek.points}
+    assert etiketler["2025-04-30"] == 2026, "FY2026'nin Q1'i FY2025 sanilmis"
+    assert etiketler["2025-07-31"] == 2026
+    assert yillik.fiscal_year_derived and ceyrek.fiscal_year_derived
+
+
+@pytest.mark.anyio
+async def test_yillik_seri_ceyrek_sonu_bakiyeleri_icermiyor(srv):
+    """Bilanco kalemleri ANIdir, `days` tasimazlar. Yillik filtreden oldugu
+    gibi gecerlerse `total_assets` + `annual` her CEYREK sonu bakiyeyi
+    dondurur ve ayni mali yil birden fazla kez tekrarlanir."""
+    b = await srv.get_concept_series(ticker="WMT", concept="total_assets",
+                                     period="annual")
+    bitisler = [p.period_end for p in b.points]
+    assert bitisler == ["2025-01-31", "2026-01-31"], bitisler
+    assert len({p.fiscal_year for p in b.points}) == len(b.points), \
+        "ayni mali yil birden fazla kez donmus"
+
+
+@pytest.mark.anyio
+async def test_ceyreklik_seri_anlik_kalemi_bos_dondurmuyor(srv):
+    """`period="quarterly"` anlik kayitlari tamamen eliyordu: HTTP 200 + BOS
+    liste. KK-23: bos bir basari, gercek "veri yok" cevabindan ayirt edilemez."""
+    b = await srv.get_concept_series(ticker="WMT", concept="total_assets",
+                                     period="quarterly")
+    assert b.total_periods == 4, f"{b.total_periods} donem dondu"
+    assert {p.period_end for p in b.points} >= {"2025-04-30", "2025-07-31"}
+
+
+# ============ 15 Agu 2026 denetiminde bulunan kusurlar
+def test_gizli_blok_kapanmayan_etikette_belgeyi_yutmuyor():
+    """Gercek EDGAR HTML'i `<td>`/`<tr>` kapanislarini atlar ve `<img>` gibi
+    kapanmayan elemanlar tasir. Ilk surumde gizli bir `<td>` acildiktan sonra
+    her sey gizli sayiliyordu: olculdu, 2,4 MB'lik bir belge 3 karaktere
+    dusuyordu - HTTP 200, hata yok, "bu dosyalama bos" (P-19)."""
+    from edgar_mcp.belge import metne_cevir
+
+    kapanmamis = ('<table><tr><td style="display:none">gizli<tr><td>Revenue'
+                  '<td>391,035</table><div>Item 7.</div><p>' + "Govde. " * 60 + "</p>")
+    m = metne_cevir(kapanmamis)
+    assert "Revenue" in m and "391,035" in m and "Govde." in m
+    assert "gizli" not in m, "gizli hucre metne sizmis"
+
+    assert "REAL" in metne_cevir('<img style="display:none"><p>REAL BODY</p>')
+
+    # Ic ice ayni ad: erken kapanip gizli icerigi SIZDIRMAMALI
+    ic_ice = '<div style="display:none"><div>x</div>SIZINTI</div><p>GERCEK</p>'
+    m2 = metne_cevir(ic_ice)
+    assert "GERCEK" in m2 and "SIZINTI" not in m2
+
+
+def test_gizli_filtresi_belgeyi_yutarsa_filtresiz_donuyor():
+    """Emniyet agi: filtre belgenin neredeyse tamamini yutuyorsa filtre
+    yaniliyordur. Gurultulu ama dolu metin, sessizce bos metinden iyidir."""
+    from edgar_mcp.belge import metne_cevir
+
+    govde = '<div style="display:none">' + "x" * 100 + "<p>" + "gercek govde. " * 2000
+    m = metne_cevir(govde)
+    assert len(m) > 20000, f"emniyet agi devreye girmedi: {len(m)} karakter"
+
+
+@pytest.mark.anyio
+async def test_mutabakat_sayfalama_sinirindan_etkilenmiyor(srv):
+    """Mutabakat dondurulen SAYFA uzerinden hesaplaniyordu, konsolide deger
+    dosyalamanin TAMAMI uzerinden: limit=1 ile ayni dosyalama "20,7 milyar
+    dolarlik fark var" diyordu. Gercek bir 10-K'da segment sorgusu varsayilan
+    40 satiri asiyor, yani bu uydurma fark sahada gorulurdu."""
+    genis = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis", limit=40)
+    dar = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis", limit=1)
+    assert dar.returned == 1 and genis.returned > 1
+    assert dar.reconciliation[0].members_sum == genis.reconciliation[0].members_sum
+    assert dar.reconciliation[0].agrees is True
+
+
+@pytest.mark.anyio
+async def test_mutabakat_disarida_biraktiklarini_sayiyor(srv):
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
+    m = b.reconciliation[0]
+    assert m.members_counted == 2
+    assert m.excluded_from_sum == {"multi_axis": 1}, m.excluded_from_sum
+
+
+@pytest.mark.anyio
+async def test_revizyon_geri_alinan_degerde_seriyle_celismiyor(srv):
+    """Bir rakam 100 -> 90 -> 100 diye revize edilip geri alinirsa, FARKLI
+    degerlerin sonuncusu 90'dir ama EN SON DOSYALANAN deger 100'dur. Ilk surum
+    "en son 90" diyordu ve seri araci ayni donem icin 100 gosteriyordu - iki
+    arac, ayni gercek, iki cevap."""
+    seri = await srv.get_concept_series(ticker="MSFT", concept="revenue",
+                                        period="annual")
+    rev = await srv.get_fact_revisions(ticker="MSFT", concept="revenue")
+    son_seri = {p.period_end: p.value for p in seri.points}
+    for r in rev.revisions:
+        assert r.latest_value == son_seri[r.period_end], (
+            f"{r.period_end}: revizyon {r.latest_value}, seri {son_seri[r.period_end]}")
+
+
+@pytest.mark.anyio
+async def test_ust_kaynak_hatasi_eyleme_donusturulebilir(srv):
+    """SEC'in gercek kisitlama yaniti HTTP 403 + HTML govde. Ilk surumde bu
+    cig `HTTPStatusError` olarak modele gidiyordu; model ne yapacagini
+    bilemezdi."""
+    import httpx as _h
+
+    from edgar_mcp.client import EdgarClient
+
+    def kisitli(request: _h.Request) -> _h.Response:
+        if "company_tickers" in str(request.url):
+            return _h.Response(200, json=TICKERS)
+        return _h.Response(403, text="<html>Undeclared Automated Tool</html>")
+
+    c = EdgarClient()
+    c._http = _h.AsyncClient(transport=_h.MockTransport(kisitli),
+                             headers={"User-Agent": "Test Runner test@example.com"})
+    srv._client = c
+    with pytest.raises(ValueError) as e:
+        await srv.get_company_profile(ticker="AAPL")
+    mesaj = str(e.value)
+    assert "403" in mesaj and "SEC_USER_AGENT" in mesaj
+
+
+@pytest.mark.anyio
+async def test_json_yerine_html_gelirse_soyleniyor(srv):
+    import httpx as _h
+
+    from edgar_mcp.client import EdgarClient
+
+    def html_don(request: _h.Request) -> _h.Response:
+        return _h.Response(200, text="<html><body>Service unavailable</body></html>")
+
+    c = EdgarClient()
+    c._http = _h.AsyncClient(transport=_h.MockTransport(html_don),
+                             headers={"User-Agent": "Test Runner test@example.com"})
+    srv._client = c
+    with pytest.raises(ValueError) as e:
+        await srv.get_company_profile(ticker="AAPL")
+    assert "not JSON" in str(e.value) and "<html>" in str(e.value)
+
+
+@pytest.mark.anyio
+async def test_ayni_cik_iki_sembol_tasiyorsa_ikisi_de_gorunuyor(srv):
+    """GOOG/GOOGL gibi hisse siniflari ayni CIK'e duser. CIK'i anahtar yapan
+    ilk surumde ikinci sembol birinciyi eziyordu ve istenen sirket ne listede
+    ne de missing_tickers'ta goruluyordu."""
+    b = await srv.compare_companies(concept="revenue", period="CY2025Q1",
+                                    tickers=["AAPL", "AAPL"])
+    assert b.matching_request == 1
+    assert b.companies[0].ticker == "AAPL, AAPL"
+
+
+@pytest.mark.anyio
+async def test_recent_akisinin_disindaki_dosyalamalar_bildiriliyor(srv):
+    """SEC `filings.recent` alanini ~1000 dosyalamada keser. Bunu okumadan
+    `has_more: false` demek, otuz yillik gecmisi olan bir sirket icin
+    "baska dosyalama yok" iddiasi olurdu."""
+    b = await srv.list_recent_filings(ticker="AAPL", form_type="10-K", limit=50)
+    assert b.older_filings_exist is True
+    assert b.has_more is True, "eski dosyalamalar varken has_more False kalmis"
+
+
+def test_main_kullanici_ajani_olmadan_baslamayi_reddediyor(monkeypatch):
+    """README "refuses to start without SEC_USER_AGENT" diyor. Ilk surumde
+    sunucu aciliyor, dokuz araci ilan ediyor ve ancak ilk cagride patliyordu -
+    yani ortam degiskeni eksik bir konteyner canlilik kontrolunu geciyordu."""
+    from edgar_mcp import server as s
+
+    monkeypatch.delenv("SEC_USER_AGENT", raising=False)
+    monkeypatch.setattr(s, "_client", None)
+    with pytest.raises(RuntimeError) as e:
+        s.main()
+    assert "SEC_USER_AGENT" in str(e.value)
+
+
+@pytest.mark.anyio
+async def test_onbellekler_sinirli(srv):
+    """companyfacts en buyuk nesne: olculdu, 11 MB JSON -> 45 MB yerlesik.
+    Sinirsiz birakmak, masaustu istemci acik kaldigi surece yasayan bir stdio
+    surecinde yirmi sirket taraninca ~1 GB demekti. Diger her onbellek acik
+    bir sinirla ve gerekcesiyle yaziliydi; en buyugu tek sinirsiz olandi."""
+    c = srv._client
+    for cik in ("0000000001", "0000000002", "0000000003", "0000000004"):
+        await c.company_facts(cik)
+    assert len(c._facts_cache) <= 2, f"{len(c._facts_cache)} companyfacts tutuluyor"
+    assert "0000000004" in c._facts_cache, "en son cekilen girdi atilmis"
+
+    for cik in ("0000000001", "0000000002", "0000000003",
+                "0000000004", "0000000005", "0000000006"):
+        await c.submissions(cik)
+    assert len(c._subs_cache) <= 4, f"{len(c._subs_cache)} submissions tutuluyor"
+
+
+@pytest.mark.anyio
+async def test_takma_ad_boyutlu_fact_te_cift_saymiyor(srv):
+    """Seri aracinda takma adin TUM etiketlerini birlestirmek dogru (KK-8:
+    tarihsel gecmis kirpilmasin). Boyutlu fact'lerde AYNI sey cift sayimdir:
+    bir dosyalama ayni segmenti hem `Revenues` hem `SalesRevenueNet` altinda
+    tasiyorsa ikisi de toplama girer ve uye toplami konsolidenin iki katina
+    cikar. Fixture bu iki etiketi ayni context'lerde tasiyor."""
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
+    assert {f.tag for f in b.facts} == {b.resolved_tag}, \
+        f"birden fazla etiket karismis: {sorted({f.tag for f in b.facts})}"
+    assert b.reconciliation[0].members_sum == 97690000000

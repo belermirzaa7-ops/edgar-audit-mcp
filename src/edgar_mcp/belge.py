@@ -34,6 +34,25 @@ _ATLANAN = {"script", "style", "head", "title", "meta", "link"}
 _BLOK = {"p", "div", "br", "tr", "table", "h1", "h2", "h3", "h4", "h5", "h6",
          "li", "ul", "ol", "section", "article", "header", "footer"}
 
+# Kapanis etiketi OLMAYAN elemanlar. Yigina konursa sonsuza kadar acik kalirlar.
+_KAPANMAYAN = {"area", "base", "br", "col", "embed", "hr", "img", "input",
+               "link", "meta", "param", "source", "track", "wbr"}
+
+# HTML kapanis etiketini ZORUNLU TUTMAZ: `<td>a<td>b` gecerlidir ve ikinci
+# `<td>` birincisini kapatir. Tarayicilar bunu "implied end tag" diye uygular.
+# Gercek EDGAR dosyalamalari bu bicimde HTML uretiyor; uygulamazsak ayni ada
+# sahip elemanlar yigin uzerinde birikir.
+_ORTULU_KAPANIS = {
+    "p": {"p"},
+    "li": {"li"},
+    "tr": {"td", "th", "tr"},
+    "td": {"td", "th"},
+    "th": {"td", "th"},
+    "option": {"option"},
+    "dd": {"dd", "dt"},
+    "dt": {"dd", "dt"},
+}
+
 
 def _gizli_mi(attrs: list) -> bool:
     """`style="display:none"` tasiyan oge ve altindaki her sey metne girmez.
@@ -48,26 +67,71 @@ def _gizli_mi(attrs: list) -> bool:
 
 
 class _MetinToplayici(HTMLParser):
-    def __init__(self) -> None:
+    """Gizli bloklari atlayarak metni toplar.
+
+    Yigin yonetimi (15 Agu 2026'da bulunan hata): ilk surum gizli etiketleri
+    bir yigina koyuyor ve kapanis etiketi YALNIZCA yiginin tepesiyle
+    eslesirse cikariyordu. Gercek EDGAR HTML'inde bu, belgenin TAMAMINI
+    yutuyordu:
+      - `<td style="display:none">gizli<tr><td>Revenue` - ilk `td` hic
+        kapanmiyor, `_atla` bir daha sifirlanmiyor, geri kalan her sey gizli
+        sayiliyor. Olculdu: 2,4 MB'lik bir belge 3 karaktere dusuyordu.
+      - `<img style="display:none">` - kapanis etiketi olmayan eleman, ayni
+        sonuc.
+      - `<div style="display:none"><div>x</div>SIZINTI</div>` - ic teki `div`
+        yigini erken bosaltiyor ve gizli icerik metne SIZIYOR.
+    Cozum tarayicilarin yaptigi: yigin (ad, gizli_mi) ciftleri tutar, kapanis
+    etiketi yiginda GERIYE DOGRU aranir ve o noktaya kadar her sey kapatilir,
+    kapanmayan elemanlar hic yigina girmez, ve `<td>a<td>b` gibi ortulu
+    kapanislar uygulanir.
+    """
+
+    def __init__(self, gizliyi_atla: bool = True) -> None:
         super().__init__(convert_charrefs=True)
         self.parcalar: list[str] = []
+        self._gizliyi_atla = gizliyi_atla
         self._atla = 0
-        self._gizli_yigin: list[str] = []
+        self._yigin: list[tuple[str, bool]] = []
+
+    def _kapat(self, tag: str) -> bool:
+        """Yiginda `tag`'i geriye dogru arar ve oraya kadar her seyi kapatir."""
+        for i in range(len(self._yigin) - 1, -1, -1):
+            if self._yigin[i][0] == tag:
+                for _, gizli in self._yigin[i:]:
+                    if gizli:
+                        self._atla -= 1
+                del self._yigin[i:]
+                return True
+        return False      # eslesmeyen kapanis etiketi: yok sayilir
 
     def handle_starttag(self, tag: str, attrs: list) -> None:
-        if tag in _ATLANAN or _gizli_mi(attrs):
+        if tag in _KAPANMAYAN:
+            if tag == "br" and not self._atla:
+                self.parcalar.append("\n")
+            return
+
+        for kapanacak in _ORTULU_KAPANIS.get(tag, ()):
+            if any(a == kapanacak for a, _ in self._yigin):
+                self._kapat(kapanacak)
+                break
+
+        gizli = tag in _ATLANAN or (self._gizliyi_atla and _gizli_mi(attrs))
+        self._yigin.append((tag, gizli))
+        if gizli:
             self._atla += 1
-            self._gizli_yigin.append(tag)
         elif tag in ("td", "th"):
             self.parcalar.append(" | ")
         elif tag in _BLOK:
             self.parcalar.append("\n")
 
+    def handle_startendtag(self, tag: str, attrs: list) -> None:
+        if tag == "br" and not self._atla:
+            self.parcalar.append("\n")
+
     def handle_endtag(self, tag: str) -> None:
-        if self._gizli_yigin and self._gizli_yigin[-1] == tag and self._atla:
-            self._gizli_yigin.pop()
-            self._atla -= 1
-        elif tag in _BLOK:
+        if tag in _KAPANMAYAN:
+            return
+        if self._kapat(tag) and not self._atla and tag in _BLOK:
             self.parcalar.append("\n")
 
     def handle_data(self, data: str) -> None:
@@ -75,14 +139,33 @@ class _MetinToplayici(HTMLParser):
             self.parcalar.append(data)
 
 
-def metne_cevir(govde: str) -> str:
-    """HTML (ya da duz metin) -> okunabilir duz metin."""
+# Gizli blok filtresi belgenin bu kesrinden fazlasini yutarsa, filtre yaniliyor
+# demektir. Olculdu: gercek bir 10-K'da gizli iXBRL basligi ~1.200 karakter,
+# belge 2,4 MB - yani normalde binde birden az. 1/200 genis bir emniyet payi.
+_YUTMA_ORANI = 200
+_YUTMA_TABANI = 5000
+
+
+def metne_cevir(govde: str, gizliyi_atla: bool = True) -> str:
+    """HTML (ya da duz metin) -> okunabilir duz metin.
+
+    Emniyet agi: gizli blok filtresi belgeyi neredeyse tamamen yutuyorsa,
+    filtresiz yeniden cevrilir. Gizli bir blok yuzunden BOS bir metin
+    dondurmek, modele "bu dosyalama bos" dedirtir - bu deponun butun tezi olan
+    "sessiz yanlislik"in ta kendisi (P-19). Gurultulu ama dolu bir metin,
+    sessizce bos bir metinden iyidir.
+    """
     if "<" not in govde:
         return _bosluk_topla(govde)
-    ayristirici = _MetinToplayici()
+    ayristirici = _MetinToplayici(gizliyi_atla=gizliyi_atla)
     ayristirici.feed(govde)
     ayristirici.close()
-    return _bosluk_topla("".join(ayristirici.parcalar))
+    metin = _bosluk_topla("".join(ayristirici.parcalar))
+
+    if (gizliyi_atla and len(govde) >= _YUTMA_TABANI
+            and len(metin) < len(govde) // _YUTMA_ORANI):
+        return metne_cevir(govde, gizliyi_atla=False)
+    return metin
 
 
 def _bosluk_topla(metin: str) -> str:

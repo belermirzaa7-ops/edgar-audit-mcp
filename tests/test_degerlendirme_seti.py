@@ -76,3 +76,45 @@ def test_sorular_en_yeni_donemi_hedeflemiyor():
         soru = (c.findtext("question") or "")
         assert not yasak.search(soru), \
             f"{i}. soru zamana bagli bir ifade kullaniyor: {soru!r}"
+
+
+def test_readme_soru_sayisi_dosyayla_ayni():
+    """15 Agu 2026 denetiminde bulundu: iki README de "on soru" diyordu, dosyada
+    on sekiz vardi. P-14 ("dokuman var olmayan davranisi vaat eder") PATTERNS.md
+    icin testliydi, README icin degildi. Sayilar yaziyla yazildigi icin bu test
+    de yaziyla arıyor."""
+    import re
+
+    yazi = {10: "ten", 15: "fifteen", 16: "sixteen", 17: "seventeen",
+            18: "eighteen", 19: "nineteen", 20: "twenty"}
+    tr_yazi = {10: "on", 15: "on beş", 16: "on altı", 17: "on yedi",
+               18: "on sekiz", 19: "on dokuz", 20: "yirmi"}
+    n = len(_ciftler())
+    assert n in yazi, f"{n} icin yazi karsiligi tabloya eklenmeli"
+
+    en = (KOK / "README.md").read_text(encoding="utf-8")
+    tr = (KOK / "README.tr.md").read_text(encoding="utf-8")
+    for ad, metin, tablo in (("README.md", en, yazi), ("README.tr.md", tr, tr_yazi)):
+        for sayi, kelime in tablo.items():
+            if sayi == n:
+                continue
+            kalip = rf"\b{re.escape(kelime)}\s+(questions|pairs|soru)"
+            assert not re.search(kalip, metin, re.IGNORECASE), (
+                f"{ad} '{kelime} soru' diyor ama dosyada {n} soru var")
+
+
+def test_readme_takma_ad_listesi_kodla_ayni():
+    """Takma ad listesi README'de elle yaziliydi ve KK-26'nin uc yeni takma adi
+    (public_float, shares_outstanding, shares_diluted) eklenmemisti."""
+    import asyncio
+    import os
+    import sys
+
+    sys.path.insert(0, str(KOK / "src"))
+    os.environ.setdefault("SEC_USER_AGENT", "Test Runner test@example.com")
+    from edgar_mcp.server import CONCEPT_ALIASES
+
+    en = (KOK / "README.md").read_text(encoding="utf-8")
+    eksik = [a for a in CONCEPT_ALIASES if f"`{a}`" not in en]
+    assert not eksik, f"README bu takma adlari saymiyor: {eksik}"
+    del asyncio

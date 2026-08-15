@@ -139,8 +139,11 @@ claims, and this tool refuses to turn them into one equation:
 
 So nothing is summed silently. Ask for one axis and the response carries the
 member sum and the entity-wide total side by side, with the difference, and
-says which facts it excluded from the sum. Deciding which number is right is
-left to the reader, who is the only one who can.
+names what it excluded from the sum and why — `members_counted` and
+`excluded_from_sum` carry the counts, by reason. The sum is computed over every
+matching fact in the filing, not over the page returned, so changing `limit`
+never moves it. Deciding which number is right is left to the reader, who is
+the only one who can.
 
 A note on provenance: the file being read, `<name>_htm.xml`, is SEC's
 extraction from the filer's inline XBRL document — SEC's own dissemination
@@ -199,9 +202,7 @@ Concepts are requested by alias, not by raw XBRL tag:
 sec_edgar_get_concept_series(ticker="MSFT", concept="revenue", limit=5)
 ```
 
-Available aliases: `capex`, `cash`, `eps_diluted`, `gross_profit`,
-`net_income`, `operating_cash_flow`, `operating_income`, `revenue`,
-`rnd_expense`, `stockholders_equity`, `total_assets`, `total_liabilities`.
+Available aliases: `capex`, `cash`, `eps_diluted`, `gross_profit`, `net_income`, `operating_cash_flow`, `operating_income`, `public_float`, `revenue`, `rnd_expense`, `shares_diluted`, `shares_outstanding`, `stockholders_equity`, `total_assets`, `total_liabilities`.
 Raw US-GAAP tags are accepted too. When a concept is not found the error
 message names the valid aliases and points at the discovery tool — errors are
 written for the model to act on, not just to report failure.
@@ -303,7 +304,7 @@ companies with calendar-year, ending-year and starting-year fiscal conventions.
 
 ### Evaluation set
 
-[`evaluation/questions.xml`](evaluation/questions.xml) holds ten questions that
+[`evaluation/questions.xml`](evaluation/questions.xml) holds eighteen questions that
 can only be answered by calling the tools: cross-company fiscal year labels,
 tag merges across an accounting standard change, ratios that need two series,
 and the pagination fields. Every answer was produced by running the tools
@@ -311,7 +312,7 @@ against live SEC data and reading the result — none is written from memory —
 and each question records the exact calls used, so the measurement can be
 repeated instead of trusted.
 
-A test keeps the file structurally honest: ten pairs, every pair carrying a
+A test keeps the file structurally honest: eighteen pairs, every pair carrying a
 question, an answer and a verification block, every tool it names actually
 existing on the server, and no question anchored to "the latest" period.
 
