@@ -794,3 +794,45 @@ listemizdeki bir maddenin tekrari (P-4 fixture'lar, P-19 bos basari, P-14
 dokuman, P-17 yuzey). Kontrol listesini yazmis olmak, ona uymak degil - ve
 denetimi bir baskasina yaptirmak, listeyi kendi kendine okumaktan daha etkili
 oldu.
+
+### KK-33: Ilerleme bildirimi - yalnizca bekleten araclarda
+**Tarih:** 15 Agustos 2026 · **Durum:** yururlukte · **Standart:** §16, §19
+
+Spesifikasyon yuzeyi tarandi (2026-07-28): sunucunun `tools` disinda
+sunabilecegi her yetenek tek tek degerlendirildi ve **yalnizca biri** bu
+sunucuya uygun cikti.
+
+**Eklenen: progress.** `read_filing_text`, `compare_companies`,
+`list_fact_dimensions` ve `get_dimensional_facts` artik `ctx.report_progress`
+cagiriyor. Gerekce bu araclarin GERCEKTEN bekletmesi: 2,7 MB'lik bir XBRL
+instance'i indirip ayristirmak, 2,4 MB'lik bir dosyalamayi metne cevirmek,
+2.543 satirlik bir cerceve indirmek. Spesifikasyon bunu MAY diyor ve yalnizca
+istemci `progressToken` yolladiysa gonderiliyor; token yoksa SDK'nin
+`report_progress`'i sessizce hicbir sey yapmiyor.
+
+**Eklenmeyenler ve neden:** `resources`, `prompts`, `completions`,
+`elicitation`, `resource subscriptions`, `tools/list` sayfalamasi - dokuz araci
+olan salt-okunur bir veri sunucusu icin gosteris olurdu. Sayfalama icin
+spesifikasyonda esik yok, dokuz arac tek yanitta doner. Daha onemlisi:
+**`logging`, `sampling` ve `roots` bu spesifikasyon revizyonunda DEPRECATE
+edildi** (SEP-2577); simdi eklemek "degisiklik gunlugunu okumadim" sinyali
+verirdi.
+
+**Iki olcum, ikisi de kod yazmadan once yapildi:**
+1. **Iki ayri `Context` sinifi var.** Arac katmani yalnizca
+   `mcp.server.mcpserver.context.Context`'i taniyor;
+   `mcp.server.context.Context` ile yazilinca sunucu ACILMIYOR - sema uretimi
+   `PydanticInvalidForJsonSchema` ile patliyor. Ikisi de "Context" adinda ve
+   ikisinde de `report_progress` var.
+2. **`ctx` parametresi input semasina GIRMIYOR** (olculdu): SDK tur ipucundan
+   buluyor ve `skip_names` ile semadan cikariyor. `Context | None = None`
+   yazimi da taniniyor - testler arac fonksiyonlarini dogrudan cagirdigi icin
+   opsiyonel olmasi sart.
+
+Ucuncu bir sey de teyit edildi: `ValueError` firlatmak DOGRU yol. SDK v2
+istisnayi yakalayip `isError=True` + `str(e)` olarak donduruyor, yani modele
+ulasip duzeltme sansi veriyor. `MCPError` ise protokol hatasi olur ve model
+onu HIC gormez - bu depoda hicbir yerde kullanilmiyor, kullanilmamali.
+
+Uc test sabitliyor: ilerleme gercekten bildiriliyor mu, baglam yokken arac
+calisiyor mu, ve `ctx` hicbir aracin semasinda gorunuyor mu.

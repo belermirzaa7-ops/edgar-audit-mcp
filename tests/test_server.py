@@ -2150,3 +2150,80 @@ async def test_takma_ad_boyutlu_fact_te_cift_saymiyor(srv):
     assert {f.tag for f in b.facts} == {b.resolved_tag}, \
         f"birden fazla etiket karismis: {sorted({f.tag for f in b.facts})}"
     assert b.reconciliation[0].members_sum == 97690000000
+
+
+# ============ Ilerleme bildirimi (MCP 2026-07-28, basic/utilities/progress)
+class _SahteBaglam:
+    """Gercek `Context` yerine: yalnizca `report_progress` cagrilarini kaydeder."""
+
+    def __init__(self) -> None:
+        self.cagrilar: list[tuple[float, float | None, str | None]] = []
+
+    async def report_progress(self, progress, total=None, message=None):
+        self.cagrilar.append((progress, total, message))
+
+
+@pytest.mark.anyio
+async def test_uzun_suren_araclar_ilerleme_bildiriyor(srv):
+    """Spesifikasyon bunu zorunlu tutmuyor ama bekleten bir cagride kullanim
+    ornegi tam olarak bu: 2,7 MB instance indirmek ya da 2,4 MB dosyalamayi
+    metne cevirmek saniyeler suruyor."""
+    b = _SahteBaglam()
+    await srv.read_filing_text(ticker="AAPL", max_characters=500, ctx=b)
+    assert len(b.cagrilar) >= 2, b.cagrilar
+    assert all(t == 3 for _, t, _ in b.cagrilar), "toplam adim bildirilmiyor"
+    assert any("Downloading" in (m or "") for *_, m in b.cagrilar)
+
+    b2 = _SahteBaglam()
+    await srv.list_fact_dimensions(ticker="AAPL",
+                                   accession_number="0000320193-25-000041", ctx=b2)
+    assert any("XBRL" in (m or "") for *_, m in b2.cagrilar), b2.cagrilar
+
+    b3 = _SahteBaglam()
+    await srv.compare_companies(concept="revenue", period="CY2025Q1", ctx=b3)
+    assert b3.cagrilar
+
+
+@pytest.mark.anyio
+async def test_baglam_yokken_araclar_calismaya_devam_ediyor(srv):
+    """`ctx` opsiyonel olmali: testler arac fonksiyonlarini dogrudan cagiriyor
+    ve istemci `progressToken` yollamadiginda SDK zaten hicbir sey gondermiyor."""
+    b = await srv.read_filing_text(ticker="AAPL", max_characters=200)
+    assert b.returned_characters == 200
+
+
+@pytest.mark.anyio
+async def test_baglam_parametresi_arac_semasinda_gorunmuyor(srv):
+    """SDK baglami tur ipucundan bulup enjekte ediyor; modele bir parametre
+    gibi gostermek onu doldurmaya calismasina yol acardi.
+
+    Olculdu (15 Agu 2026): IKI ayri `Context` sinifi var ve arac katmani
+    yalnizca `mcp.server.mcpserver.context.Context`'i taniyor;
+    `mcp.server.context.Context` ile yazilinca sunucu ACILMIYOR bile
+    (PydanticInvalidForJsonSchema)."""
+    from edgar_mcp.server import mcp
+
+    for t in await mcp.list_tools():
+        ozellikler = (t.input_schema or {}).get("properties", {})
+        assert "ctx" not in ozellikler, f"{t.name} baglami semada gosteriyor"
+
+
+def test_hicbir_arac_protokol_hatasi_firlatmiyor():
+    """SDK v2'de `MCPError` PROTOKOL hatasidir ve model onu HIC gormez; her
+    baska istisna `isError=True` + `str(e)` olarak modele ulasir. Bu depodaki
+    hata mesajlari modelin ne yapacagini soylemek icin yazildi (§18/P-13), yani
+    onlari `MCPError` ile firlatmak butun o emegi gorunmez kilardi."""
+    import ast
+    import pathlib
+
+    kok = pathlib.Path(__file__).resolve().parents[1] / "src" / "edgar_mcp"
+    for f in sorted(kok.glob("*.py")):
+        agac = ast.parse(f.read_text(encoding="utf-8"))
+        for dugum in ast.walk(agac):
+            if not isinstance(dugum, ast.Raise) or dugum.exc is None:
+                continue
+            cagri = dugum.exc
+            ad = getattr(getattr(cagri, "func", cagri), "id", None) \
+                or getattr(getattr(cagri, "func", cagri), "attr", None)
+            assert ad not in ("MCPError", "McpError"), (
+                f"{f.name}: protokol hatasi firlatiliyor, model mesaji gormez")

@@ -713,6 +713,18 @@ ENJEKSIYONLAR = [
   "        if not cozulen_etiket or o.tag != cozulen_etiket:",
   "        if not _etiket_uyuyor(o.tag, adaylar):",
   "test_takma_ad_boyutlu_fact_te_cift_saymiyor"),
+
+ ("E: ilerleme bildirimini sessizce yut",
+  "src/edgar_mcp/server.py",
+  "    if ctx is not None:\n        await ctx.report_progress(adim, toplam, mesaj)",
+  "    if False:\n        await ctx.report_progress(adim, toplam, mesaj)",
+  "test_uzun_suren_araclar_ilerleme_bildiriyor"),
+
+ ("E: belge indirme adimini bildirme",
+  "src/edgar_mcp/server.py",
+  '    await _ilerleme(ctx, 1, 3, f"Downloading {ad}")',
+  "    pass",
+  "test_uzun_suren_araclar_ilerleme_bildiriyor"),
 ]
 
 

@@ -49,6 +49,14 @@ reports which taxonomies a company actually files under, so the model discovers
 them instead of guessing: financial statements live in `us-gaap`, while public
 float and shares outstanding live in `dei`.
 
+The four tools that can take several seconds — reading a filing, parsing an
+XBRL instance, ranking a frame of thousands of companies — report progress
+while they work, which the 2026-07-28 spec defines for exactly this case. The
+rest do not: progress on a call that returns in milliseconds is noise. Nothing
+else beyond `tools` is implemented, deliberately — for a read-only data server
+`resources`, `prompts` and `completions` would be decoration, and `logging`,
+`sampling` and `roots` were deprecated in this very spec revision.
+
 Every tool is annotated `readOnlyHint: true`. That annotation is a hint,
 not a guarantee — the guarantee is that the package contains no write path at
 all, which a test enforces.

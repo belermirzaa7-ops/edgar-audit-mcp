@@ -12,6 +12,7 @@ from typing import Annotated, Literal
 
 import httpx
 from mcp.server import MCPServer
+from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
@@ -177,6 +178,26 @@ def _fy_sonuna_gore_yil(end: str, ay_gun: tuple[int, int]) -> int:
     return yil if (bu - sinir).days <= FY_SONU_TOLERANSI else yil + 1
 
 _client: EdgarClient | None = None
+
+
+async def _ilerleme(ctx: Context | None, adim: float, toplam: float, mesaj: str) -> None:
+    """Uzun suren cagrilarda ilerleme bildirimi.
+
+    Spesifikasyon (2026-07-28, basic/utilities/progress) bunu ZORUNLU tutmuyor:
+    sunucu yalnizca istemci istekte bir `progressToken` yolladiysa gonderir ve
+    yollamadiysa SDK'nin `report_progress`'i sessizce hicbir sey yapmaz. Bu
+    yuzden yalnizca gercekten bekleten araclara konuyor - 2,7 MB'lik bir XBRL
+    instance'i indirip ayristirmak ya da 2,4 MB'lik bir dosyalamayi metne
+    cevirmek saniyeler suruyor. Her araca serpistirmek "protokolu okudum"
+    gosterisi olurdu; spesifikasyonun kendi ornegi tam olarak bu durum.
+
+    `ctx` opsiyonel: testler arac fonksiyonlarini DOGRUDAN cagiriyor (KK'nin
+    basindaki not - `@mcp.tool()` orijinal fonksiyonu dondurur), yani baglam
+    olmadan da calismali. SDK baglami tur ipucundan bulup enjekte ediyor ve
+    parametre input semasina GIRMIYOR (olculdu, 15 Agu 2026).
+    """
+    if ctx is not None:
+        await ctx.report_progress(adim, toplam, mesaj)
 
 
 def _c() -> EdgarClient:
@@ -991,7 +1012,9 @@ async def read_filing_text(
         Field(default=6000, ge=500, le=40000,
               description="Maximum characters of text to return in one call"),
     ] = 6000,
+    ctx: Context | None = None,
 ) -> FilingText:
+    await _ilerleme(ctx, 0, 3, "Locating the filing")
     cik = await _c().cik_for_ticker(ticker)
     kayit = await _dosyalama_bul(cik, accession_number, form_type)
 
@@ -1009,7 +1032,9 @@ async def read_filing_text(
         )
 
     url = f"{dizin}/{ad}"
+    await _ilerleme(ctx, 1, 3, f"Downloading {ad}")
     metin = await _belge_metni(url)
+    await _ilerleme(ctx, 2, 3, "Extracting text and headings")
 
     bulunanlar = bolumler(metin)
     basliklar = [b[0] for b in bulunanlar]
@@ -1462,7 +1487,9 @@ async def compare_companies(
         Field(default=25, ge=1, le=100,
               description="Maximum companies to return; check has_more"),
     ] = 25,
+    ctx: Context | None = None,
 ) -> CompanyComparison:
+    await _ilerleme(ctx, 0, 2, "Reading the frame from SEC")
     cerceve = _cerceve_normalle(period)
     anahtar = concept.strip().lower()
     adaylar = CONCEPT_ALIASES.get(anahtar, [concept.strip()])
@@ -1487,6 +1514,7 @@ async def compare_companies(
 
     veri, kullanilan = bulunan
     satirlar = veri.get("data") or []
+    await _ilerleme(ctx, 1, 2, f"Ranking {len(satirlar)} companies")
     if not satirlar:
         raise ValueError(
             f"The frame {kullanilan} for {secilen_etiket} exists but holds no "
@@ -1616,8 +1644,10 @@ async def _instance(dizin: str, belgeler: list[FilingDocument]) -> tuple[Instanc
 
 
 async def _dosyalama_ve_instance(
-    ticker: str, accession: str | None, form_type: str
+    ticker: str, accession: str | None, form_type: str,
+    ctx: Context | None = None,
 ) -> tuple[dict, Instance, str]:
+    await _ilerleme(ctx, 0, 3, "Locating the filing")
     cik = await _c().cik_for_ticker(ticker)
     kayit = await _dosyalama_bul(cik, accession, form_type)
     dizin = (
@@ -1625,7 +1655,9 @@ async def _dosyalama_ve_instance(
         f"{kayit['accession_number'].replace('-', '')}"
     )
     belgeler = await _okunabilir_belgeler(dizin, kayit["primary_document"])
+    await _ilerleme(ctx, 1, 3, "Downloading the XBRL instance")
     inst, url = await _instance(dizin, belgeler)
+    await _ilerleme(ctx, 2, 3, f"Read {len(inst.olgular)} facts")
     return kayit, inst, url
 
 
@@ -1822,8 +1854,10 @@ async def list_fact_dimensions(
         int,
         Field(default=25, ge=1, le=100, description="Maximum axes to return"),
     ] = 25,
+    ctx: Context | None = None,
 ) -> DimensionCatalog:
-    kayit, inst, url = await _dosyalama_ve_instance(ticker, accession_number, form_type)
+    kayit, inst, url = await _dosyalama_ve_instance(
+        ticker, accession_number, form_type, ctx)
     adaylar = _etiket_cozumle(concept) if concept else None
 
     eksenler: dict[str, dict] = {}
@@ -1908,8 +1942,10 @@ async def get_dimensional_facts(
         int,
         Field(default=40, ge=1, le=200, description="Maximum facts to return"),
     ] = 40,
+    ctx: Context | None = None,
 ) -> DimensionalFacts:
-    kayit, inst, url = await _dosyalama_ve_instance(ticker, accession_number, form_type)
+    kayit, inst, url = await _dosyalama_ve_instance(
+        ticker, accession_number, form_type, ctx)
     adaylar = _etiket_cozumle(concept)
 
     def _son(q: str | None) -> str:

@@ -46,6 +46,15 @@ etiketle çağrılır. Etiket taksonomisiyle nitelenebilir — `dei:EntityPublic
 fiilen kullandığı taksonomileri bildirir, böylece model tahmin etmez: mali
 tablolar `us-gaap` içinde, halka açıklık oranı ve hisse adedi `dei` içindedir.
 
+Birkaç saniye sürebilen dört araç — dosyalama okuma, XBRL instance ayrıştırma,
+binlerce şirketlik çerçeve sıralama — çalışırken ilerleme bildiriyor; 2026-07-28
+spesifikasyonu bu yeteneği tam olarak bu durum için tanımlıyor. Diğerleri
+bildirmiyor: milisaniyede dönen bir çağrıda ilerleme gürültüdür. `tools`
+dışında başka hiçbir yetenek bilerek uygulanmadı — salt okunur bir veri
+sunucusunda `resources`, `prompts` ve `completions` süs olurdu; `logging`,
+`sampling` ve `roots` ise zaten bu spesifikasyon revizyonunda kullanımdan
+kaldırıldı.
+
 Her araç `readOnlyHint: true` ilan eder. Bu bir **ipucudur**, garanti
 değil — garanti, pakette hiçbir yazma yolunun bulunmaması ve bunu bir testin
 zorunlu tutmasıdır.
