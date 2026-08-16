@@ -6,6 +6,7 @@ veriyordu. Testler yesilken script cokuyordu.
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import sys
 
@@ -399,3 +400,75 @@ def test_tani_ixbrl_modu_zincirin_kapali_olup_olmadigini_soyluyor(monkeypatch, c
     assert asyncio.run(mod.main()) == 0
     cikti = capsys.readouterr().out
     assert "Zincir KAPALI DEGIL:" in cikti, cikti
+
+
+# ---------------------------------------------------------------- .env yukleyici
+def test_env_yukleyici_bom_lu_dosyayi_okuyor(tmp_path, monkeypatch):
+    """PowerShell'in `Out-File -Encoding utf8` komutu dosyanin basina BOM koyar.
+    BOM'lu ilk anahtar `SEC_USER_AGENT` degil `﻿SEC_USER_AGENT` olarak
+    okunur ve degisken hic tanimlanmaz (15 Agu 2026'da yasandi)."""
+    import importlib
+
+    yol = tmp_path / ".env"
+    yol.write_text('SEC_USER_AGENT="Ada Lovelace ada@example.com"\n',
+                   encoding="utf-8-sig")
+    assert yol.read_bytes().startswith(b"\xef\xbb\xbf"), "test BOM yazmamis"
+
+    ortam = importlib.import_module("arac.ortam")
+    monkeypatch.delenv("SEC_USER_AGENT", raising=False)
+    ortam._elle_yukle(yol)
+    assert os.environ["SEC_USER_AGENT"] == "Ada Lovelace ada@example.com"
+
+
+def test_env_yukleyici_bagimlilik_olmadan_da_yukluyor(tmp_path, monkeypatch):
+    """`python-dotenv` kurulu degilse eski surum SESSIZCE geciyordu: dosya
+    yerinde, degisken tanimsiz, hata mesaji ise "ortam degiskeni yok" diyordu.
+    Opsiyonel olan sey bagimliliktir, yuklemenin kendisi degil."""
+    import builtins
+    import importlib
+
+    yol = tmp_path / ".env"
+    yol.write_text("SEC_USER_AGENT=Ada ada@example.com\n", encoding="utf-8")
+
+    ortam = importlib.import_module("arac.ortam")
+    monkeypatch.setattr(ortam, "ENV_YOLU", yol)
+    monkeypatch.delenv("SEC_USER_AGENT", raising=False)
+
+    gercek_import = builtins.__import__
+
+    def dotenv_yok(ad, *a, **k):
+        if ad == "dotenv":
+            raise ImportError("no dotenv")
+        return gercek_import(ad, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", dotenv_yok)
+    ortam.env_yukle()
+    assert os.environ["SEC_USER_AGENT"] == "Ada ada@example.com"
+
+
+def test_env_yukleyici_mevcut_degiskeni_ezmiyor(tmp_path, monkeypatch):
+    """Kabuğunda degiskeni elle veren biri, dosyadaki eski degerin onu sessizce
+    gecersiz kilmasini beklemez."""
+    import importlib
+
+    yol = tmp_path / ".env"
+    yol.write_text("SEC_USER_AGENT=dosyadaki dosya@example.com\n", encoding="utf-8")
+    ortam = importlib.import_module("arac.ortam")
+    monkeypatch.setenv("SEC_USER_AGENT", "kabuktaki kabuk@example.com")
+    ortam._elle_yukle(yol)
+    assert os.environ["SEC_USER_AGENT"] == "kabuktaki kabuk@example.com"
+
+
+@pytest.mark.parametrize("satir,beklenen", [
+    ('SEC_USER_AGENT="Ada ada@example.com"', ("SEC_USER_AGENT", "Ada ada@example.com")),
+    ("SEC_USER_AGENT='Ada ada@example.com'", ("SEC_USER_AGENT", "Ada ada@example.com")),
+    ("export SEC_USER_AGENT=Ada", ("SEC_USER_AGENT", "Ada")),
+    ("  # yorum satiri", None),
+    ("", None),
+    ("anahtarsiz satir", None),
+    ("=degersiz", None),
+])
+def test_env_satir_ayristirma(satir, beklenen):
+    import importlib
+    ortam = importlib.import_module("arac.ortam")
+    assert ortam._ayristir(satir) == beklenen

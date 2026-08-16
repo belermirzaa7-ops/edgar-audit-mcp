@@ -412,6 +412,69 @@ DIZIN_ESKI_JSON = {"directory": {"item": [
     {"name": "aapl-20240928.htm", "type": "text.gif", "size": "2400"},
 ]}}
 
+# ---- Etiket linkbase'i (`*_lab.xml`).
+# Yapi 15 Agu 2026'da canli olculdu (tsla-20251231_lab.xml): uc parca - `loc`
+# elemani QName'i, `label` elemani metni tasiyor, ikisini `labelArc` BAGLIYOR.
+# Sahte veri gercek dosyanin uc ozelligini tasimali, yoksa kod sinanmis olmaz:
+#   (1) ayni eleman birden fazla ROLDE etiketlenir (standart rol kazanmali),
+#   (2) `loc_`/`lab_` isimlendirmesi bir aliskanlik; yay olmadan baglanti yok,
+#   (3) etiketi olmayan elemanlar vardir (us-gaap:GrossProfit burada yok).
+LAB_XML = """<?xml version="1.0" encoding="utf-8"?>
+<link:linkbase xmlns:link="http://www.xbrl.org/2003/linkbase"
+               xmlns:xlink="http://www.w3.org/1999/xlink">
+  <link:labelLink xlink:type="extended" xlink:role="http://www.xbrl.org/2003/role/link">
+    <link:loc xlink:type="locator" xlink:label="loc_1"
+      xlink:href="https://xbrl.fasb.org/us-gaap/2025/elts/us-gaap-2025.xsd#us-gaap_StatementBusinessSegmentsAxis"/>
+    <link:label xlink:type="resource" xlink:label="lab_1" xml:lang="en-US"
+      xlink:role="http://www.xbrl.org/2003/role/terseLabel">Segments</link:label>
+    <link:label xlink:type="resource" xlink:label="lab_1" xml:lang="en-US"
+      xlink:role="http://www.xbrl.org/2003/role/label">Segment Reporting Information [Axis]</link:label>
+    <link:labelArc xlink:type="arc" xlink:from="loc_1" xlink:to="lab_1"
+      xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-label" order="1"/>
+
+    <link:loc xlink:type="locator" xlink:label="loc_2"
+      xlink:href="tsla-20251231.xsd#tsla_AutomotiveSegmentMember"/>
+    <link:label xlink:type="resource" xlink:label="lab_2" xml:lang="en-US"
+      xlink:role="http://www.xbrl.org/2003/role/label">Automotive Segment [Member]</link:label>
+    <link:labelArc xlink:type="arc" xlink:from="loc_2" xlink:to="lab_2"
+      xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-label" order="1"/>
+
+    <link:loc xlink:type="locator" xlink:label="loc_3"
+      xlink:href="tsla-20251231.xsd#tsla_EnergyGenerationAndStorageSegmentMember"/>
+    <link:label xlink:type="resource" xlink:label="lab_3" xml:lang="en-US"
+      xlink:role="http://www.xbrl.org/2003/role/label">Energy Generation and Storage Segment [Member]</link:label>
+    <link:labelArc xlink:type="arc" xlink:from="loc_3" xlink:to="lab_3"
+      xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-label" order="1"/>
+
+    <link:loc xlink:type="locator" xlink:label="loc_4"
+      xlink:href="https://xbrl.fasb.org/us-gaap/2025/elts/us-gaap-2025.xsd#us-gaap_Revenues"/>
+    <link:label xlink:type="resource" xlink:label="lab_4" xml:lang="en-US"
+      xlink:role="http://www.xbrl.org/2003/role/label">Revenues</link:label>
+    <link:label xlink:type="resource" xlink:label="lab_4" xml:lang="en-US"
+      xlink:role="http://www.xbrl.org/2003/role/documentation">Amount of revenue recognized from goods sold, services rendered.</link:label>
+    <link:labelArc xlink:type="arc" xlink:from="loc_4" xlink:to="lab_4"
+      xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-label" order="1"/>
+
+    <!-- Yay YOK: konum ve etiket var ama baglanti kurulmamis. Isimlendirmeye
+         guvenen bir kod bunu yine de eslestirir. -->
+    <link:loc xlink:type="locator" xlink:label="loc_5"
+      xlink:href="tsla-20251231.xsd#tsla_PlantAxis"/>
+    <link:label xlink:type="resource" xlink:label="lab_5" xml:lang="en-US"
+      xlink:role="http://www.xbrl.org/2003/role/label">Plant [Axis]</link:label>
+  </link:labelLink>
+</link:linkbase>
+"""
+
+
+# XBRL var ama ETIKET LINKBASE'I YOK. Gercekte olabilir: eski dosyalamalarda
+# etiket linkbase'i ayri bir ek olarak sunulmayabiliyor. Kod bu durumda adlari
+# QName olarak gostermeye devam etmeli - cevabi dusurmemeli.
+DIZIN_ETIKETSIZ_JSON = {"directory": {"item": [
+    {"name": "aapl-20250628.htm", "type": "text.gif", "size": "2400"},
+    {"name": "aapl-20250628_htm.xml", "type": "text.gif", "size": "2667"},
+    {"name": "aapl-20250628.xsd", "type": "text.gif", "size": "900"},
+]}}
+
 DIZIN_XBRLSIZ_JSON = {"directory": {"item": [
     {"name": "aapl-8k.htm", "type": "text.gif", "size": "2400"},
     {"name": "report.css", "type": "text.gif", "size": "100"},
@@ -489,6 +552,68 @@ YIL_SONU_OYNAK_ANLIK = {"cik": 55067, "taxonomy": "us-gaap", "tag": "Assets",
 ]}}
 
 
+# ---- SEC'in ESKI dosyalama akisi (`filings.files[]` altinda adi gecen dosya).
+# Bicim olculdu (15 Agu 2026, CIK0001318605-submissions-001.json): ust duzeyde
+# `recent` ile AYNI paralel diziler, saran nesne YOK. `primaryDocument`
+# anahtarinin BULUNMAMASI da olculdu - sahte veri onu tasisaydi, eksik alani
+# ele alan kod hic sinanmamis olurdu (P-4).
+EK_SUBS = {
+    "accessionNumber": ["0000320193-99-000010", "0000320193-97-000005"],
+    "form":            ["10-K", "8-K"],
+    "filingDate":      ["1999-12-22", "1997-12-19"],
+    "reportDate":      ["1999-09-25", ""],
+}
+
+# ---- EDGAR tam metin aramasi (efts.sec.gov/LATEST/search-index).
+# Yanit bicimi 15 Agu 2026'da canli olctugum yanittan kopyalandi. Iki ozelligi
+# taklit etmesi sart:
+#   (1) `_id` = "<erisim numarasi>:<belge adi>" - vurus DOSYALAMA degil BELGE,
+#   (2) ilk vurus bir EK (SUPPLY AGREEMENT), yillik raporun kendisi degil.
+# Ikinci hit'in CIK'i company_tickers.json'da YOK: ticker cozulemeyen vurus
+# yolu ancak boyle sinanir.
+FTS = {
+    "took": 12, "timed_out": False,
+    "_shards": {"total": 3, "successful": 3, "skipped": 0, "failed": 0},
+    "hits": {
+        "total": {"value": 12, "relation": "eq"},
+        "max_score": 6.45,
+        "hits": [
+            {"_index": "edgar_file",
+             "_id": "0001193125-12-081990:d279413dex1050.htm",
+             "_score": 6.45,
+             "_source": {"ciks": ["0001318605"], "period_ending": "2011-12-31",
+                         "display_names": ["Tesla, Inc.  (TSLA)  (CIK 0001318605)"],
+                         "root_forms": ["10-K"], "file_date": "2012-02-27",
+                         "form": "10-K", "adsh": "0001193125-12-081990",
+                         "file_type": "EX-10.50",
+                         "file_description": "SUPPLY AGREEMENT", "items": []}},
+            {"_index": "edgar_file",
+             "_id": "0000999999-24-000001:fund-main.htm",
+             "_score": 3.10,
+             "_source": {"ciks": ["0000999999"], "period_ending": None,
+                         "display_names": ["Example Fund Trust  (CIK 0000999999)"],
+                         "root_forms": ["10-K"], "file_date": "2024-05-02",
+                         "form": "10-K", "adsh": "0000999999-24-000001",
+                         "file_type": "10-K", "file_description": "10-K",
+                         "items": []}},
+        ],
+    },
+    "query": {"query_string": {"query": "\"tariff\"", "size": 100}},
+}
+
+FTS_BOS = {"hits": {"total": {"value": 0, "relation": "eq"}, "hits": []}}
+
+# Elasticsearch buyuk kumelerde sayiyi ALT SINIR olarak bildirir.
+FTS_ALT_SINIR = {"hits": {"total": {"value": 10000, "relation": "gte"},
+                          "hits": FTS["hits"]["hits"][:1]}}
+
+# Olculdu (15 Agu 2026): `from=9990` istegine SEC sonuc kumesi degil bu govdeyi
+# donuyor. Bos sonuc saymak "hicbir sey bulunamadi" diye okunurdu.
+FTS_HATA = {"error": "Result window is too large, from + size must be less "
+                     "than or equal to: [10000] but was [10090].",
+            "errorType": "illegal_argument_exception"}
+
+
 ISTEK_KAYDI: list[str] = []
 
 
@@ -498,10 +623,23 @@ def handler(request: httpx.Request) -> httpx.Response:
     assert "@" in request.headers["User-Agent"], "SEC User-Agent e-posta icermeli"
     if "company_tickers" in u:
         return httpx.Response(200, json=TICKERS)
+    if "efts.sec.gov" in u:
+        if "q=bos" in u:
+            return httpx.Response(200, json=FTS_BOS)
+        if "q=altsinir" in u:
+            return httpx.Response(200, json=FTS_ALT_SINIR)
+        if "q=hata" in u:
+            return httpx.Response(200, json=FTS_HATA)
+        return httpx.Response(200, json=FTS)
+    if "-submissions-" in u:            # eski akis dosyasi
+        return httpx.Response(200, json=EK_SUBS)
     if "/submissions/" in u:
         return httpx.Response(200, json=SUBS)
     if "companyfacts" in u:
         return httpx.Response(200, json=FACTS)
+    if u.endswith("_lab.xml"):
+        return httpx.Response(200, text=LAB_XML,
+                              headers={"Content-Type": "application/xml"})
     if u.endswith("_htm.xml") or u.endswith("tsla-20181231.xml"):
         return httpx.Response(200, text=INSTANCE_XML,
                               headers={"Content-Type": "application/xml"})
@@ -516,6 +654,8 @@ def handler(request: httpx.Request) -> httpx.Response:
     if u.endswith("/index.json"):
         if "000032019324000123" in u:
             return httpx.Response(200, json=DIZIN_ESKI_JSON)
+        if "000032019325000058" in u:
+            return httpx.Response(200, json=DIZIN_ETIKETSIZ_JSON)
         if "000032019325000012" in u:
             return httpx.Response(200, json=DIZIN_XBRLSIZ_JSON)
         return httpx.Response(200, json=DIZIN_JSON)
@@ -571,6 +711,8 @@ def srv(monkeypatch):
     # otekinin onbellegini kullanir ve "indirildi mi" olcumu anlamsizlasir.
     s._BELGE_METNI.clear()
     s._client._index_cache.clear()
+    s._client._extra_cache.clear()
+    s._ETIKET.clear()
     s._CERCEVE.clear()
     s._INSTANCE.clear()
     return s
@@ -817,6 +959,7 @@ async def test_arac_isimleri_servis_onekli():
     assert isimler == {
         "sec_edgar_get_company_profile",
         "sec_edgar_list_filings",
+        "sec_edgar_search_filings",
         "sec_edgar_get_concept_series",
         "sec_edgar_get_fact_revisions",
         "sec_edgar_read_filing_text",
@@ -2141,7 +2284,7 @@ async def test_recent_akisinin_disindaki_dosyalamalar_bildiriliyor(srv):
 
 def test_main_kullanici_ajani_olmadan_baslamayi_reddediyor(monkeypatch):
     """README "refuses to start without SEC_USER_AGENT" diyor. Ilk surumde
-    sunucu aciliyor, dokuz araci ilan ediyor ve ancak ilk cagride patliyordu -
+    sunucu aciliyor, on araci ilan ediyor ve ancak ilk cagride patliyordu -
     yani ortam degiskeni eksik bir konteyner canlilik kontrolunu geciyordu."""
     from edgar_mcp import server as s
 
@@ -2394,3 +2537,341 @@ async def test_200_ile_gelen_engel_sayfasi_dosyalama_metni_sanilmiyor(srv):
     with pytest.raises(ValueError) as e:
         await srv.read_filing_text(ticker="AAPL", max_characters=200)
     assert "block page" in str(e.value)
+
+
+# ------------------------------------------------------- eski dosyalama akislari
+@pytest.mark.anyio
+async def test_eski_akis_varsayilan_olarak_okunmuyor_ama_bildiriliyor(srv):
+    """Varsayilan davranis degismedi: recent akisi okunur, eski akislarin
+    VARLIGI bildirilir. Bildirmemek "sirketin baska dosyalamasi yok" diye
+    okunurdu (§16)."""
+    s = await srv.list_recent_filings(ticker="AAPL", limit=50)
+    assert s.older_filings_exist is True
+    assert s.older_filings_read is False
+    assert s.has_more is True, "eksik gecmis has_more ile de isaretlenmeli"
+    assert all(x.accession_number.startswith("0000320193-2") for x in s.filings), \
+        "eski akis istenmedigi halde okunmus"
+
+
+@pytest.mark.anyio
+async def test_eski_akis_include_older_ile_birlesiyor(srv):
+    s = await srv.list_recent_filings(ticker="AAPL", limit=50, include_older=True)
+    numaralar = [x.accession_number for x in s.filings]
+    assert "0000320193-99-000010" in numaralar, "eski akis okunmadi"
+    assert "0000320193-97-000005" in numaralar
+    assert s.older_filings_read is True
+    assert s.older_feeds_skipped == 0
+    assert s.total_matching == 7, numaralar   # 5 recent + 2 eski
+    # Birlesik liste TARIHE gore siralanmali: iki akisin kendi ic sirasi,
+    # birlestirildiginde dogru sirayi vermez.
+    tarihler = [x.filing_date for x in s.filings]
+    assert tarihler == sorted(tarihler, reverse=True), tarihler
+
+
+@pytest.mark.anyio
+async def test_eski_akiste_birincil_belge_yoksa_alan_bos_kaliyor(srv):
+    """Olculdu: eski akis dosyasinda `primaryDocument` bulunmuyordu. Kod bunu
+    IndexError'a cevirmemeli; erisim numarasi hala dosyalamayi tanimliyor."""
+    s = await srv.list_recent_filings(ticker="AAPL", limit=50, include_older=True)
+    eski = [x for x in s.filings if x.accession_number == "0000320193-99-000010"][0]
+    assert eski.primary_document_url is None
+    yeni = [x for x in s.filings if x.accession_number == "0000320193-25-000073"][0]
+    assert yeni.primary_document_url.endswith("aapl-20250927.htm")
+
+
+@pytest.mark.anyio
+async def test_form_filtresi_buyuk_kucuk_harf_duyarsiz(srv):
+    """`10-k` yazan bir cagri eskiden BOS liste donuyordu - "bu sirket hic
+    10-K vermemis" gibi okunan bir sonuc."""
+    kucuk = await srv.list_recent_filings(ticker="AAPL", form_type="10-k", limit=50)
+    buyuk = await srv.list_recent_filings(ticker="AAPL", form_type="10-K", limit=50)
+    assert kucuk.total_matching == buyuk.total_matching == 2
+    # Amendment ayri belge olarak KALIYOR: 10-K/A, 10-K degildir.
+    assert all(x.form == "10-K" for x in kucuk.filings)
+
+
+@pytest.mark.anyio
+async def test_eski_akis_siniri_sessiz_degil(srv, monkeypatch):
+    """Kapsam kisitlamasi bildirilmezse "hepsini gordum" diye okunur."""
+    import copy
+    cok = copy.deepcopy(SUBS)
+    cok["filings"]["files"] = [
+        {"name": f"CIK0000320193-submissions-{i:03d}.json"} for i in range(1, 7)
+    ]
+
+    async def sahte(cik):
+        return cok
+
+    monkeypatch.setattr(srv._client, "submissions", sahte)
+    s = await srv.list_recent_filings(ticker="AAPL", limit=50, include_older=True)
+    assert s.older_feeds_skipped == 2, "6 dosyanin 4'u okunur, 2'si bildirilmeli"
+    assert s.has_more is True
+
+
+@pytest.mark.anyio
+async def test_eski_akis_ana_submissions_onbellegini_atmiyor(srv):
+    """Ek akislar `_subs_cache`i paylassaydi, DORT ek dosya (onbellek siniri
+    da dort) 1-2 MB'lik ana kaydi disari atar ve sonraki cagri onu yeniden
+    indirirdi. Dort dosya, siniri ASMAK icin secildi: ucle bu test paylasilan
+    onbellekte de yesil kalir, yani hicbir sey olcmezdi."""
+    c = srv._client
+    ISTEK_KAYDI.clear()
+    await c.submissions("0000320193")
+    for i in range(1, 5):
+        await c.submissions_extra(f"CIK0000320193-submissions-{i:03d}.json")
+    await c.submissions("0000320193")
+    assert sum(u.endswith("/submissions/CIK0000320193.json") for u in ISTEK_KAYDI) == 1
+    assert sum("-submissions-" in u for u in ISTEK_KAYDI) == 4
+
+
+@pytest.mark.anyio
+async def test_eski_akis_ayni_cagride_iki_kez_indirilmiyor(srv):
+    ISTEK_KAYDI.clear()
+    await srv.list_recent_filings(ticker="AAPL", limit=5, include_older=True)
+    await srv.list_recent_filings(ticker="AAPL", limit=5, include_older=True)
+    assert sum("-submissions-001.json" in u for u in ISTEK_KAYDI) == 1
+
+
+@pytest.mark.anyio
+async def test_metin_araci_eski_akistaki_dosyalamayi_okuyabiliyor(srv):
+    """Arac kendi ciktisini reddetmemeli: include_older ile donen bir erisim
+    numarasi, metin aracina verildiginde de bulunmali."""
+    t = await srv.read_filing_text(ticker="AAPL",
+                                   accession_number="0000320193-99-000010",
+                                   max_characters=200)
+    assert t.accession_number == "0000320193-99-000010"
+    # Birincil belge adi bilinmiyor: en buyuk okunabilir dosya secildi ve bu
+    # SOYLENDI. Sessizce secmek "SEC'in birincil belgesi budur" iddiasi olurdu.
+    assert t.primary_document_known is False
+    assert t.document_name == "aapl-8k.htm", [b.name for b in t.available_documents]
+    assert all(b.is_primary is False for b in t.available_documents)
+
+
+@pytest.mark.anyio
+async def test_bilinmeyen_erisim_numarasi_eylem_soyluyor(srv):
+    with pytest.raises(ValueError) as e:
+        await srv.read_filing_text(ticker="AAPL", accession_number="0000000000-00-000000")
+    assert "sec_edgar_list_filings" in str(e.value)
+
+
+# ------------------------------------------------------------ tam metin aramasi
+@pytest.mark.anyio
+async def test_arama_vurusu_okunabilir_adrese_cevriliyor(srv):
+    r = await srv.search_filings(query='"tariff"', form_type="10-K", ticker="TSLA")
+    ilk = r.results[0]
+    # `_id` = erisim numarasi + belge adi. Ikisi de read_filing_text'in
+    # parametreleri; ayirmadan donmek modele bir dizge birakirdi.
+    assert ilk.accession_number == "0001193125-12-081990"
+    assert ilk.document == "d279413dex1050.htm"
+    assert ilk.document_url == ("https://www.sec.gov/Archives/edgar/data/1318605/"
+                                "000119312512081990/d279413dex1050.htm")
+    assert ilk.ticker == "TSLA" and ilk.cik == "0001318605"
+    assert ilk.description == "SUPPLY AGREEMENT"
+    assert ilk.relevance_score == 6.45
+    assert r.total_matching == 12 and r.total_is_exact is True
+    assert r.has_more is True, "12 vurusun 2'si donduruldu"
+    assert r.coverage_note is None
+
+
+@pytest.mark.anyio
+async def test_arama_ticker_cozulemeyen_vurusu_gizlemiyor(srv):
+    """company_tickers.json fon ve yabanci ihracci tasimaz. Bu vuruslari
+    atmak, sonucu sessizce eksiltirdi."""
+    r = await srv.search_filings(query='"tariff"')
+    fon = r.results[1]
+    assert fon.cik == "0000999999" and fon.ticker is None
+    assert fon.document_url.endswith("000099999924000001/fund-main.htm")
+
+
+@pytest.mark.anyio
+async def test_arama_ticker_ve_tarih_filtreleri_sorguya_giriyor(srv):
+    ISTEK_KAYDI.clear()
+    await srv.search_filings(query="tariff", ticker="TSLA", form_type="10-K",
+                             start_date="2020-01-01", end_date="2021-12-31",
+                             offset=100)
+    u = [x for x in ISTEK_KAYDI if "efts" in x][0]
+    assert "ciks=0001318605" in u and "forms=10-K" in u
+    assert "dateRange=custom" in u and "startdt=2020-01-01" in u
+    assert "enddt=2021-12-31" in u and "from=100" in u
+
+
+@pytest.mark.anyio
+async def test_arama_bos_sonucta_kapsam_notu_veriyor(srv):
+    """Sifir sonuc "hic dosyalanmamis" DEGIL: indeks 2001 oncesini pratikte
+    tasimiyor ve bunu soylemeyen bir yanit yanlis okunur."""
+    r = await srv.search_filings(query="bos")
+    assert r.results == [] and r.total_matching == 0
+    assert r.coverage_note and "2001" in r.coverage_note
+    assert r.has_more is False
+
+
+@pytest.mark.anyio
+async def test_arama_2001_oncesine_uzaninca_uyariyor(srv):
+    r = await srv.search_filings(query="tariff", start_date="1998-01-01")
+    assert r.coverage_note and "1996" in r.coverage_note
+
+
+@pytest.mark.anyio
+async def test_arama_alt_sinir_kesin_sayi_gibi_sunulmuyor(srv):
+    r = await srv.search_filings(query="altsinir")
+    assert r.total_matching == 10000 and r.total_is_exact is False
+    assert r.has_more is True
+
+
+@pytest.mark.anyio
+async def test_arama_hata_govdesi_bos_sonuc_sanilmiyor(srv):
+    """SEC hatayi HTTP 200 + govde ile de bildiriyor (olculdu). Bunu bos sonuc
+    saymak, en sessiz yanlis cevabi uretirdi."""
+    with pytest.raises(ValueError) as e:
+        await srv.search_filings(query="hata")
+    assert "Result window is too large" in str(e.value)
+
+
+@pytest.mark.anyio
+async def test_arama_gecersiz_tarih_sessizce_yok_sayilmiyor(srv):
+    """SEC gecersiz tarihi yok sayip FARKLI bir kume donuyor; model bunu
+    istedigi filtre sanir."""
+    with pytest.raises(ValueError) as e:
+        await srv.search_filings(query="tariff", start_date="2024")
+    assert "YYYY-MM-DD" in str(e.value)
+    with pytest.raises(ValueError) as e:
+        await srv.search_filings(query="tariff", end_date="2024-02-31")
+    assert "calendar date" in str(e.value)
+
+
+@pytest.mark.anyio
+async def test_arama_ters_tarih_araligi_yakalaniyor(srv):
+    with pytest.raises(ValueError) as e:
+        await srv.search_filings(query="tariff", start_date="2025-01-01",
+                                 end_date="2024-01-01")
+    assert "Swap" in str(e.value)
+
+
+@pytest.mark.anyio
+async def test_arama_bos_sorgu_baska_araca_yonlendiriyor(srv):
+    with pytest.raises(ValueError) as e:
+        await srv.search_filings(query="   ")
+    assert "sec_edgar_list_filings" in str(e.value)
+
+
+@pytest.mark.anyio
+async def test_arama_offset_siniri_semada_ilan_ediliyor(srv):
+    """Olculdu: SEC `from + size > 10000` istegini reddediyor. Sinir sema
+    disinda kalsaydi model onu ancak hatayla ogrenirdi."""
+    from edgar_mcp.server import mcp
+    arac = [t for t in await mcp.list_tools() if t.name == "sec_edgar_search_filings"][0]
+    ozellik = arac.input_schema["properties"]["offset"]
+    assert ozellik["maximum"] == 9900
+    assert arac.input_schema["properties"]["limit"]["maximum"] == 100
+
+
+@pytest.mark.anyio
+async def test_arama_limit_sayfayi_kirpiyor(srv):
+    r = await srv.search_filings(query='"tariff"', limit=1)
+    assert r.returned == 1 and len(r.results) == 1
+    assert r.has_more is True
+
+
+# ------------------------------------------------------------------ etiketler
+@pytest.mark.anyio
+async def test_eksen_ve_uye_adlari_insan_okunur_geliyor(srv):
+    b = await srv.list_fact_dimensions(ticker="AAPL", form_type="8-K")
+    eksen = [a for a in b.axes if a.axis == "us-gaap:StatementBusinessSegmentsAxis"][0]
+    # Ayni eleman iki rolde etiketli: STANDART rol kazanmali, kisa rol degil.
+    assert eksen.axis_label == "Segment Reporting Information [Axis]"
+    assert eksen.member_labels["tsla:AutomotiveSegmentMember"] == \
+        "Automotive Segment [Member]"
+    assert b.label_source == "aapl-8k_lab.xml"
+    # Etiketi COZULMEYEN uye haritada hic gorunmemeli: bos dizgeyle doldurmak
+    # "adi yok" ile "bulamadim"i ayni gosterirdi.
+    cografya = [a for a in b.axes if a.axis == "srt:StatementGeographicalAxis"][0]
+    assert cografya.member_labels == {}, cografya.member_labels
+    assert all(v for v in eksen.member_labels.values())
+
+
+@pytest.mark.anyio
+async def test_etiketi_olmayan_ad_uydurulmuyor(srv):
+    """Linkbase'de yay kurulmamis eleman ETIKETSIZDIR. `loc_5`/`lab_5`
+    isimlendirmesine bakan bir kod ona 'Plant [Axis]' derdi."""
+    b = await srv.list_fact_dimensions(ticker="AAPL", form_type="8-K")
+    eksen = [a for a in b.axes if a.axis == "tsla:PlantAxis"][0]
+    assert eksen.axis_label is None
+    assert eksen.axis == "tsla:PlantAxis", "ad her halukarda QName olarak duruyor"
+
+
+@pytest.mark.anyio
+async def test_fact_etiketleri_dokumantasyon_metnini_kullanmiyor(srv):
+    """`documentation` rolu etiket degil TANIM metnidir; onu ad diye gostermek
+    her satiri paragrafa cevirirdi."""
+    b = await srv.get_dimensional_facts(ticker="AAPL", concept="revenue",
+                                        form_type="8-K",
+                                        axis="us-gaap:StatementBusinessSegmentsAxis")
+    assert b.facts[0].tag_label == "Revenues"
+    boyut = b.facts[0].dimensions[0]
+    assert boyut.axis_label == "Segment Reporting Information [Axis]"
+    assert boyut.member_label and "Segment [Member]" in boyut.member_label
+    assert b.label_source == "aapl-8k_lab.xml"
+
+
+@pytest.mark.anyio
+async def test_etiket_istenmediginde_indirilmiyor(srv):
+    """Etiket linkbase'i olculen dosyalamada 1,21 MB. Istenmedigi halde
+    indirmek her cagriya bedava olmayan bir maliyet eklerdi."""
+    ISTEK_KAYDI.clear()
+    b = await srv.list_fact_dimensions(ticker="AAPL", form_type="8-K",
+                                       include_labels=False)
+    assert not any("_lab.xml" in u for u in ISTEK_KAYDI)
+    assert b.label_source is None
+    assert b.axes and all(a.axis_label is None for a in b.axes)
+
+
+@pytest.mark.anyio
+async def test_etiket_dosyasi_yokken_calismaya_devam_ediyor(srv):
+    """Linkbase yoksa cevap yine gelmeli: etiket bir sus payi, veri degil."""
+    b = await srv.list_fact_dimensions(ticker="AAPL",
+                                       accession_number="0000320193-25-000058")
+    assert b.label_source is None
+    assert b.axes, "etiket dosyasi yok diye boyutlar kaybolmamali"
+
+
+@pytest.mark.anyio
+async def test_etiket_dosyasi_ayni_cagrida_iki_kez_indirilmiyor(srv):
+    ISTEK_KAYDI.clear()
+    await srv.list_fact_dimensions(ticker="AAPL", form_type="8-K")
+    await srv.get_dimensional_facts(ticker="AAPL", concept="revenue", form_type="8-K")
+    assert sum("_lab.xml" in u for u in ISTEK_KAYDI) == 1
+
+
+def test_etiket_ayristirici_onek_uyusmazliginda_yerel_ada_dusuyor():
+    """Linkbase'deki onek, instance'daki onekle ayni olmak ZORUNDA degil.
+    Yerel ad tek anlamliysa kullanilir; degilse hicbir sey uydurulmaz."""
+    from edgar_mcp.xbrl import etiketleri_ayristir
+    e = etiketleri_ayristir(LAB_XML)
+    assert e.bul("us-gaap:Revenues") == "Revenues"
+    assert e.bul("baskaonek:Revenues") == "Revenues", "yerel ad yedegi calismali"
+    assert e.bul("us-gaap:GrossProfit") is None
+
+
+def test_etiket_ayristirici_cok_anlamli_yerel_adi_tahmin_etmiyor():
+    ikili = LAB_XML.replace(
+        '<link:loc xlink:type="locator" xlink:label="loc_4"\n'
+        '      xlink:href="https://xbrl.fasb.org/us-gaap/2025/elts/us-gaap-2025.xsd#us-gaap_Revenues"/>',
+        '<link:loc xlink:type="locator" xlink:label="loc_4"\n'
+        '      xlink:href="https://xbrl.fasb.org/us-gaap/2025/elts/us-gaap-2025.xsd#us-gaap_Revenues"/>\n'
+        '    <link:loc xlink:type="locator" xlink:label="loc_6"\n'
+        '      xlink:href="tsla-20251231.xsd#tsla_Revenues"/>\n'
+        '    <link:label xlink:type="resource" xlink:label="lab_6" xml:lang="en-US"\n'
+        '      xlink:role="http://www.xbrl.org/2003/role/label">Company Revenues</link:label>\n'
+        '    <link:labelArc xlink:type="arc" xlink:from="loc_6" xlink:to="lab_6"\n'
+        '      xlink:arcrole="http://www.xbrl.org/2003/arcrole/concept-label" order="1"/>')
+    from edgar_mcp.xbrl import etiketleri_ayristir
+    e = etiketleri_ayristir(ikili)
+    assert e.bul("us-gaap:Revenues") == "Revenues", "tam eslesme hala calismali"
+    assert e.bul("tsla:Revenues") == "Company Revenues"
+    assert e.bul("baskaonek:Revenues") is None, "iki aday varken tahmin edilmemeli"
+
+
+def test_etiket_ayristirici_bozuk_xml_de_cokmuyor():
+    from edgar_mcp.xbrl import etiketleri_ayristir
+    e = etiketleri_ayristir("<link:linkbase><link:loc kapanmamis")
+    assert e.qname == {} and e.bul("us-gaap:Revenues") is None

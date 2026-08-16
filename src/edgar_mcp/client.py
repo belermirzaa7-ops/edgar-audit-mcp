@@ -10,11 +10,15 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+from urllib.parse import quote
 
 import httpx
 
 SEC_DATA = "https://data.sec.gov"
 SEC_WWW = "https://www.sec.gov"
+# EDGAR tam metin aramasinin ucu. Ayri bir host ama ayni SEC altyapisi;
+# hiz sinirlayici istemci genelinde oldugu icin bu uc de ayni butceden yer.
+SEC_EFTS = "https://efts.sec.gov"
 
 
 # SEC'in engel sayfasindaki degismeyen ifade. Kisa ve genis tutulmadi:
@@ -92,6 +96,12 @@ class EdgarClient:
         # yirmi sirket taranınca ~1 GB demekti (15 Agu 2026'da bulundu).
         self._facts_cache: dict[str, dict] = {}
         self._subs_cache: dict[str, dict] = {}
+        # Ek dosyalama akislari AYRI onbellekte: `_subs_cache` ile paylassaydi
+        # tek bir sirketin dort ek dosyasini okumak, ana submissions kaydini
+        # (1-2 MB, on aracin altisinin kullandigi) kendi siniri yuzunden
+        # disari atardi. Ayirmak, "eski dosyalamalari oku" secenegini acmanin
+        # sicak yoldaki maliyetini sifirliyor.
+        self._extra_cache: dict[str, dict] = {}
         self._index_cache: dict[str, dict] = {}
 
     async def aclose(self) -> None:
@@ -192,8 +202,48 @@ class EdgarClient:
                 return None
             raise
 
+    async def full_text_search(
+        self, sorgu: str, forms: str | None = None, ciks: str | None = None,
+        start: str | None = None, end: str | None = None, frm: int = 0,
+    ) -> dict:
+        """EDGAR tam metin aramasi. Elasticsearch bicimli yanit doner.
+
+        Olculdu (15 Agu 2026): her vurusun `_id` alani
+        `0000215466-26-000004:cde-20251231.htm` bicimindeydi - yani erisim
+        numarasi VE belge adi birlikte. Ikisi de `read_filing_text`'in
+        parametreleri, dolayisiyla arama sonucu dogrudan okunabilir bir adres.
+        """
+        parcalar = [f"q={quote(sorgu)}"]
+        if forms:
+            parcalar.append(f"forms={quote(forms)}")
+        if ciks:
+            parcalar.append(f"ciks={quote(ciks)}")
+        if start or end:
+            parcalar.append("dateRange=custom")
+            if start:
+                parcalar.append(f"startdt={quote(start)}")
+            if end:
+                parcalar.append(f"enddt={quote(end)}")
+        if frm:
+            parcalar.append(f"from={int(frm)}")
+        return await self._get(f"{SEC_EFTS}/LATEST/search-index?" + "&".join(parcalar))
+
+    async def submissions_extra(self, ad: str) -> dict:
+        """`filings.files[]` altinda adi gecen ek dosyalamalar dosyasi.
+
+        SEC `filings.recent` alanini ~1000 dosyalamada keser ve gerisini bu
+        ayri JSON'lara koyar. Olculdu (15 Agu 2026): ust duzeyde `recent` ile
+        ayni PARALEL DIZI bicimi var, sarmalayici bir nesne yok. Hangi
+        anahtarlarin bulundugu dosyadan dosyaya degisebiliyor - okuyan taraf
+        `primaryDocument` YOKMUS gibi calisabilmeli.
+        """
+        if ad not in self._extra_cache:
+            self._sinirla(self._extra_cache, ad,
+                          await self._get(f"{SEC_DATA}/submissions/{ad}"), 4)
+        return self._extra_cache[ad]
+
     async def submissions(self, cik: str) -> dict:
-        """1-2 MB, dokuz aracin besi kullaniyor. Onbelleksiz birakmak her
+        """1-2 MB, on aracin altisi kullaniyor. Onbelleksiz birakmak her
         cagride yeniden indirmek demekti."""
         if cik not in self._subs_cache:
             self._sinirla(self._subs_cache, cik,

@@ -26,7 +26,8 @@ tuzak barındırıyor. Bu projenin asıl kısmı o tuzakları ele alması.
 | Araç | Ne yapar |
 |---|---|
 | `sec_edgar_get_company_profile` | Ticker → CIK, resmi unvan, SIC sektörü, mali yıl sonu |
-| `sec_edgar_list_filings` | Son dosyalamalar, form türüne göre filtrelenebilir |
+| `sec_edgar_list_filings` | Şirketin dosyalamaları, form türüne göre filtrelenebilir; `include_older` ile SEC'in ~1000 kayıtlık son dosyalama akışının ötesine geçer |
+| `sec_edgar_search_filings` | Tüm dosyalayanlar arasında tam metin arama — bir ifadeyi içeren dosyalamaları, onu taşıyan ekin adına kadar bulur |
 | `sec_edgar_get_concept_series` | Tek bir finansal kalemin zaman serisi |
 | `sec_edgar_get_fact_revisions` | Bir rakamın dosyalamalar arasında nasıl değiştiği — yeniden düzenlemeler, her değişimin erişim numarasıyla |
 | `sec_edgar_read_filing_text` | XBRL'in taşımadığı anlatı: MD&A, risk faktörleri, vergi ve segment dipnotları; 8-K ekleri ve dosyalama içi arama dahil |
@@ -161,6 +162,71 @@ oldu (büyük hızlandırılmış dosyalayanlar için 2019-06-15, diğerleri iç
 ve 2021'de biten dönemler); öncesindeki dosyalamalarda dosyalayanın sunduğu
 instance okunuyor.
 
+### Tüm dosyalayanların metninde arama
+
+`sec_edgar_search_filings` yukarıdaki araçların tersi yönde çalışır: şirketten
+değil, ifadeden başlar. EDGAR'ın tam metin indeksini sorgular; böylece "hangi
+şirketler yıllık raporunda gümrük tarifesinden bahsetti" sorusunun, şirketi
+önceden bilmeyi gerektirmeyen bir cevabı olur.
+
+Üç noktayı açıkça yazmak gerekiyor, çünkü üçü de sonucun nasıl okunacağını
+değiştirir:
+
+- **Bir vuruş dosyalama değil, belgedir.** 15 Ağu 2026'da ölçüldü: Tesla'nın
+  yıllık raporlarında *tariff* kelimesinin en eski eşleşmesi 10-K'nin kendisi
+  değil, içindeki bir ek — bir tedarik sözleşmesi. Bu yüzden sonuçlar hem
+  erişim numarasını hem dosya adını taşıyor; ikisi de doğrudan
+  `sec_edgar_read_filing_text`'e girer.
+- **Toplam sayı bir alt sınır olabilir.** SEC büyük sonuç kümelerini sayı
+  yerine `gte` ilişkisiyle bildiriyor; hangisinin geldiğini `total_is_exact`
+  söylüyor.
+- **Kapsam 2001 civarında başlıyor ve öncesi için sıfır sonuç bir şey
+  kanıtlamıyor.** SEC kendi sayfasında indeksin "2001'den beri" dosyalamaları
+  tuttuğunu yazıyor. 1996-2000 arası yıllık raporlarda *revenue* kadar yaygın
+  bir kelimenin araması 14 dosyalama döndürdü, en eskisi 1999-03-31 tarihli —
+  yani 2001 öncesinden birkaç belge indekste var, çoğu yok. Yanıt bunu kendisi
+  söylüyor: boş dönen ya da 2001 öncesine uzanan bir arama, çıplak bir sıfır
+  yerine `coverage_note` ile geri geliyor.
+
+Uç, 10000 sıralı sonucun ötesine sayfalamayı reddediyor; şema bunu `offset`
+üst sınırı olarak ilan ediyor, modelin hatayla öğrenmesine bırakmıyor.
+
+### Son dosyalama akışının ötesindeki dosyalamalar
+
+SEC'in `submissions` ucu son dosyalama akışını yaklaşık bin kayıtta kesip
+gerisini ayrı dosyalara taşıyor. Aktif bir dosyalayanda bu, uzun bir geçmiş
+değil: Tesla'nın son dosyalama akışı 1.053 kayıtla ancak Mayıs 2018'e iniyor,
+tek ek dosyası ise 1.096 kayıtla Şubat 2005'e (15 Ağu 2026'da ölçüldü).
+
+`sec_edgar_list_filings` varsayılan olarak son akışı okur ve daha fazlasının
+olup olmadığını söyler. `include_older` verilirse eski akışları da okur,
+birleştirir ve tarihe göre sıralar. En fazla dördünü okur ve kaçını atladığını
+bildirir; söylenmeyen bir sınır "hepsini gördüm" diye okunur. Eski akışlar
+birincil belge adını her zaman taşımıyor, bu yüzden `primary_document_url`
+boş olabiliyor; dosyalama erişim numarasıyla açıldığında araç en büyük
+okunabilir dosyayı seçiyor ve bu seçimi SEC'in tayini gibi sunmak yerine
+`primary_document_known: false` ile tahmin olarak işaretliyor.
+
+### Etiketler ve üyeler için insan okunur adlar
+
+`tsla:OperatingLeaseVehiclesMember` bir dosyalamanın kullandığı addır, bir
+insanın yazacağı ad değil. Çevirisi dosyalamanın kendisinde, etiket
+linkbase'inde (`*_lab.xml`) duruyor ve boyut araçları onu okuyor: eksenler,
+üyeler ve etiketler `axis_label`, `member_label`, `tag_label` alanlarıyla
+birlikte dönüyor.
+
+Linkbase adı etikete bir *yay* üzerinden bağlar; kod bu yayı takip ediyor,
+üreticilerin kullandığı `loc_`/`lab_` isimlendirmesini değil — bir hata
+enjeksiyonu tam bu kestirmeyi deniyor ve test kırmızıya dönüyor. Bir eleman
+birden fazla rolde etiketliyse standart rol kazanıyor; ad değil tanım paragrafı
+olan `documentation` rolü hiçbir zaman ad olarak kullanılmıyor. Hiçbir şey
+uydurulmuyor: dosyalamanın etiketlemediği eleman kendi etiketiyle dönüyor ve
+`label_source` etiketlerin hangi dosyadan geldiğini söylüyor, dosya yoksa boş
+kalıyor.
+
+Etiketler bir ek indirme demek — Tesla'nın FY2025 yıllık raporunda 2,68 MB'lık
+instance'a karşılık 1,21 MB — bu yüzden `include_labels` ile kapatılabiliyor.
+
 ## Ele alınan üç tuzak
 
 ### 1. `fy` alanı verinin değil, dosyalamanın yılıdır
@@ -267,6 +333,7 @@ python dogrula.py          # canlı SEC verisine karşı doğrulama
 python arac/tani.py KO Assets           # tek bir SEC yanıtını ham haliyle incele
 python arac/tani.py KO Assets --matris   # aynı veriyi farklı koşullarda iste, sebebi ayır
 python arac/tani.py --tarama             # kaç şirket etkileniyor
+python arac/tani.py TSLA --etiket        # etiket ayrıştırıcısı gerçek linkbase'de çözüyor mu
 ```
 
 ### Hata enjeksiyonu
@@ -315,13 +382,13 @@ yılı, bitiş yılı ve başlangıç yılı geleneklerini kullanan şirketlerle
 ### Değerlendirme seti
 
 [`evaluation/questions.xml`](evaluation/questions.xml), yalnızca araçlar
-çağrılarak cevaplanabilecek on sekiz soru tutuyor: şirketler arası mali yıl
+çağrılarak cevaplanabilecek on dokuz soru tutuyor: şirketler arası mali yıl
 adlandırması, muhasebe standardı değişiminde etiket birleştirme, iki seri
 gerektiren oranlar ve sayfalama alanları. Her cevap araçlar canlı SEC verisine
 karşı çalıştırılarak üretildi — hiçbiri ezberden yazılmadı — ve her soru hangi
 çağrılarla ölçüldüğünü kaydediyor, böylece ölçüm tekrarlanabilir.
 
-Bir test dosyayı yapısal olarak dürüst tutuyor: on çift, her çiftte soru, cevap
+Bir test dosyayı yapısal olarak dürüst tutuyor: on dokuz çift, her çiftte soru, cevap
 ve ölçüm bloğu, adı geçen her aracın sunucuda gerçekten var olması ve hiçbir
 sorunun "en son dönem" gibi bayatlayacak bir ifadeye bağlanmaması.
 
@@ -346,7 +413,7 @@ src/edgar_mcp/client.py   SEC HTTP istemcisi, hız sınırlayıcı, önbellek
 tests/                    mock'lu birim testleri
 tests/dil.py              dışa bakan yüzey için dil kontrolü
 tests/test_http_tasima.py belgelenen HTTP ve stdio taşımalarını çalıştırır
-evaluation/questions.xml  ölçülmüş on sekiz soru ve hangi çağrılarla ölçüldükleri
+evaluation/questions.xml  ölçülmüş on dokuz soru ve hangi çağrılarla ölçüldükleri
 arac/enjeksiyon.py        hata enjeksiyonu harness'ı
 arac/sir_tarama.py        sır tarayıcı
 arac/tani.py              tek bir SEC yanıtını ham haliyle ölçen tanı aracı

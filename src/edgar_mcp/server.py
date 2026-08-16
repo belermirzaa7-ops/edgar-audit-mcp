@@ -18,7 +18,17 @@ from pydantic import BaseModel, Field
 
 from .belge import bolum_sec, bolumler, metne_cevir
 from .client import SEC_WWW, EdgarClient
-from .xbrl import BOS_BAGLAM, Baglam, Boyut, Instance, Olgu, ayristir, sayi_mi
+from .xbrl import (
+    BOS_BAGLAM,
+    Baglam,
+    Boyut,
+    Etiketler,
+    Instance,
+    Olgu,
+    ayristir,
+    etiketleri_ayristir,
+    sayi_mi,
+)
 
 mcp = MCPServer(
     name="sec-edgar",
@@ -221,13 +231,19 @@ class Filing(BaseModel):
     filing_date: str = Field(description="Date the filing was submitted, ISO 8601")
     report_date: str | None = None
     accession_number: str
-    primary_document_url: str
+    primary_document_url: str | None = Field(
+        default=None,
+        description="None for filings read from SEC's older feeds, which do "
+        "not always name a primary document. The accession number still "
+        "identifies the filing, and sec_edgar_read_filing_text takes it",
+    )
 
 
 class FilingPage(BaseModel):
     ticker: str
     total_matching: int = Field(
-        description="Total filings matching form_type in the recent-filings feed"
+        description="Total filings matching form_type in the feeds that were "
+        "read - the recent feed alone unless include_older was set"
     )
     returned: int = Field(description="Number of filings in this response")
     has_more: bool = Field(
@@ -237,11 +253,79 @@ class FilingPage(BaseModel):
     older_filings_exist: bool = Field(
         default=False,
         description="True when SEC keeps further filings outside the recent "
-        "feed, which it caps at about a thousand entries. This tool reads only "
-        "that feed, so a company with a long history has filings it cannot see "
-        "here - treat the list as recent filings, not as all of them",
+        "feed, which it caps at about a thousand entries. For an active filer "
+        "that feed is only the last few years",
+    )
+    older_filings_read: bool = Field(
+        default=False,
+        description="True when this response also covers SEC's older feeds. "
+        "When it is False and older_filings_exist is True, the list is recent "
+        "filings only - call again with include_older to reach further back",
+    )
+    older_feeds_skipped: int = Field(
+        default=0,
+        description="Older feed files that were NOT read because this tool "
+        "reads at most four of them. Anything above zero means the history "
+        "here is still incomplete",
     )
     filings: list[Filing]
+
+
+class SearchedDocument(BaseModel):
+    company: str = Field(description="Filer name as SEC's search index shows it")
+    cik: str | None = Field(default=None, description="10-digit zero-padded SEC Central Index Key")
+    ticker: str | None = Field(
+        default=None,
+        description="None when SEC's ticker file does not list this filer, "
+        "which is common for funds and foreign private issuers. "
+        "sec_edgar_read_filing_text needs a ticker, so a filing without one "
+        "can only be opened through document_url",
+    )
+    form: str = Field(description="Form type of the filing this document belongs to")
+    filing_date: str = Field(description="Date the filing was submitted, ISO 8601")
+    period_ending: str | None = Field(
+        default=None, description="Period the filing reports on, when SEC records one"
+    )
+    accession_number: str = Field(
+        description="Pass to sec_edgar_read_filing_text together with document"
+    )
+    document: str | None = Field(
+        default=None,
+        description="File inside the filing that matched. Hits are documents, "
+        "not filings: a match often lands in an exhibit rather than in the "
+        "main report",
+    )
+    document_url: str | None = None
+    description: str | None = Field(
+        default=None, description="SEC's own description of this document"
+    )
+    relevance_score: float | None = Field(
+        default=None,
+        description="Score from SEC's search engine. It ranks hits within one "
+        "response and means nothing across responses",
+    )
+
+
+class FilingSearchResults(BaseModel):
+    query: str = Field(description="The text that was searched for")
+    total_matching: int = Field(description="Documents matching the search")
+    total_is_exact: bool = Field(
+        default=True,
+        description="False when SEC reports the total as a lower bound rather "
+        "than a count, so more documents match than this number states",
+    )
+    returned: int = Field(description="Documents in this response")
+    offset: int = Field(description="Rank this page starts at")
+    has_more: bool = Field(
+        description="True if matches remain after this page; call again with "
+        "offset = offset + returned"
+    )
+    coverage_note: str | None = Field(
+        default=None,
+        description="Set when the result can be read as absence of evidence "
+        "although the index cannot support that reading",
+    )
+    results: list[SearchedDocument]
 
 
 class FactPoint(BaseModel):
@@ -381,6 +465,14 @@ class FilingText(BaseModel):
     filing_date: str
     document_name: str = Field(description="File that was read")
     document_url: str = Field(description="The document this text was read from")
+    primary_document_known: bool = Field(
+        default=True,
+        description="False when SEC's feed does not name a primary document "
+        "for this filing, which happens on older filings. In that case the "
+        "file read here was picked as the largest readable one - a guess, not "
+        "SEC's designation. Check available_documents and pass document "
+        "explicitly if the text looks wrong",
+    )
     available_documents: list[FilingDocument] = Field(
         default_factory=list,
         description="Readable files in this filing, largest first. A form 8-K "
@@ -475,6 +567,88 @@ async def get_company_profile(
     )
 
 
+# SEC'in `filings.files[]` altina koydugu ek akis dosyasi sayisi ust sinir.
+# Her dosya ~1000 dosyalama tasiyor; dordu ~5000 eder ve otuz yillik bir
+# gecmisi kapsar. Sinir SESSIZ DEGIL: okunmayan dosya sayisi yanitta bildiriliyor
+# ("no silent caps" - bir kapsam kisitlamasini soylememek, "hepsini gordum"
+# diye okunuyor).
+EK_AKIS_SINIRI = 4
+
+
+def _form_uyuyor(form: str, istenen: str | None) -> bool:
+    """Form turu karsilastirmasi buyuk/kucuk harf duyarsiz.
+
+    Model `10-k` yazdiginda eskiden sessizce BOS liste donuyordu - "bu sirket
+    hic 10-K vermemis" gibi okunan bir sonuc. Amendment'lar yine disarida
+    kaliyor: `10-K/A` != `10-K` ve bu bilincli, cunku duzeltme ayri bir belge.
+    """
+    return not istenen or form.upper() == istenen.upper()
+
+
+def _akis_kayitlari(r: dict, cik: str, form_type: str | None) -> list[Filing]:
+    """SEC'in paralel dizi bicimindeki dosyalama akisini `Filing`'lere cevirir.
+
+    Bicim olculdu (15 Agu 2026, CIK0001318605-submissions-001.json): eski akis
+    dosyalari ust duzeyde `recent` ile AYNI paralel dizileri tasiyor, saran bir
+    nesne yok. Hangi anahtarlarin bulundugu garanti DEGIL - iki ayri okumada
+    `primaryDocument` gorunmedi. Bu yuzden her dizi ayri ayri uzunluk
+    kontrolunden geciyor: eksik anahtar bir IndexError degil, eksik bir alan.
+    """
+    accs = r.get("accessionNumber") or []
+    formlar = r.get("form") or []
+    tarihler = r.get("filingDate") or []
+    raporlar = r.get("reportDate") or []
+    birincil = r.get("primaryDocument") or []
+
+    def al(dizi: list, i: int) -> str:
+        return str(dizi[i]) if i < len(dizi) and dizi[i] is not None else ""
+
+    out: list[Filing] = []
+    for i, acc in enumerate(accs):
+        form = al(formlar, i)
+        if not _form_uyuyor(form, form_type):
+            continue
+        belge = al(birincil, i)
+        out.append(Filing(
+            form=form,
+            filing_date=al(tarihler, i),
+            report_date=al(raporlar, i) or None,
+            accession_number=str(acc),
+            primary_document_url=(
+                f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
+                f"{str(acc).replace('-', '')}/{belge}"
+            ) if belge else None,
+        ))
+    return out
+
+
+async def _tum_akislar(
+    cik: str, sub: dict, form_type: str | None, eski_dahil: bool,
+    ctx: Context | None = None,
+) -> tuple[list[Filing], int]:
+    """Recent akisi (+ istenirse eski akislar) -> tarihe gore yeni-once liste.
+
+    Siralama tarihe gore YAPILIYOR, akis sirasina guvenilmiyor: iki akis
+    birlestirildiginde SEC'in her dosyada ayri ayri koruduğu sira, birlesik
+    listede dogru sirayi vermez. `filingDate` ISO oldugu icin metin siralamasi
+    tarih siralamasidir.
+    """
+    kayitlar = _akis_kayitlari(sub.get("filings", {}).get("recent", {}), cik, form_type)
+    dosyalar = list(sub.get("filings", {}).get("files") or [])
+    if not eski_dahil:
+        return kayitlar, 0
+
+    okunacak = dosyalar[:EK_AKIS_SINIRI]
+    for n, dosya in enumerate(okunacak):
+        ad = str(dosya.get("name") or "").strip()
+        if not ad:
+            continue
+        await _ilerleme(ctx, n, len(okunacak) + 1, f"Reading older feed {ad}")
+        kayitlar += _akis_kayitlari(await _c().submissions_extra(ad), cik, form_type)
+    kayitlar.sort(key=lambda f: f.filing_date, reverse=True)
+    return kayitlar, max(0, len(dosyalar) - len(okunacak))
+
+
 @mcp.tool(
     name="sec_edgar_list_filings",
     annotations=ToolAnnotations(
@@ -484,9 +658,13 @@ async def get_company_profile(
         open_world_hint=True,
     ),
     description=(
-        "Lists a company's most recent SEC filings with links to the primary "
-        "document. Pass form_type to restrict to one kind of filing, e.g. '10-K' "
-        "for annual reports or '10-Q' for quarterly reports."
+        "Lists a company's SEC filings with links to the primary document. "
+        "Pass form_type to restrict to one kind of filing, e.g. '10-K' for "
+        "annual reports or '10-Q' for quarterly reports.\n"
+        "By default it reads SEC's recent-filings feed, which stops at about a "
+        "thousand filings - for an active filer that is only the last few "
+        "years. Set include_older to reach back to the start of the company's "
+        "EDGAR history."
     )
 )
 async def list_recent_filings(
@@ -503,48 +681,237 @@ async def list_recent_filings(
             description="Maximum number of filings to return, newest first",
         ),
     ] = 10,
+    include_older: Annotated[
+        bool,
+        Field(default=False,
+              description="Also read SEC's older filing feeds. The recent feed "
+              "stops at about a thousand filings, which for an active filer is "
+              "only the last few years; set this when the question reaches "
+              "further back. It costs one extra download per older feed."),
+    ] = False,
+    ctx: Context | None = None,
 ) -> FilingPage:
     c = _c()
     cik = await c.cik_for_ticker(ticker)
     sub = await c.submissions(cik)
-    r = sub["filings"]["recent"]
 
-    dosyalamalar: list[Filing] = []
-    for i in range(len(r["accessionNumber"])):
-        if form_type and r["form"][i] != form_type:
-            continue
-        acc = r["accessionNumber"][i]
-        acc_nodash = acc.replace("-", "")
-        dosyalamalar.append(
-            Filing(
-                form=r["form"][i],
-                filing_date=r["filingDate"][i],
-                report_date=r["reportDate"][i] or None,
-                accession_number=acc,
-                primary_document_url=(
-                    f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
-                    f"{acc_nodash}/{r['primaryDocument'][i]}"
-                ),
-            )
-        )
+    dosyalamalar, atlanan = await _tum_akislar(cik, sub, form_type, include_older, ctx)
 
     # §16: limit tek basina yetmez. Model, gordugu listenin tamami mi yoksa
     # kirpilmis mi oldugunu bilmeden "sirketin N dosyalamasi var" diye
     # sonuclandirabilir.
     # SEC `filings.recent` alanini yaklasik 1000 dosyalamada kesip gerisini
-    # `filings.files[]` altindaki ayri JSON dosyalarina koyar. Aktif bir
-    # dosyalayanda bu bir-iki yillik gecmis demek. Bunu okumadan `has_more:
-    # false` demek, "sirketin baska 10-K'si yok" iddiasi olurdu - oysa otuz
-    # yillik gecmisi olabilir (15 Agu 2026'da bulundu). Eski dosyalamalar
-    # okunmuyor ama SUSULMUYOR: yanit onlarin varligini bildiriyor.
+    # `filings.files[]` altindaki ayri JSON dosyalarina koyar (olculdu, 15 Agu
+    # 2026: TSLA'nin recent akisi 1.053 kayitla ancak 2018-05-07'ye iniyor; tek
+    # ek dosyasi 1.096 kayitla 2005-02-17'ye). `include_older` bu akislari da
+    # okur; okunmadiginda varliklari SUSULMUYOR.
     daha_eski = bool(sub.get("filings", {}).get("files"))
+    eksik_kaldi = (daha_eski and not include_older) or atlanan > 0
     return FilingPage(
         ticker=ticker.upper(),
         total_matching=len(dosyalamalar),
         returned=min(limit, len(dosyalamalar)),
         older_filings_exist=daha_eski,
-        has_more=len(dosyalamalar) > limit or daha_eski,
+        older_filings_read=include_older and daha_eski,
+        older_feeds_skipped=atlanan,
+        has_more=len(dosyalamalar) > limit or eksik_kaldi,
         filings=dosyalamalar[:limit],
+    )
+
+
+# Tam metin aramasinin olculen sinirlari (15 Agu 2026, efts.sec.gov):
+#   - Yanit sayfasi 100 kayit ("size":100 sorgu yankisinda gorunuyor).
+#   - `from + size <= 10000`. Asildiginda SEC sonuc degil hata govdesi
+#     donuyor: "Result window is too large, from + size must be less than or
+#     equal to: [10000] but was [10090]." Bu yuzden offset ust siniri 9900.
+ARAMA_SAYFASI = 100
+ARAMA_PENCERESI = 10000
+_ISO_TARIH = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+# Ayni gun olculen kapsam: SEC kendi sayfasinda (sec.gov/edgar/search/)
+# "full text of electronic filings since 2001" diyor. 1996-2000 araligindaki
+# 10-K'larda "revenue" aramasi 14 sonuc verdi - yani 2001 oncesinden de birkac
+# belge indekste var, ama sayi bir taramayi tasiyacak buyuklukte degil. Iki
+# kaynak birbirini yalanlamiyor; belgelenen sinir pratikte dogru, sifir sonuc
+# ise "hic dosyalanmamis" demek DEGIL.
+KAPSAM_ESIGI = "2001-01-01"
+_KAPSAM_YOK = (
+    "SEC states that this index holds filings since 2001. A measured search "
+    "of annual reports from 1996 to 2000 for a word as common as revenue "
+    "returned only 14 filings, so a few older documents are indexed and most "
+    "are not. An empty result is therefore not evidence that the text was "
+    "never filed, and it is no evidence at all for years before 2001."
+)
+_KAPSAM_ESKI = (
+    "This search reaches before 2001, where SEC's index is nearly empty: a "
+    "measured search of annual reports from 1996 to 2000 for the word revenue "
+    "returned only 14 filings. Read what comes back as a sample, never as the "
+    "full set of filings that used this text."
+)
+
+
+def _tarih_dogrula(deger: str | None, alan: str) -> str | None:
+    """Tarih dogrulamasi BURADA, cunku SEC gecersiz tarihi sessizce yok
+    sayiyor: `startdt=2024` yazan bir cagri hata degil, FARKLI bir sonuc
+    kumesi doner ve model bunu istedigi filtre sanir."""
+    if deger is None or not deger.strip():
+        return None
+    d = deger.strip()
+    if not _ISO_TARIH.match(d):
+        raise ValueError(
+            f"{alan} must be a date written as YYYY-MM-DD, for example "
+            f"2024-01-31. It was: {d!r}."
+        )
+    try:
+        date.fromisoformat(d)
+    except ValueError as e:
+        raise ValueError(f"{alan} is not a real calendar date: {d!r}.") from e
+    return d
+
+
+@mcp.tool(
+    name="sec_edgar_search_filings",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
+    description=(
+        "Searches the TEXT of filings across every company. Use it when the "
+        "question names a phrase rather than a company: which filers wrote "
+        "about a tariff, who names a supplier, where a term first appears.\n"
+        "Matches are documents inside filings, so a hit often points to an "
+        "exhibit rather than to the main report. Pass accession_number and "
+        "document to sec_edgar_read_filing_text to read one.\n"
+        "Put a phrase in double quotes to match it whole. SEC's index holds "
+        "filings since 2001 and answers with at most 10000 ranked matches per "
+        "query, so narrow with form_type, ticker or dates rather than reading "
+        "deep into the ranking."
+    ),
+)
+async def search_filings(
+    query: Annotated[
+        str,
+        Field(description='Text to find, e.g. "supply chain disruption". '
+              "Double quotes match the phrase whole; without them the words "
+              "are matched on their own."),
+    ],
+    form_type: Annotated[
+        str | None,
+        Field(default=None,
+              description="Restrict to one form type, e.g. 10-K or 8-K"),
+    ] = None,
+    ticker: Annotated[
+        str | None,
+        Field(default=None,
+              description="Restrict to one company by stock ticker symbol"),
+    ] = None,
+    start_date: Annotated[
+        str | None,
+        Field(default=None, description="Earliest filing date, as YYYY-MM-DD"),
+    ] = None,
+    end_date: Annotated[
+        str | None,
+        Field(default=None, description="Latest filing date, as YYYY-MM-DD"),
+    ] = None,
+    limit: Annotated[
+        int,
+        Field(default=10, ge=1, le=100,
+              description="Maximum matches to return, most relevant first"),
+    ] = 10,
+    offset: Annotated[
+        int,
+        Field(default=0, ge=0, le=ARAMA_PENCERESI - ARAMA_SAYFASI,
+              description="Rank to start from, for reading further down the "
+              "ranking. SEC refuses a request that reaches past 10000"),
+    ] = 0,
+    ctx: Context | None = None,
+) -> FilingSearchResults:
+    ifade = query.strip()
+    if not ifade:
+        raise ValueError(
+            "query must hold the text to search for. To list a company's "
+            "filings without searching their text, call sec_edgar_list_filings."
+        )
+    bas = _tarih_dogrula(start_date, "start_date")
+    son = _tarih_dogrula(end_date, "end_date")
+    if bas and son and bas > son:
+        raise ValueError(
+            f"start_date {bas} falls after end_date {son}, so no filing can "
+            "match. Swap them."
+        )
+
+    ciks = await _c().cik_for_ticker(ticker) if ticker else None
+    await _ilerleme(ctx, 0, 2, "Searching the EDGAR full-text index")
+    ham = await _c().full_text_search(ifade, forms=form_type, ciks=ciks,
+                                      start=bas, end=son, frm=offset)
+
+    kume = ham.get("hits")
+    if not isinstance(kume, dict):
+        # SEC hata durumunda HTTP 200 ile de gelebilen bir hata GOVDESI
+        # doner (`errorType`/`error`). Bunu bos sonuc saymak, "hicbir sey
+        # bulunamadi" diye okunurdu.
+        neden = str(ham.get("error") or ham.get("errorType") or "")[:200]
+        raise ValueError(
+            "SEC's full-text search returned no result set for this query"
+            + (f": {neden}. " if neden else ". ")
+            + "Simplify the search text or narrow the range and retry."
+        )
+
+    await _ilerleme(ctx, 1, 2, "Reading matches")
+    kayitlar: list[SearchedDocument] = []
+    for vurus in (kume.get("hits") or [])[:limit]:
+        kaynak = vurus.get("_source") or {}
+        acc, _, belge = str(vurus.get("_id") or "").partition(":")
+        cikler = [str(x) for x in (kaynak.get("ciks") or [])]
+        cik = cikler[0].zfill(10) if cikler and cikler[0].isdigit() else None
+        adlar = [str(x) for x in (kaynak.get("display_names") or [])]
+        formlar = [str(x) for x in (kaynak.get("root_forms") or [])]
+        url = None
+        if cik and acc and belge:
+            url = (f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
+                   f"{acc.replace('-', '')}/{belge}")
+        kayitlar.append(SearchedDocument(
+            company=adlar[0] if adlar else "",
+            cik=cik,
+            ticker=await _c().ticker_for_cik(cik) if cik else None,
+            form=str(kaynak.get("form") or (formlar[0] if formlar else "")),
+            filing_date=str(kaynak.get("file_date") or ""),
+            period_ending=str(kaynak.get("period_ending") or "") or None,
+            accession_number=acc,
+            document=belge or None,
+            document_url=url,
+            description=str(kaynak.get("file_description") or "") or None,
+            relevance_score=(float(vurus["_score"])
+                             if isinstance(vurus.get("_score"), int | float) else None),
+        ))
+
+    sayac = kume.get("total")
+    if isinstance(sayac, dict):
+        toplam = int(sayac.get("value") or 0)
+        # Elasticsearch buyuk sonuc kumelerinde `relation: "gte"` doner - sayi
+        # o zaman bir ALT SINIR. Ikisini ayirmadan bildirmek, modele olculmemis
+        # bir kesinlik satmak olurdu.
+        kesin = str(sayac.get("relation") or "eq") == "eq"
+    else:
+        toplam, kesin = int(sayac or 0), True
+
+    not_ = None
+    if not kayitlar:
+        not_ = _KAPSAM_YOK
+    elif bas and bas < KAPSAM_ESIGI:
+        not_ = _KAPSAM_ESKI
+
+    return FilingSearchResults(
+        query=ifade,
+        total_matching=toplam,
+        total_is_exact=kesin,
+        returned=len(kayitlar),
+        offset=offset,
+        has_more=(offset + len(kayitlar) < toplam) or not kesin,
+        coverage_note=not_,
+        results=kayitlar,
     )
 
 
@@ -919,33 +1286,66 @@ def _ara(metin: str, ifade: str) -> tuple[int, list[SearchHit]]:
     return toplam, vurgular
 
 
-async def _dosyalama_bul(cik: str, accession: str | None, form_type: str) -> dict:
-    """Erisim numarasindan (ya da form turunden) dosyalama kaydini bulur."""
-    sub = await _c().submissions(cik)
-    r = sub.get("filings", {}).get("recent", {})
-    n = len(r.get("accessionNumber", []))
-    for i in range(n):
+def _akista_ara(r: dict, accession: str | None, form_type: str) -> dict | None:
+    """Tek akis icinde erisim numarasi ya da form turu araması."""
+    accs = r.get("accessionNumber") or []
+    formlar = r.get("form") or []
+    tarihler = r.get("filingDate") or []
+    birincil = r.get("primaryDocument") or []
+
+    def al(dizi: list, i: int) -> str:
+        return str(dizi[i]) if i < len(dizi) and dizi[i] is not None else ""
+
+    for i, acc in enumerate(accs):
         if accession:
-            if r["accessionNumber"][i] != accession:
+            if str(acc) != accession:
                 continue
-        elif r["form"][i] != form_type:
+        elif not _form_uyuyor(al(formlar, i), form_type):
             continue
         return {
-            "accession_number": r["accessionNumber"][i],
-            "form": r["form"][i],
-            "filing_date": r["filingDate"][i],
-            "primary_document": r["primaryDocument"][i],
+            "accession_number": str(acc),
+            "form": al(formlar, i),
+            "filing_date": al(tarihler, i),
+            # Eski akislarda bu alan bulunmayabiliyor; bos string "bilinmiyor"
+            # demek ve cagiran taraf onu ele almak zorunda (bkz. read_filing_text).
+            "primary_document": al(birincil, i),
         }
+    return None
+
+
+async def _dosyalama_bul(cik: str, accession: str | None, form_type: str) -> dict:
+    """Erisim numarasindan (ya da form turunden) dosyalama kaydini bulur.
+
+    Recent akisi yetmezse eski akislar da taraniyor. Sebep tutarlilik: hem
+    `sec_edgar_list_filings(include_older=True)` hem tam metin aramasi, recent
+    akisinda BULUNMAYAN erisim numaralari dondurebiliyor. Bunlari okumayi
+    reddetmek, aracin kendi ciktisini kendi reddetmesi olurdu.
+    """
+    sub = await _c().submissions(cik)
+    kayit = _akista_ara(sub.get("filings", {}).get("recent", {}), accession, form_type)
+    if kayit:
+        return kayit
+
+    dosyalar = list(sub.get("filings", {}).get("files") or [])[:EK_AKIS_SINIRI]
+    for dosya in dosyalar:
+        ad = str(dosya.get("name") or "").strip()
+        if not ad:
+            continue
+        kayit = _akista_ara(await _c().submissions_extra(ad), accession, form_type)
+        if kayit:
+            return kayit
+
     if accession:
         raise ValueError(
-            f"Accession number {accession} is not in the recent filings feed "
-            "for this company. Call sec_edgar_list_filings to see the "
-            "accession numbers that are available."
+            f"Accession number {accession} is not in this company's filing "
+            "feeds. Check the number - it belongs to a filing by a different "
+            "company if it was copied from elsewhere. Call "
+            "sec_edgar_list_filings to see the accession numbers available."
         )
     raise ValueError(
-        f"No {form_type} filing found for this company in the recent filings "
-        "feed. Call sec_edgar_list_filings without form_type to see which "
-        "forms it has filed."
+        f"No {form_type} filing found for this company. Call "
+        "sec_edgar_list_filings without form_type to see which forms it has "
+        "filed."
     )
 
 
@@ -1031,14 +1431,31 @@ async def read_filing_text(
         f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
         f"{kayit['accession_number'].replace('-', '')}"
     )
-    belgeler = await _okunabilir_belgeler(dizin, kayit["primary_document"])
+    birincil = kayit["primary_document"]
+    belgeler = await _okunabilir_belgeler(dizin, birincil)
 
-    ad = document or kayit["primary_document"]
     if document and not any(b.name == document for b in belgeler):
         raise ValueError(
             f"This filing has no readable file named '{document}'. It has: "
             f"{', '.join(b.name for b in belgeler) or 'none'}."
         )
+
+    # Eski akislardan gelen kayitlarda birincil belge adi bulunmayabiliyor
+    # (olculdu, 15 Agu 2026: TSLA'nin ek submissions dosyasi bu alani
+    # tasimiyordu). O durumda en buyuk okunabilir dosya secilir - ama bu bir
+    # TAHMIN ve yanit bunu `primary_document_known: false` ile soyluyor.
+    # Sessizce secmek, "SEC'in birincil belgesi budur" iddiasi olurdu; oysa
+    # 14 Agu 2026'da bir 8-K'da bu varsayimi olcup yanlislamistim.
+    ad = document or birincil
+    if not ad:
+        if not belgeler:
+            raise ValueError(
+                f"Filing {kayit['accession_number']} has no readable document "
+                "in SEC's archive: its directory holds no .htm, .html or .txt "
+                "file. Filings before the late 1990s are sometimes stored in "
+                "formats this tool cannot read."
+            )
+        ad = belgeler[0].name
 
     url = f"{dizin}/{ad}"
     await _ilerleme(ctx, 1, 3, f"Downloading {ad}")
@@ -1072,6 +1489,7 @@ async def read_filing_text(
         filing_date=kayit["filing_date"],
         document_name=ad,
         document_url=url,
+        primary_document_known=bool(birincil),
         available_documents=belgeler,
         search_query=search,
         search_total_matches=toplam_vurus,
@@ -1652,11 +2070,47 @@ async def _instance(dizin: str, belgeler: list[FilingDocument]) -> tuple[Instanc
     return _INSTANCE[url], url
 
 
+# Etiket linkbase'i: QName'leri insan okunur adlara baglar. Ayri onbellek,
+# instance ile ayni sinirla; olculdu (15 Agu 2026): TSLA FY2025'te instance
+# 2,68 MB, etiket linkbase'i 1,21 MB. Yani etiketler cagrinin indirme
+# hacmini yaklasik yarim kat artiriyor - bu yuzden kapatilabilir.
+_ETIKET: dict[str, Etiketler] = {}
+ETIKET_SINIRI = 2
+_ETIKET_DOSYASI = re.compile(r"_lab\.xml$", re.IGNORECASE)
+BOS_ETIKET = Etiketler()
+
+
+async def _etiketler(dizin: str) -> tuple[Etiketler, str | None]:
+    """Dosyalamanin etiket linkbase'i. Yoksa bos harita ve None.
+
+    Etiketin kaynagi bilincli olarak DOSYALAMANIN KENDI dizini: adlar, o
+    dosyalamanin ilan ettigi adlardir. Standart etiketler US-GAAP
+    taksonomisinden, uzanti etiketleri sirketin kendi taksonomisinden gelir.
+    SEC'in bu dosyayi - ayikladigi instance'ta oldugu gibi - yeniden uretip
+    uretmedigi DOGRULANMADI; dogrulanan sey dosyanin dosyalamanin dizininde
+    durdugu ve etiket metinlerinin oradan geldigi.
+    """
+    veri = await _c().filing_index(dizin)
+    for x in (veri.get("directory") or {}).get("item", []):
+        ad = str(x.get("name", ""))
+        if not _ETIKET_DOSYASI.search(ad):
+            continue
+        url = f"{dizin}/{ad}"
+        if url not in _ETIKET:
+            cozulmus = etiketleri_ayristir(await _c().filing_document(url))
+            if len(_ETIKET) >= ETIKET_SINIRI:
+                _ETIKET.pop(next(iter(_ETIKET)))
+            _ETIKET[url] = cozulmus
+        return _ETIKET[url], ad
+    return BOS_ETIKET, None
+
+
 async def _dosyalama_ve_instance(
     ticker: str, accession: str | None, form_type: str,
-    ctx: Context | None = None,
-) -> tuple[dict, Instance, str]:
-    await _ilerleme(ctx, 0, 3, "Locating the filing")
+    ctx: Context | None = None, etiket_iste: bool = False,
+) -> tuple[dict, Instance, str, Etiketler, str | None]:
+    adim_sayisi = 4 if etiket_iste else 3
+    await _ilerleme(ctx, 0, adim_sayisi, "Locating the filing")
     cik = await _c().cik_for_ticker(ticker)
     kayit = await _dosyalama_bul(cik, accession, form_type)
     dizin = (
@@ -1664,10 +2118,14 @@ async def _dosyalama_ve_instance(
         f"{kayit['accession_number'].replace('-', '')}"
     )
     belgeler = await _okunabilir_belgeler(dizin, kayit["primary_document"])
-    await _ilerleme(ctx, 1, 3, "Downloading the XBRL instance")
+    await _ilerleme(ctx, 1, adim_sayisi, "Downloading the XBRL instance")
     inst, url = await _instance(dizin, belgeler)
-    await _ilerleme(ctx, 2, 3, f"Read {len(inst.olgular)} facts")
-    return kayit, inst, url
+    etiketler, etiket_dosyasi = BOS_ETIKET, None
+    if etiket_iste:
+        await _ilerleme(ctx, 2, adim_sayisi, "Downloading the label linkbase")
+        etiketler, etiket_dosyasi = await _etiketler(dizin)
+    await _ilerleme(ctx, adim_sayisi - 1, adim_sayisi, f"Read {len(inst.olgular)} facts")
+    return kayit, inst, url, etiketler, etiket_dosyasi
 
 
 class DimensionValue(BaseModel):
@@ -1681,11 +2139,30 @@ class DimensionValue(BaseModel):
         "None for a typed dimension, whose value is in typed_value instead",
     )
     typed_value: str | None = Field(default=None)
+    axis_label: str | None = Field(
+        default=None,
+        description="Human-readable name of the axis, as the filing's own label "
+        "linkbase declares it. None when the filing declares none",
+    )
+    member_label: str | None = Field(
+        default=None, description="Human-readable name of the member"
+    )
 
 
 class AxisInfo(BaseModel):
     axis: str
+    axis_label: str | None = Field(
+        default=None,
+        description="Human-readable name of the axis, from the filing's own "
+        "label linkbase",
+    )
     members: list[str] = Field(description="Members seen on this axis in this filing")
+    member_labels: dict[str, str] = Field(
+        default_factory=dict,
+        description="Human-readable name for each member that the filing labels. "
+        "A member missing from this map has no label in the filing, so its tag "
+        "is the only name there is",
+    )
     fact_count: int = Field(description="Facts qualified by this axis")
 
 
@@ -1711,10 +2188,21 @@ class DimensionCatalog(BaseModel):
         description="Tags that have at least one dimensional fact here; pass "
         "one as concept to sec_edgar_get_dimensional_facts"
     )
+    label_source: str | None = Field(
+        default=None,
+        description="File the labels were read from, inside this same filing. "
+        "None means either that labels were not requested or that the filing "
+        "carries no label linkbase; names are then tags only, never invented",
+    )
 
 
 class DimensionalFact(BaseModel):
     tag: str
+    tag_label: str | None = Field(
+        default=None,
+        description="Human-readable name of the tag, from the filing's own "
+        "label linkbase",
+    )
     dimensions: list[DimensionValue] = Field(
         description="Every axis qualifying this fact. More than one is normal - "
         "a figure can be segment AND geography at once, and treating such a "
@@ -1800,6 +2288,12 @@ class DimensionalFacts(BaseModel):
         description="Only filled when a single axis was requested; comparing a "
         "sum across mixed axes would double count",
     )
+    label_source: str | None = Field(
+        default=None,
+        description="File the labels were read from, inside this same filing. "
+        "None means either that labels were not requested or that the filing "
+        "carries no label linkbase; names are then tags only, never invented",
+    )
 
 
 def _olcu(inst: Instance, o: Olgu) -> tuple[Baglam, str | None]:
@@ -1863,10 +2357,17 @@ async def list_fact_dimensions(
         int,
         Field(default=25, ge=1, le=100, description="Maximum axes to return"),
     ] = 25,
+    include_labels: Annotated[
+        bool,
+        Field(default=True, description="Read the filing's label linkbase so "
+              "axes, members and tags carry human-readable names. It costs one "
+              "extra download - about 1 MB on a large annual report - so turn "
+              "it off when the tag names alone are enough"),
+    ] = True,
     ctx: Context | None = None,
 ) -> DimensionCatalog:
-    kayit, inst, url = await _dosyalama_ve_instance(
-        ticker, accession_number, form_type, ctx)
+    kayit, inst, url, etiket_haritasi, etiket_dosyasi = await _dosyalama_ve_instance(
+        ticker, accession_number, form_type, ctx, include_labels)
     adaylar = _etiket_cozumle(concept) if concept else None
 
     eksenler: dict[str, dict] = {}
@@ -1894,10 +2395,22 @@ async def list_fact_dimensions(
         returned=min(limit, len(sirali)),
         has_more=len(sirali) > limit,
         axes=[
-            AxisInfo(axis=eksen, members=sorted(v["uyeler"]), fact_count=v["sayi"])
+            AxisInfo(
+                axis=eksen,
+                axis_label=etiket_haritasi.bul(eksen),
+                members=sorted(v["uyeler"]),
+                # Etiketi COZULEN uye haritaya girer. Cozulmeyeni bos dizgeyle
+                # doldurmak, "bu uyenin adi yok" ile "adini bulamadim"i ayni
+                # gosterirdi.
+                member_labels={u: etiket_haritasi.bul(u) or ""
+                               for u in sorted(v["uyeler"])
+                               if etiket_haritasi.bul(u)},
+                fact_count=v["sayi"],
+            )
             for eksen, v in sirali[:limit]
         ],
         tags_with_dimensions=sorted(etiketler)[:60],
+        label_source=etiket_dosyasi,
     )
 
 
@@ -1951,10 +2464,17 @@ async def get_dimensional_facts(
         int,
         Field(default=40, ge=1, le=200, description="Maximum facts to return"),
     ] = 40,
+    include_labels: Annotated[
+        bool,
+        Field(default=True, description="Read the filing's label linkbase so "
+              "axes, members and tags carry human-readable names. It costs one "
+              "extra download - about 1 MB on a large annual report - so turn "
+              "it off when the tag names alone are enough"),
+    ] = True,
     ctx: Context | None = None,
 ) -> DimensionalFacts:
-    kayit, inst, url = await _dosyalama_ve_instance(
-        ticker, accession_number, form_type, ctx)
+    kayit, inst, url, etiket_haritasi, etiket_dosyasi = await _dosyalama_ve_instance(
+        ticker, accession_number, form_type, ctx, include_labels)
     adaylar = _etiket_cozumle(concept)
 
     def _son(q: str | None) -> str:
@@ -1995,8 +2515,11 @@ async def get_dimensional_facts(
             continue
         tumu.append(DimensionalFact(
             tag=o.tag,
+            tag_label=etiket_haritasi.bul(o.tag),
             dimensions=[DimensionValue(axis=b.axis, member=b.member,
-                                       typed_value=b.typed_value)
+                                       typed_value=b.typed_value,
+                                       axis_label=etiket_haritasi.bul(b.axis),
+                                       member_label=etiket_haritasi.bul(b.member))
                         for b in baglam.boyutlar],
             value=float(o.deger) if sayi_mi(o.deger) and o.deger else None,
             text_value=None if sayi_mi(o.deger) else o.deger,
@@ -2045,6 +2568,7 @@ async def get_dimensional_facts(
         has_more=eslesen > len(secilen),
         facts=secilen,
         reconciliation=_mutabakat(inst, cozulen_etiket, eksen_kumesi) if axis else [],
+        label_source=etiket_dosyasi,
     )
 
 
@@ -2120,7 +2644,7 @@ def _mutabakat(
 
 def main() -> None:
     # README "refuses to start without SEC_USER_AGENT" diyor; ilk surumde
-    # istemci TEMBEL kuruluyordu, yani sunucu aciliyor, dokuz araci ilan ediyor
+    # istemci TEMBEL kuruluyordu, yani sunucu aciliyor, on araci ilan ediyor
     # ve ancak ilk cagride patliyordu. Ortam degiskeni eksik bir konteyner her
     # canlilik kontrolunu geciyordu (15 Agu 2026'da bulundu). Iddia edilen
     # davranis burada gercek oluyor.

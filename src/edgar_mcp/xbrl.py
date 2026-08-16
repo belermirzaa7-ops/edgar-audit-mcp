@@ -235,6 +235,128 @@ def _doldur(inst: Instance, ayristirici) -> None:
             veri.clear()
 
 
+# --------------------------------------------------------------- etiketler
+# Dosyalamanin etiket linkbase'i (`<mnemonic>-<tarih>_lab.xml`) QName'leri
+# insan okunur adlara baglar. Bicim olculdu (15 Agu 2026,
+# tsla-20251231_lab.xml, 1.211.922 bayt) ve uc parcadan olusuyor:
+#   <link:loc      xlink:label="loc_tsla_BitcoinMember"
+#                  xlink:href="tsla-20251231.xsd#tsla_BitcoinMember"/>
+#   <link:labelArc xlink:from="loc_tsla_BitcoinMember" xlink:to="lab_tsla_BitcoinMember"
+#                  xlink:arcrole=".../concept-label"/>
+#   <link:label    xlink:label="lab_tsla_BitcoinMember"
+#                  xlink:role=".../label">Bitcoin [Member]</link:label>
+# Baglanti YAY uzerinden kuruluyor, `loc_`/`lab_` isimlendirmesine
+# GUVENILMIYOR: o bir uretici aliskanligi, spesifikasyonun kurali degil.
+#
+# Ayni elemanin birden fazla rolde etiketi olabiliyor (olculdu: srt:
+# RestatementAxis hem `label` hem `terseLabel` tasiyor). Standart rol
+# tercih ediliyor; `documentation` rolu ETIKET DEGIL tanim metnidir ve
+# bilincli olarak disarida.
+LINKBASE_NS = "http://www.xbrl.org/2003/linkbase"
+XLINK_NS = "http://www.w3.org/1999/xlink"
+
+_ROL_ONCELIK = (
+    "http://www.xbrl.org/2003/role/label",
+    "http://www.xbrl.org/2003/role/terseLabel",
+    "http://www.xbrl.org/2003/role/verboseLabel",
+)
+
+
+@dataclass
+class Etiketler:
+    """QName -> insan okunur etiket. Bos olabilir; o zaman ad QName kalir."""
+    qname: dict[str, str] = field(default_factory=dict)
+    # Onek uyusmazligina karsi yedek: yalnizca TEK anlamli yerel adlar.
+    # Iki farkli QName ayni yerel adi farkli etiketle tasiyorsa haritaya
+    # girmez - yanlis etiket, etiketsizlikten kotudur.
+    yerel: dict[str, str] = field(default_factory=dict)
+
+    def bul(self, ad: str | None) -> str | None:
+        if not ad:
+            return None
+        etiket = self.qname.get(ad)
+        if etiket:
+            return etiket
+        return self.yerel.get(ad.split(":")[-1])
+
+
+def _id_qname(eleman_id: str) -> str:
+    """`tsla_BitcoinMember` -> `tsla:BitcoinMember`.
+
+    Sema icindeki eleman kimligi oneki alt cizgiyle ayirir; QName iki nokta
+    ile. Ilk alt cizgi ayirac: `us-gaap_Revenues` dogru bolunur.
+    """
+    onek, _, ad = eleman_id.partition("_")
+    return f"{onek}:{ad}" if ad else eleman_id
+
+
+def _rol_sec(roller: dict[str, str]) -> tuple[int, str] | None:
+    for sira, rol in enumerate(_ROL_ONCELIK):
+        if roller.get(rol):
+            return sira, roller[rol]
+    return None
+
+
+def etiketleri_ayristir(govde: str) -> Etiketler:
+    """Etiket linkbase metni -> Etiketler. Bozuk dosya sessizce bos doner.
+
+    Neden sessiz: etiket bir SUS payi, veri degil. Linkbase okunamazsa dogru
+    davranis adlari QName olarak gostermeye devam etmek; cagriyi tumden
+    dusurmek, calisir bir cevabi kozmetik bir dosya yuzunden yok etmek olurdu.
+    """
+    konumlar: dict[str, str] = {}
+    kaynaklar: dict[str, dict[str, str]] = {}
+    yaylar: list[tuple[str, str]] = []
+
+    try:
+        for _, e in ET.iterparse(io.StringIO(govde), events=("end",)):
+            uri, ad = _yerel(e.tag)
+            if uri != LINKBASE_NS:
+                continue
+            if ad == "loc":
+                anahtar = e.get(f"{{{XLINK_NS}}}label") or ""
+                hedef = (e.get(f"{{{XLINK_NS}}}href") or "").partition("#")[2]
+                if anahtar and hedef:
+                    konumlar[anahtar] = hedef
+                e.clear()
+            elif ad == "label":
+                anahtar = e.get(f"{{{XLINK_NS}}}label") or ""
+                rol = e.get(f"{{{XLINK_NS}}}role") or ""
+                metin = " ".join("".join(e.itertext()).split())
+                if anahtar and rol and metin:
+                    kaynaklar.setdefault(anahtar, {})[rol] = metin
+                e.clear()
+            elif ad == "labelArc":
+                bas = e.get(f"{{{XLINK_NS}}}from") or ""
+                son = e.get(f"{{{XLINK_NS}}}to") or ""
+                if bas and son:
+                    yaylar.append((bas, son))
+                e.clear()
+    except ET.ParseError:
+        return Etiketler()
+
+    secilen: dict[str, tuple[int, str]] = {}
+    for bas, son in yaylar:
+        eleman = konumlar.get(bas)
+        roller = kaynaklar.get(son)
+        if not eleman or not roller:
+            continue
+        aday = _rol_sec(roller)
+        if aday is None:
+            continue
+        qad = _id_qname(eleman)
+        mevcut = secilen.get(qad)
+        if mevcut is None or aday[0] < mevcut[0]:
+            secilen[qad] = aday
+
+    out = Etiketler(qname={q: m for q, (_, m) in secilen.items()})
+    adaylar: dict[str, set[str]] = {}
+    for q, m in out.qname.items():
+        adaylar.setdefault(q.split(":")[-1], set()).add(m)
+    out.yerel = {k: next(iter(v)) for k, v in adaylar.items() if len(v) == 1}
+    return out
+
+
 _SAYI = re.compile(r"^-?\d+(\.\d+)?$")
 
 

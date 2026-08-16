@@ -21,6 +21,7 @@ DOSYALAR = [
     "src/edgar_mcp/server.py",
     "src/edgar_mcp/client.py",
     "arac/sir_tarama.py",
+    "arac/ortam.py",
     "src/edgar_mcp/belge.py",
     "src/edgar_mcp/xbrl.py",
     "Dockerfile",
@@ -121,8 +122,8 @@ ENJEKSIYONLAR = [
 
  ("Form turu filtresini kaldir (10-K istenince hepsi gelsin)",
   "src/edgar_mcp/server.py",
-  "if form_type and r[\"form\"][i] != form_type:",
-  "if False:",
+  "        if not _form_uyuyor(form, form_type):\n            continue",
+  "        if False:\n            continue",
   "test_filings_filter"),
 
  ("list_filings: limit kirpmasini kaldir",
@@ -242,7 +243,7 @@ ENJEKSIYONLAR = [
 
  ("list_filings: has_more'u sabit False yap",
   'src/edgar_mcp/server.py',
-  '        has_more=len(dosyalamalar) > limit or daha_eski,',
+  '        has_more=len(dosyalamalar) > limit or eksik_kaldi,',
   '        has_more=False,',
   'test_filings_sayfalama_bilgisi_verir'),
 
@@ -435,8 +436,8 @@ ENJEKSIYONLAR = [
 
  ("document parametresini yoksay (hep birincil belgeyi oku)",
   "src/edgar_mcp/server.py",
-  '    ad = document or kayit["primary_document"]',
-  '    ad = kayit["primary_document"]',
+  "    ad = document or birincil",
+  "    ad = birincil",
   "test_8k_govdesi_ekte_oldugunda_ek_okunabiliyor"),
 
  ("Olmayan belge adini dogrulamadan gec",
@@ -762,6 +763,160 @@ ENJEKSIYONLAR = [
   "        if _engel_sayfasi_mi(govde):",
   "        if False:",
   "test_200_ile_gelen_engel_sayfasi_dosyalama_metni_sanilmiyor"),
+
+ ("G: eski akislari okumayi sessizce atla",
+  "src/edgar_mcp/server.py",
+  "    if not eski_dahil:\n        return kayitlar, 0",
+  "    if True:\n        return kayitlar, 0",
+  "test_eski_akis_include_older_ile_birlesiyor"),
+
+ ("G: birlesik listeyi tarihe gore siralama",
+  "src/edgar_mcp/server.py",
+  "    kayitlar.sort(key=lambda f: f.filing_date, reverse=True)",
+  "    pass",
+  "test_eski_akis_include_older_ile_birlesiyor"),
+
+ ("G: okunmayan eski akis sayisini sifir bildir",
+  "src/edgar_mcp/server.py",
+  "    return kayitlar, max(0, len(dosyalar) - len(okunacak))",
+  "    return kayitlar, 0",
+  "test_eski_akis_siniri_sessiz_degil"),
+
+ ("G: form karsilastirmasini yine harfe duyarli yap",
+  "src/edgar_mcp/server.py",
+  "    return not istenen or form.upper() == istenen.upper()",
+  "    return not istenen or form == istenen",
+  "test_form_filtresi_buyuk_kucuk_harf_duyarsiz"),
+
+ ("G: ek akislari ana submissions onbellegine koy",
+  "src/edgar_mcp/client.py",
+  "        if ad not in self._extra_cache:\n            self._sinirla(self._extra_cache, ad,\n"
+  "                          await self._get(f\"{SEC_DATA}/submissions/{ad}\"), 4)\n"
+  "        return self._extra_cache[ad]",
+  "        if ad not in self._subs_cache:\n            self._sinirla(self._subs_cache, ad,\n"
+  "                          await self._get(f\"{SEC_DATA}/submissions/{ad}\"), 4)\n"
+  "        return self._subs_cache[ad]",
+  "test_eski_akis_ana_submissions_onbellegini_atmiyor"),
+
+ ("G: metin araci yine yalnizca recent akisina baksin",
+  "src/edgar_mcp/server.py",
+  "    dosyalar = list(sub.get(\"filings\", {}).get(\"files\") or [])[:EK_AKIS_SINIRI]",
+  "    dosyalar = []",
+  "test_metin_araci_eski_akistaki_dosyalamayi_okuyabiliyor"),
+
+ ("G: birincil belge bilinmezken bilinir gibi bildir",
+  "src/edgar_mcp/server.py",
+  "        primary_document_known=bool(birincil),",
+  "        primary_document_known=True,",
+  "test_metin_araci_eski_akistaki_dosyalamayi_okuyabiliyor"),
+
+ ("H: arama vurusunun belge adini erisim numarasindan ayirma",
+  "src/edgar_mcp/server.py",
+  "        acc, _, belge = str(vurus.get(\"_id\") or \"\").partition(\":\")",
+  "        acc, belge = str(vurus.get(\"_id\") or \"\"), \"\"",
+  "test_arama_vurusu_okunabilir_adrese_cevriliyor"),
+
+ ("H: alt sinir sayisini kesin say",
+  "src/edgar_mcp/server.py",
+  "        kesin = str(sayac.get(\"relation\") or \"eq\") == \"eq\"",
+  "        kesin = True",
+  "test_arama_alt_sinir_kesin_sayi_gibi_sunulmuyor"),
+
+ ("H: bos sonucta kapsam notunu sus",
+  "src/edgar_mcp/server.py",
+  "    if not kayitlar:\n        not_ = _KAPSAM_YOK",
+  "    if False:\n        not_ = _KAPSAM_YOK",
+  "test_arama_bos_sonucta_kapsam_notu_veriyor"),
+
+ ("H: hata govdesini bos sonuc say",
+  "src/edgar_mcp/server.py",
+  "    if not isinstance(kume, dict):",
+  "    if False:",
+  "test_arama_hata_govdesi_bos_sonuc_sanilmiyor"),
+
+ ("H: tarih dogrulamasini kaldir (SEC sessizce yok sayar)",
+  "src/edgar_mcp/server.py",
+  "    if not _ISO_TARIH.match(d):",
+  "    if False:",
+  "test_arama_gecersiz_tarih_sessizce_yok_sayilmiyor"),
+
+ ("H: ticker cozulemeyen vurusu at",
+  "src/edgar_mcp/server.py",
+  "        kayitlar.append(SearchedDocument(",
+  "        if not cik or not cik.startswith(\"000131\"):\n            continue\n        kayitlar.append(SearchedDocument(",
+  "test_arama_ticker_cozulemeyen_vurusu_gizlemiyor"),
+
+ ("J: .env okurken BOM'u yutma",
+  "arac/ortam.py",
+  '        metin = yol.read_text(encoding="utf-8-sig")',
+  '        metin = yol.read_text(encoding="utf-8")',
+  "test_env_yukleyici_bom_lu_dosyayi_okuyor"),
+
+ ("J: dotenv yoksa yine sessizce gec",
+  "arac/ortam.py",
+  "    except ImportError:\n        pass\n    else:",
+  "    except ImportError:\n        return\n    else:",
+  "test_env_yukleyici_bagimlilik_olmadan_da_yukluyor"),
+
+ ("J: .env kabuktaki degiskeni ezsin",
+  "arac/ortam.py",
+  "            os.environ.setdefault(cift[0], cift[1])",
+  "            os.environ[cift[0]] = cift[1]",
+  "test_env_yukleyici_mevcut_degiskeni_ezmiyor"),
+
+ ("I: etiket rol sirasinda kisa etiketi one al",
+  "src/edgar_mcp/xbrl.py",
+  "    \"http://www.xbrl.org/2003/role/label\",\n    \"http://www.xbrl.org/2003/role/terseLabel\",",
+  "    \"http://www.xbrl.org/2003/role/terseLabel\",\n    \"http://www.xbrl.org/2003/role/label\",",
+  "test_eksen_ve_uye_adlari_insan_okunur_geliyor"),
+
+ ("I: dokumantasyon metnini de etiket say",
+  "src/edgar_mcp/xbrl.py",
+  "_ROL_ONCELIK = (\n    \"http://www.xbrl.org/2003/role/label\",",
+  "_ROL_ONCELIK = (\n    \"http://www.xbrl.org/2003/role/documentation\",\n    \"http://www.xbrl.org/2003/role/label\",",
+  "test_fact_etiketleri_dokumantasyon_metnini_kullanmiyor"),
+
+ ("I: yay yerine loc_/lab_ isimlendirmesine guven",
+  "src/edgar_mcp/xbrl.py",
+  "    for bas, son in yaylar:",
+  "    for bas, son in yaylar + [(k, \"lab\" + k[3:]) for k in konumlar]:",
+  "test_etiketi_olmayan_ad_uydurulmuyor"),
+
+ ("I: cok anlamli yerel adi da haritaya koy",
+  "src/edgar_mcp/xbrl.py",
+  "    out.yerel = {k: next(iter(v)) for k, v in adaylar.items() if len(v) == 1}",
+  "    out.yerel = {k: sorted(v)[0] for k, v in adaylar.items()}",
+  "test_etiket_ayristirici_cok_anlamli_yerel_adi_tahmin_etmiyor"),
+
+ ("I: bozuk linkbase'de cagriyi dusur",
+  "src/edgar_mcp/xbrl.py",
+  "    except ET.ParseError:\n        return Etiketler()",
+  "    except ET.ParseError:\n        raise",
+  "test_etiket_ayristirici_bozuk_xml_de_cokmuyor"),
+
+ ("I: etiket istenmese de linkbase'i indir",
+  "src/edgar_mcp/server.py",
+  "    if etiket_iste:\n        await _ilerleme(ctx, 2, adim_sayisi, \"Downloading the label linkbase\")",
+  "    if True:\n        await _ilerleme(ctx, 2, adim_sayisi, \"Downloading the label linkbase\")",
+  "test_etiket_istenmediginde_indirilmiyor"),
+
+ ("I: etiket onbellegini kaldir",
+  "src/edgar_mcp/server.py",
+  "        if url not in _ETIKET:",
+  "        if True:",
+  "test_etiket_dosyasi_ayni_cagrida_iki_kez_indirilmiyor"),
+
+ ("I: etiket dosyasi yoksa cagriyi dusur",
+  "src/edgar_mcp/server.py",
+  "    return BOS_ETIKET, None",
+  "    raise ValueError(\"This filing carries no label linkbase.\")",
+  "test_etiket_dosyasi_yokken_calismaya_devam_ediyor"),
+
+ ("I: cozulemeyen uyeyi bos etiketle doldur",
+  "src/edgar_mcp/server.py",
+  "                               if etiket_haritasi.bul(u)},",
+  "                               },",
+  "test_eksen_ve_uye_adlari_insan_okunur_geliyor"),
 ]
 
 

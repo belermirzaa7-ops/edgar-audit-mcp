@@ -25,6 +25,7 @@ Kullanim:
     python arac/tani.py --tarama               # kac sirket etkileniyor
     python arac/tani.py TSLA --envanter        # companyfacts'te NE VAR (taksonomiler)
     python arac/tani.py TSLA --ixbrl           # fact id'leri inline belgeye kadar izleniyor mu
+    python arac/tani.py TSLA --etiket          # etiket linkbase'i GERCEK dosyada cozuluyor mu
 """
 from __future__ import annotations
 
@@ -305,6 +306,82 @@ async def _tarama(c: EdgarClient, tag: str) -> int:
     return 1 if bos else 0
 
 
+async def _etiket(c: EdgarClient, ticker: str) -> int:
+    """Etiket ayristiricisini GERCEK bir linkbase dosyasina karsi olcer.
+
+    Neden ayri bir mod: `etiketleri_ayristir` mock'la yesil - ama mock'u ben
+    yazdim ve yapisini canli olctugum bir ORNEKTEN turettim, dosyanin
+    tamamindan degil (P-4: mock, yazarinin varsayimini dogrular). Bu mod
+    dosyanin tamamini indirir, kac QName cozuldugunu ve dosyalamada FIILEN
+    kullanilan eksen/uyelerin kacinin etiketlendigini sayar. Cozulme orani
+    dusukse sorun ayristiricidadir; sifirsa dosya baska bir yapidadir.
+    """
+    from edgar_mcp.xbrl import ayristir, etiketleri_ayristir
+
+    cik = await c.cik_for_ticker(ticker)
+    sub = await c.submissions(cik)
+    r = sub.get("filings", {}).get("recent", {})
+    i = next((k for k in range(len(r.get("form", []))) if r["form"][k] == "10-K"), None)
+    if i is None:
+        print(f"{ticker} icin son dosyalamalar arasinda 10-K yok.")
+        return 1
+
+    erisim = r["accessionNumber"][i]
+    dizin = (f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+             f"{erisim.replace('-', '')}")
+    print(f"Dosyalama: {erisim}  ({r['filingDate'][i]})")
+
+    veri = await c.filing_index(dizin)
+    ogeler = (veri.get("directory") or {}).get("item", [])
+    lab = next((str(x.get("name", "")) for x in ogeler
+                if str(x.get("name", "")).lower().endswith("_lab.xml")), None)
+    if lab is None:
+        print("  Bu dosyalamada etiket linkbase'i (*_lab.xml) YOK.")
+        print("  Beklenen davranis: adlar QName olarak doner, label_source null.")
+        return 1
+    boyut = next((str(x.get("size", "")) for x in ogeler
+                  if str(x.get("name", "")) == lab), "")
+    print(f"  linkbase: {lab}  ({boyut} bayt)")
+
+    etiketler = etiketleri_ayristir(await c.filing_document(f"{dizin}/{lab}"))
+    print(f"  cozulen QName sayisi: {len(etiketler.qname)}")
+    print(f"  tek anlamli yerel ad: {len(etiketler.yerel)}")
+    ornek = list(etiketler.qname.items())[:5]
+    for q, m in ornek:
+        print(f"    {q} -> {m}")
+
+    instance = next((str(x.get("name", "")) for x in ogeler
+                     if str(x.get("name", "")).lower().endswith("_htm.xml")), None)
+    if instance is None:
+        print("\n  instance (*_htm.xml) yok; kullanim orani olculemedi.")
+        return 0
+
+    inst = ayristir(await c.filing_document(f"{dizin}/{instance}"))
+    eksenler, uyeler = set(), set()
+    for o in inst.boyutlu():
+        for b in inst.baglamlar[o.context_id].boyutlar:
+            eksenler.add(b.axis)
+            if b.member:
+                uyeler.add(b.member)
+
+    def oran(kume: set) -> str:
+        if not kume:
+            return "0/0"
+        bulunan = sum(1 for x in kume if etiketler.bul(x))
+        return f"{bulunan}/{len(kume)}  ({bulunan / len(kume):.0%})"
+
+    print(f"\n  dosyalamada kullanilan eksenlerin etiketlenmesi: {oran(eksenler)}")
+    print(f"  dosyalamada kullanilan uyelerin etiketlenmesi:    {oran(uyeler)}")
+    eksik = sorted(x for x in eksenler | uyeler if not etiketler.bul(x))[:10]
+    if eksik:
+        print(f"  etiketi bulunamayanlardan ornek: {eksik}")
+    print("\nYORUM:")
+    print("  Yuksek oran: ayristirici gercek dosyada calisiyor, adlar okunur.")
+    print("  Dusuk oran: yay/rol okumasi ya da onek turetimi bu dosyada tutmuyor -")
+    print("  duzeltilene kadar `include_labels` varsayilani sorgulanmali.")
+    return 0
+
+
 async def _ixbrl(c: EdgarClient, ticker: str) -> int:
     """Kaynak zincirinin son halkasini olcer: SEC'in ayikladigi instance'taki
     `id="f-..."` degerleri, DOSYALAYANIN kendi inline belgesindeki isaretli
@@ -378,7 +455,7 @@ async def _ixbrl(c: EdgarClient, ticker: str) -> int:
 async def main() -> int:
     argv = [a for a in sys.argv[1:] if not a.startswith("--")]
     bayraklar = {a for a in sys.argv[1:] if a.startswith("--")}
-    if bayraklar - {"--matris", "--tarama", "--envanter", "--ixbrl"}:
+    if bayraklar - {"--matris", "--tarama", "--envanter", "--ixbrl", "--etiket"}:
         print(__doc__)
         return 2
 
@@ -389,6 +466,16 @@ async def main() -> int:
         c = EdgarClient()
         try:
             return await _tarama(c, argv[0] if argv else "Assets")
+        finally:
+            await c.aclose()
+
+    if "--etiket" in bayraklar:
+        if len(argv) != 1:
+            print("KULLANIM: python arac/tani.py TICKER --etiket")
+            return 2
+        c = EdgarClient()
+        try:
+            return await _etiket(c, argv[0])
         finally:
             await c.aclose()
 

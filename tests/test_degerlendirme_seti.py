@@ -22,7 +22,7 @@ def _ciftler() -> list[ET.Element]:
 
 def test_xml_gecerli_ve_beklenen_sayida_soru_var():
     ciftler = _ciftler()
-    assert len(ciftler) == 18, f"18 soru bekleniyordu, {len(ciftler)} var"
+    assert len(ciftler) == 19, f"19 soru bekleniyordu, {len(ciftler)} var"
 
 
 def test_her_arac_degerlendirme_setinde_temsil_ediliyor():

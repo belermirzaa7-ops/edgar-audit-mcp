@@ -16,6 +16,11 @@
   tool calls were executed against the live API later the same day, once the
   build was installed, and the recorded figures below are what they returned.
 
+  Question 19, covering the full-text search tool added on 15 Aug 2026, was
+  measured the same day by fetching the endpoint the tool calls
+  (https://efts.sec.gov/LATEST/search-index) directly and reading every hit it
+  returned.
+
   Design rules applied to each question:
     - answerable only through the tools, not from general knowledge
     - needs more than one tool call
@@ -240,6 +245,24 @@
       sentence is from https://www.sec.gov/search-filings/edgar-application-programming-interfaces
       — SEC does not use the word "dimensional", so the conclusion drawn from it is
       supported inference rather than a direct statement.
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Searching the full text of Tesla's 10-K filings for the word tariff, how many documents does SEC's index match, which of them was filed first, and is that first document the annual report itself?</question>
+    <answer>Twelve documents match, and SEC reports that count as exact rather than as a lower bound. The oldest was filed on 27 February 2012 under accession 0001193125-12-081990: the file d279413dex1050.htm, which SEC describes as "SUPPLY AGREEMENT". It is an exhibit inside a 10-K submission, not the annual report itself — the match is a document, not a filing. The eleven other matches are the annual reports for fiscal years 2015 through 2025 with the exception of fiscal years 2012, 2013 and 2014, whose reports are absent from the result.</answer>
+    <verification>
+      sec_edgar_search_filings(query="\"tariff\"", form_type="10-K", ticker="TSLA", limit=100)
+        -> total_matching = 12, total_is_exact = true
+        -> the hit with the earliest filing_date is
+           accession_number 0001193125-12-081990, document d279413dex1050.htm,
+           filing_date 2012-02-27, description "SUPPLY AGREEMENT"
+      Measured 15 Aug 2026 by fetching
+      https://efts.sec.gov/LATEST/search-index?q=%22tariff%22&amp;forms=10-K&amp;ciks=0001318605
+      directly and reading all twelve hits; the identifiers and dates above are quoted
+      from that response, in which hits.total was {"value":12,"relation":"eq"}.
+      This answer moves as Tesla files further annual reports that use the word, so the
+      count is the part to re-measure before treating a mismatch as a regression.
     </verification>
   </qa_pair>
 

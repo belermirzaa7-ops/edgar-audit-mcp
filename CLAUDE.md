@@ -886,3 +886,126 @@ Yedi yeni enjeksiyon dogruluyor. Determinizm testi digerlerinden farkli
 calisiyor: bes ayri ALT SUREC baslatip farkli `PYTHONHASHSEED` degerleriyle
 ayni girdiyi cevirtiyor ve bes ciktinin ayni olmasini sart kosuyor - bu hata
 sinifi tek surecin icinden gorunmuyor.
+
+### KK-35: Uc kor nokta kapatildi - tam metin arama, eski dosyalama akislari, etiketler
+
+15 Agu 2026. Aracin yapabildikleri sayilirken yedi sinir yazilmisti; bunlarin
+uc tanesi ayni gun kapatildi. Ucu de "veri yok" degil "veriye giden yol yok"
+sinifindaydi.
+
+**1. Tam metin arama (`sec_edgar_search_filings`).** Sunucu bir sirketi
+ADIYLA sorabiliyordu ama bir IFADEYI soramiyordu: "hangi sirketler gumruk
+tarifesinden bahsetti" cevapsizdi. EDGAR'in tam metin ucu
+(`efts.sec.gov/LATEST/search-index`) bunu veriyor. Olculen sozlesme:
+
+- Yanit Elasticsearch bicimli. Bir vurusun `_id` alani
+  `0001193125-12-081990:d279413dex1050.htm` - yani **erisim numarasi ve belge
+  adi birlikte**. Ikisi de `read_filing_text`'in parametreleri; ayirmadan
+  dondurmek modele islenmemis bir dizge birakirdi.
+- **Vurus dosyalama degil BELGEDIR.** Olculen ornekte Tesla'nin en eski
+  "tariff" esleşmesi 10-K'nin kendisi degil, icindeki bir EK ("SUPPLY
+  AGREEMENT"). Bunu soylemeyen bir arac aciklamasi, modeli yillik raporda
+  olmayan bir cumleyi aramaya gonderirdi.
+- `hits.total.relation` `eq` degil `gte` olabiliyor: sayi bir ALT SINIR.
+  `total_is_exact` alani bu ayrimi tasiyor.
+- `from + size <= 10000`. Asildiginda SEC sonuc degil hata GOVDESI donuyor
+  ("Result window is too large..."). Bu yuzden `offset` semada 9900'de
+  sinirli ve `hits` icermeyen govde bos sonuc degil hata sayiliyor.
+
+**Kaynaklar arasi celiski, kayda geciriliyor.** SEC kendi sayfasinda
+(sec.gov/edgar/search/, 15 Agu 2026) "the full text of electronic filings since
+2001" diyor. Olcum bunu tam dogrulamiyor: 1996-2000 araligindaki 10-K'larda
+"revenue" aramasi 14 sonuc dondu (en eskisi 1999-03-31). Yani 2001 oncesinden
+de birkac belge indekste var, ama sayi bir taramayi tasiyacak buyuklukte degil.
+Dogru ifade "2001 oncesi yok" degil, "2001 oncesi icin SIFIR SONUC hicbir sey
+kanitlamaz". Bu, sonucu bos donen ya da 2001 oncesine uzanan her cagrida
+`coverage_note` olarak yanitin icinde gidiyor - README'de degil, cunku modelin
+okudugu yer yanit.
+
+**2. Eski dosyalama akislari (`include_older`).** SEC `filings.recent` alanini
+~1000 dosyalamada kesip gerisini `filings.files[]` altindaki ayri JSON'lara
+koyuyor. Olculdu: TSLA'nin recent akisi 1.053 kayitla ancak 2018-05-07'ye
+iniyor, tek ek dosyasi 1.096 kayitla 2005-02-17'ye. Yani "son dosyalamalar"
+aktif bir dosyalayanda son BIRKAC YIL demek. Onceki surum bu akislarin
+varligini bildiriyordu ama okuyamiyordu.
+
+Olculen ve koda giren ayrintilar:
+- Ek dosyalar ust duzeyde `recent` ile **ayni paralel dizi bicimini** tasiyor,
+  saran nesne yok.
+- `primaryDocument` anahtari bulunmayabiliyor. Bu yuzden `Filing.
+  primary_document_url` artik `None` olabiliyor ve `read_filing_text` birincil
+  belge adini bilmedigi dosyalamada en buyuk okunabilir dosyayi seciyor -
+  **ve bunu `primary_document_known: false` ile soyluyor.** 14 Agu 2026'da
+  "en buyuk dosya icerigi tasir" varsayimini olcup yanlislamistim; ayni
+  varsayimi sessizce geri getirmemek icin isaret alani sart.
+- En fazla dort ek dosya okunuyor (~5000 dosyalama). Sinir SESSIZ DEGIL:
+  `older_feeds_skipped` okunmayanlari sayiyor.
+- Birlesik liste tarihe gore siralaniyor; iki akisin kendi ic sirasi
+  birlestirildiginde dogru sirayi vermez.
+- `_dosyalama_bul` da eski akislari tariyor. Aksi halde arac kendi
+  dondurdugu erisim numarasini okumayi reddederdi.
+- Ek akislar AYRI onbellekte (`_extra_cache`). Paylasilan onbellekte dort ek
+  dosya, 1-2 MB'lik ana submissions kaydini disari atiyordu.
+- Form turu karsilastirmasi artik buyuk/kucuk harf duyarsiz: `10-k` yazan bir
+  cagri eskiden bos liste donuyordu, yani "bu sirket hic 10-K vermemis".
+
+**3. Insan okunur adlar (etiket linkbase'i).** `tsla:OperatingLeaseVehicles
+Member` gibi QName'ler dosyalamanin kendi etiket linkbase'inde
+(`*_lab.xml`) insan okunur karsiliklariyla duruyor. Olculen yapi (TSLA FY2025,
+1.211.922 bayt): `link:loc` QName'i, `link:label` metni tasiyor, ikisini
+`link:labelArc` **bagliyor**. Kod bu yayi okuyor; `loc_`/`lab_`
+isimlendirmesine GUVENMIYOR - o bir uretici aliskanligi, spesifikasyon kurali
+degil (bir enjeksiyon tam bu kestirmeyi deniyor ve test kirmizi donuyor).
+
+- Ayni eleman birden fazla rolde etiketli olabiliyor; standart rol tercih
+  ediliyor, `documentation` rolu (tanim paragrafi) bilincli olarak disarida.
+- Onek uyusmazligina karsi yalnizca TEK ANLAMLI yerel adlar yedek olarak
+  kullaniliyor. Iki farkli QName ayni yerel adi farkli etiketle tasiyorsa
+  hicbir sey secilmiyor: yanlis etiket, etiketsizlikten kotudur.
+- Etiket bir SUS PAYIDIR: linkbase yoksa ya da bozuksa adlar QName olarak
+  donmeye devam ediyor, cagri dusmuyor. `label_source` etiketlerin hangi
+  dosyadan geldigini (ya da gelmedigini) soyluyor.
+- Maliyet gercek: olculen dosyada instance 2,68 MB, linkbase 1,21 MB - yani
+  yaklasik yarim kat. Bu yuzden `include_labels` kapatilabilir.
+
+**Olculmemis olan, acikca:** ayristirici GERCEK bir linkbase dosyasina karsi
+bu makinede calistirilamadi (konteynerden sec.gov'a dogrudan cikis yok; yapisi
+canli olctugum ORNEKLERDEN turetildi). Bunun icin `arac/tani.py TICKER
+--etiket` modu eklendi: dosyanin tamamini indirip kac QName cozuldugunu ve
+dosyalamada fiilen kullanilan eksen/uyelerin kacinin etiketlendigini sayiyor.
+Oran dusuk cikarsa duzeltilecek yer ayristiricidir - ve `include_labels`
+varsayilani yeniden dusunulmelidir.
+
+Yirmi iki yeni enjeksiyon bu uc grubun korumalarini dogruluyor.
+
+### KK-36: `.env` yuklemesi sessizce hicbir sey yapabiliyordu
+
+15 Agu 2026, v33 kurulumu sirasinda. Iki ayri kusur ust uste bindi ve
+kullaniciya tek bir yanlis belirti gosterdi: "SEC_USER_AGENT ... is required".
+
+**1. Guncelleme komutu `.env`i sildi.** Verdigim `robocopy ... /MIR /XD .git
+.venv __pycache__ ...` satiri klasorleri hariç tutuyordu ama dosyalari degil.
+`/MIR` hedefte fazladan duran her dosyayi siler; `.env` gitignore'da oldugu icin
+kaynakta yoktu. Cikti bunu `*EXTRA File 449 ...\.env` diye yazmisti, yani
+sessiz bile degildi - okunmadi. Duzeltme komut tarafinda: `/XF .env`.
+
+**2. Dosya geri konunca da okunmadi.** `arac/ortam.py` `python-dotenv` yoksa
+`return` ediyordu. Bagimlilik gercekten opsiyonel (sunucu ortami kendisini
+calistiran uygulamadan alir - KK-11), ama opsiyonel olan sey bagimliliktir,
+YUKLEMENIN KENDISI degil. Iki bagimsiz durum ayni sessiz yola cikiyor:
+sanal ortam disindaki Python ile calistirmak, ve PowerShell'in
+`Out-File -Encoding utf8` komutunun dosya basina BOM koymasi (ilk anahtar
+`﻿SEC_USER_AGENT` olarak okunur ve hicbir zaman eslesmez).
+
+Yukleyici artik kendi bagimliliksiz ayristiricisini tasiyor, `utf-8-sig` ile
+cozuyor ve `setdefault` semantigi kullaniyor - kabukta elle verilmis bir
+degisken dosyadaki eski degerle ezilmiyor.
+
+**Ic denetimden cikan ayrica bir ders.** Ilk yazimda BOM'u IKI yerde ele
+almistim: hem `utf-8-sig` ile hem satir ayristiricisinda `lstrip`. Enjeksiyon
+harness'i encoding korumasini `KORUMASIZ` diye raporladi - cunku birini bozmak
+otekini devrede biraktigi icin hicbir test kirmiziya donmuyordu. Yedeklilik
+burada guvenlik degil, olculemezlik uretiyor. `lstrip` kaldirildi; BOM tek
+yerde, ve o yer artik sinaniyor.
+
+P-30 olarak kayda gecti. Uc yeni enjeksiyon dogruluyor.

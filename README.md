@@ -28,7 +28,8 @@ answers. The interesting part of this project is handling them.
 | Tool | Purpose |
 |---|---|
 | `sec_edgar_get_company_profile` | Ticker → CIK, registrant name, SIC industry, fiscal year end |
-| `sec_edgar_list_filings` | Recent filings with links, filterable by form type |
+| `sec_edgar_list_filings` | A company's filings with links, filterable by form type; reaches past SEC's ~1000-entry recent feed with `include_older` |
+| `sec_edgar_search_filings` | Full-text search across every filer — finds the filings that contain a phrase, down to the exhibit that carries it |
 | `sec_edgar_get_concept_series` | Time series for one financial concept |
 | `sec_edgar_get_fact_revisions` | How a reported figure changed across filings — restatements, with the accession number of each change |
 | `sec_edgar_read_filing_text` | The narrative XBRL does not carry: MD&A, risk factors, the tax and segment notes — including 8-K exhibits and in-filing search |
@@ -165,6 +166,71 @@ in the filer's own document, not just a row in SEC's extraction. Filings from be
 for smaller ones) carry a filer-submitted instance instead, and that is read
 instead.
 
+### Searching the text of every filer
+
+`sec_edgar_search_filings` goes the other way round from the tools above: it
+starts from a phrase, not from a company. It queries EDGAR's full-text index,
+so a question like "which filers discussed a tariff in an annual report" has an
+answer that does not depend on knowing the company first.
+
+Three things about it are worth stating plainly, because all three change how
+the result should be read:
+
+- **A hit is a document, not a filing.** Measured on 15 Aug 2026: the oldest
+  match for *tariff* in Tesla's annual reports is not a 10-K at all but an
+  exhibit inside one, a supply agreement. Results therefore carry both the
+  accession number and the file name, and both go straight into
+  `sec_edgar_read_filing_text`.
+- **The total can be a lower bound.** SEC reports large result counts with a
+  `gte` relation rather than a count; `total_is_exact` says which one arrived.
+- **Coverage starts around 2001, and an empty result proves little before
+  that.** SEC's own page says the index holds filings "since 2001". A measured
+  search of 1996-2000 annual reports for a word as common as *revenue* returned
+  14 filings, the oldest dated 1999-03-31 — so a few older documents are
+  indexed and most are not. The response says so itself: a search that returns
+  nothing, or that reaches before 2001, comes back with a `coverage_note`
+  rather than a bare zero.
+
+The endpoint refuses to page past 10000 ranked results, which the schema
+declares as a bound on `offset` instead of leaving the model to discover it
+through an error.
+
+### Filings older than the recent feed
+
+SEC's `submissions` endpoint caps its recent-filings feed at roughly a thousand
+entries and moves the rest into separate files. For an active filer that cap is
+not a long history: Tesla's recent feed holds 1,053 filings and reaches back
+only to May 2018, while its one older file holds 1,096 more going back to
+February 2005 (measured 15 Aug 2026).
+
+`sec_edgar_list_filings` reads the recent feed by default and says whether more
+exists. Pass `include_older` and it reads the older feeds too, merges them and
+sorts by date. It reads at most four of them and reports how many it skipped,
+because a bound nobody mentions reads as completeness. Older feeds do not
+always name a primary document, so `primary_document_url` can be null; when
+the filing is then opened by accession number, the tool picks the largest
+readable file and marks the choice as a guess with `primary_document_known:
+false` rather than presenting it as SEC's designation.
+
+### Human-readable names for tags and members
+
+`tsla:OperatingLeaseVehiclesMember` is a name a filing uses, not a name a person
+would write. The filing itself carries the translation, in its label linkbase
+(`*_lab.xml`), and the dimension tools read it: axes, members and tags come back
+with `axis_label`, `member_label` and `tag_label` next to the tags themselves.
+
+The linkbase links a name to a label through an *arc*, and the code follows the
+arc rather than the `loc_`/`lab_` naming convention that generators happen to
+use — a fault injection takes the shortcut and the test turns red. Where an
+element carries labels in several roles the standard one wins, and the
+`documentation` role, which is a definition paragraph rather than a name, is
+never used as one. Nothing is invented: an element the filing does not label
+comes back as its tag, and `label_source` names the file the labels came from,
+or is null when the filing has no linkbase at all.
+
+Labels cost one extra download — 1.21 MB against a 2.68 MB instance on Tesla's
+FY2025 annual report — so `include_labels` turns them off.
+
 ## Three traps this server handles
 
 ### 1. `fy` is the filing's year, not the data's year
@@ -266,6 +332,7 @@ python dogrula.py          # live verification against real SEC data
 python arac/tani.py KO Assets           # inspect one raw SEC concept response
 python arac/tani.py KO Assets --matris   # same data under varied conditions, to isolate a cause
 python arac/tani.py --tarama             # how many companies are affected
+python arac/tani.py TSLA --etiket        # does the label parser resolve a real linkbase
 ```
 
 ### Fault injection
@@ -312,7 +379,7 @@ companies with calendar-year, ending-year and starting-year fiscal conventions.
 
 ### Evaluation set
 
-[`evaluation/questions.xml`](evaluation/questions.xml) holds eighteen questions that
+[`evaluation/questions.xml`](evaluation/questions.xml) holds nineteen questions that
 can only be answered by calling the tools: cross-company fiscal year labels,
 tag merges across an accounting standard change, ratios that need two series,
 and the pagination fields. Every answer was produced by running the tools
@@ -320,7 +387,7 @@ against live SEC data and reading the result — none is written from memory —
 and each question records the exact calls used, so the measurement can be
 repeated instead of trusted.
 
-A test keeps the file structurally honest: eighteen pairs, every pair carrying a
+A test keeps the file structurally honest: nineteen pairs, every pair carrying a
 question, an answer and a verification block, every tool it names actually
 existing on the server, and no question anchored to "the latest" period.
 

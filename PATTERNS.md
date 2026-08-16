@@ -41,6 +41,8 @@ can verify rather than remember.
 | [P-26](#p-26) | Am I treating a breakdown and its total as arithmetic that must agree? | `test_tutmayan_toplam_gizlenmiyor`, `test_raporlanmayan_toplam_sifir_sanilmiyor` |
 | [P-27](#p-27) | Does a bound I added for display leak into a number I compute? | `test_mutabakat_sayfalama_sinirindan_etkilenmiyor` |
 | [P-28](#p-28) | Does any behaviour depend on the iteration order of a set? | `test_metin_cikarimi_surecten_surece_ayni_sonucu_veriyor` |
+| [P-29](#p-29) | Does a filter compare strings the caller wrote by hand, and does a miss look like an empty answer? | `test_form_filtresi_buyuk_kucuk_harf_duyarsiz` |
+| [P-30](#p-30) | Does a missing optional dependency turn a loader into a silent no-op? | `test_env_yukleyici_bagimlilik_olmadan_da_yukluyor`, `test_env_yukleyici_bom_lu_dosyayi_okuyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -765,6 +767,72 @@ nobody thought to look at, and with a coin flip attached. The server's own
 description says "deterministic tool calls"; for one process in four it was not
 true. Worth generalising: a set literal is a claim that order does not matter.
 If order does matter, the container is wrong, not the loop.
+
+---
+
+<a id="p-29"></a>
+### P-29 · A filter compares a string the caller typed, and a miss is indistinguishable from an empty answer
+
+**Symptom.** `sec_edgar_list_filings(ticker="AAPL", form_type="10-k")` returned
+`filings: [], total_matching: 0, has_more: false` — a well-formed, confident,
+empty answer. The same call with `10-K` returned the annual reports. Nothing in
+the response said the filter had matched nothing rather than the company having
+filed nothing.
+
+**Root cause.** The form filter compared the caller's string to SEC's with `!=`.
+SEC writes form types in upper case, so any other casing matched no row. The
+failure is worse than a wrong result because the shape of the response is the
+same as a true negative: a model reading it concludes "this company has no 10-K".
+
+**Detection.** Comparison is now case-insensitive on both sides, in one helper
+used by every place that filters by form. Amendments stay excluded — `10-K/A`
+is not `10-K`, and that is a different filing, not a casing difference. A fault
+injection restores the case-sensitive comparison and the test turns red. The
+general rule: whenever a filter can silently produce nothing, the empty result
+must be either impossible by construction or explained in the response. Guard:
+`test_form_filtresi_buyuk_kucuk_harf_duyarsiz`.
+
+**Incident.** 15 Aug 2026, found while extending the same function to read
+SEC's older filing feeds. The comparison had been in place since the first
+version of the tool and no test had ever passed it anything but `10-K` — the
+suite only ever repeated the author's own spelling.
+
+---
+
+<a id="p-30"></a>
+### P-30 · An optional dependency makes the loader optional too
+
+**Symptom.** `arac/tani.py` stopped with `SEC_USER_AGENT environment variable is
+required`. The `.env` file holding that variable was present, correctly spelled
+and in the right directory. The error named the variable, so it read as a
+configuration problem on the user's side rather than as a file that was never
+opened.
+
+**Root cause.** The loader imported `python-dotenv` and returned on
+`ImportError`. The dependency is genuinely optional — the MCP server takes its
+environment from whatever launches it — but the *loading* was made optional
+along with it. Two unrelated situations reached that same silent path: running
+the script with an interpreter outside the virtual environment, where the
+package is absent, and a `.env` written by PowerShell's `Out-File -Encoding
+utf8`, which prepends a byte-order mark so the first key parses as
+`﻿SEC_USER_AGENT` and never matches.
+
+**Detection.** The loader now carries its own dependency-free parser, decodes
+with `utf-8-sig` so a BOM is consumed, and uses `setdefault` so a variable
+already exported in the shell is never overwritten by a stale file. BOM
+handling lives in exactly one place: an earlier version also stripped the mark
+inside the line parser, and fault injection reported the encoding guard as
+`KORUMASIZ` — two mechanisms for one property mean neither is tested. Guards:
+`test_env_yukleyici_bagimlilik_olmadan_da_yukluyor`,
+`test_env_yukleyici_bom_lu_dosyayi_okuyor`,
+`test_env_yukleyici_mevcut_degiskeni_ezmiyor`.
+
+**Incident.** 15 Aug 2026, after an update copied with `robocopy /MIR` deleted
+the `.env` file — `/MIR` removes anything the source does not have, and the
+command excluded directories but not files. Recreating the file did not fix the
+error, which is what exposed the loader. Both halves are the same lesson: a step
+that can quietly do nothing will eventually do nothing quietly at the worst
+moment.
 
 ---
 
