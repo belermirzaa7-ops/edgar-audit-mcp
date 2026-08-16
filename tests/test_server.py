@@ -663,6 +663,11 @@ def handler(request: httpx.Request) -> httpx.Response:
     if "-submissions-" in u:            # eski akis dosyasi
         return httpx.Response(200, json=EK_SUBS)
     if "/submissions/" in u:
+        # Var olmayan CIK'e SEC 404 doner. Sahte veri her CIK'e ayni yaniti
+        # verseydi "bilinmeyen numara" yolu hic sinanmazdi (P-4).
+        bilinen = {str(r["cik_str"]).zfill(10) for r in TICKERS.values()}
+        if not any(c in u for c in bilinen):
+            return httpx.Response(404, json={"error": "not found"})
         return httpx.Response(200, json=SUBS)
     if "companyfacts" in u:
         return httpx.Response(200, json=FACTS)
@@ -2336,8 +2341,10 @@ async def test_onbellekler_sinirli(srv):
     assert len(c._facts_cache) <= 2, f"{len(c._facts_cache)} companyfacts tutuluyor"
     assert "0000000004" in c._facts_cache, "en son cekilen girdi atilmis"
 
-    for cik in ("0000000001", "0000000002", "0000000003",
-                "0000000004", "0000000005", "0000000006"):
+    # Gercek CIK'ler kullaniliyor: sahte veri artik bilinmeyen CIK'e 404
+    # donuyor (gercek sozlesme), uydurma numaralar burada hata verirdi.
+    for cik in ("0000320193", "0000789019", "0001318605",
+                "0000104169", "0000055067", "0000320193"):
         await c.submissions(cik)
     assert len(c._subs_cache) <= 4, f"{len(c._subs_cache)} submissions tutuluyor"
 
@@ -3071,3 +3078,85 @@ def test_kapanmamis_tablo_da_donuyor():
     # zaten bitirirdi ve bu yol hic sinanmazdi.
     c = cevir("<html><body><table><tr><td>a<td>b<tr><td>c<td>d")
     assert c.tablolar and c.tablolar[0].satirlar == [["a", "b"], ["c", "d"]]
+
+
+# --------------------------------------------------- tek tarafli tarih araligi
+@pytest.mark.anyio
+async def test_tek_tarafli_tarih_araligi_tamamlaniyor(srv):
+    """Olculdu (16 Agu 2026, canli): SEC tek tarafli araligi SESSIZCE
+    dusuruyor. `start_date=2026-01-01` tek basina verildiginde 162 sonuc
+    donuyordu, en eskisi 2009 tarihli - model filtrelenmis sandigi bir listeyi
+    okuyor. Eksik uc dolduruluyor ve gonderilen aralik yanitta yaziyor."""
+    from datetime import date
+
+    ISTEK_KAYDI.clear()
+    r = await srv.search_filings(query="tariff", start_date="2026-01-01")
+    u = [x for x in ISTEK_KAYDI if "efts" in x][0]
+    assert "startdt=2026-01-01" in u and f"enddt={date.today().isoformat()}" in u
+    assert r.date_range_applied == f"2026-01-01..{date.today().isoformat()}"
+
+    ISTEK_KAYDI.clear()
+    r2 = await srv.search_filings(query="tariff", end_date="2012-12-31")
+    u2 = [x for x in ISTEK_KAYDI if "efts" in x][0]
+    assert "startdt=1994-01-01" in u2 and "enddt=2012-12-31" in u2
+    assert r2.date_range_applied == "1994-01-01..2012-12-31"
+    # 1994 baslangici 2001 esiginin gerisinde: kapsam notu da gelmeli.
+    assert r2.coverage_note and "1996" in r2.coverage_note
+
+
+@pytest.mark.anyio
+async def test_tarih_verilmediginde_aralik_uydurulmuyor(srv):
+    ISTEK_KAYDI.clear()
+    r = await srv.search_filings(query="tariff")
+    u = [x for x in ISTEK_KAYDI if "efts" in x][0]
+    assert "dateRange" not in u and "startdt" not in u
+    assert r.date_range_applied is None
+
+
+# ------------------------------------------------------------ CIK ile adresleme
+@pytest.mark.anyio
+async def test_cik_ile_adresleme_calisiyor(srv):
+    """Olculdu: tam metin aramasi ticker'i OLMAYAN dosyalayanlar donduruyor
+    (fonlar, yabanci ihraccilar). Ticker zorunlu kalsaydi arac kendi buldugu
+    belgeyi acamazdi."""
+    for girdi in ("0000320193", "320193", "CIK0000320193"):
+        p = await srv.get_company_profile(ticker=girdi)
+        assert p.cik == "0000320193" and p.name == "Apple Inc."
+        # Sembol UYDURULMUYOR: CIK ile soruldu, SEC'in dosyasindan cozuldu.
+        assert p.ticker == "AAPL", girdi
+
+
+@pytest.mark.anyio
+async def test_ticker_girdisi_oldugu_gibi_yansiyor(srv):
+    """Kullanici GOOGL yazdiysa yanitta GOOGL gorunmeli; ayni CIK'e bagli
+    baska bir sinif (GOOG) donmemeli."""
+    p = await srv.get_company_profile(ticker="aapl")
+    assert p.ticker == "AAPL"
+    s = await srv.list_recent_filings(ticker="aapl", limit=1)
+    assert s.ticker == "AAPL"
+
+
+@pytest.mark.anyio
+async def test_cik_ile_dosyalama_listesi_ve_metin(srv):
+    s = await srv.list_recent_filings(ticker="320193", form_type="10-K", limit=2)
+    assert s.total_matching == 2
+    t = await srv.read_filing_text(ticker="CIK0000320193", max_characters=500)
+    assert t.accession_number == "0000320193-25-000073"
+
+
+@pytest.mark.anyio
+async def test_bilinmeyen_cik_eyleme_donusturulebilir_hata(srv):
+    """CIK ile adresleme acilinca en olasi kullanici hatasi var olmayan bir
+    numara; cig HTTPStatusError modele ne yapacagini soylemez."""
+    with pytest.raises(ValueError) as e:
+        await srv.get_company_profile(ticker="9999999999")
+    mesaj = str(e.value)
+    assert "9999999999" in mesaj and "ticker symbol works here too" in mesaj
+
+
+@pytest.mark.anyio
+async def test_aramada_cik_filtresi_de_kabul_ediliyor(srv):
+    ISTEK_KAYDI.clear()
+    await srv.search_filings(query="tariff", ticker="1318605")
+    u = [x for x in ISTEK_KAYDI if "efts" in x][0]
+    assert "ciks=0001318605" in u

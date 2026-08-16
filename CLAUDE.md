@@ -1079,3 +1079,54 @@ On bir yeni enjeksiyon tablo korumalarini dogruluyor. Ucu ilk turda
 sifirdan baslayan bir bolumde kimlik islemiydi, gizli tablo zaten bos
 kaliyordu, kapanmamis tablo `</body>` sayesinde baska bir yoldan bitiyordu.
 Harness bir kez daha testin kendisini denetledi.
+
+### KK-38: Sessizce yok sayilan tarih filtresi, ve CIK ile adresleme
+
+16 Agu 2026. Ikisi de CANLI kullanimda olculdu; ikincisi bir gun once eklenen
+aracin kendi ciktisini okunamaz biraktigini gosterdi.
+
+**1. Tek tarafli tarih araligi SESSIZCE dusuyordu.** Olcum (`"lithium iron
+phosphate"`, forms=10-K):
+
+| Cagri | Sonuc |
+|---|---|
+| yalnizca `start_date=2026-01-01` | 162 sonuc, en eskisi **2009** tarihli |
+| yalnizca `end_date=2012-12-31` | ayni 162 sonuc |
+| ikisi birlikte | 16 sonuc, hepsi 2026-03 |
+
+EDGAR'in ucu `dateRange=custom` icin iki siniri da istiyor; biri eksikse
+araligi tumden atiyor. Kod tarih BICIMINI dogruluyordu ama tek tarafli araligi
+oldugu gibi gonderiyordu, yani model "2026'da kim bahsetti" diye sorup 2009
+sonuclarini 2026 saniyordu. **P-29'un ta kendisi - kendi kodumda, o pattern'i
+yazdiktan bir gun sonra.** Eksik uc artik dolduruluyor (baslangic yoksa
+`1994-01-01`, EDGAR arsivinin baslangici; bitis yoksa bugun) ve gonderilen
+aralik `date_range_applied` alaninda yaziyor. Varsayilan olarak 2001 DEGIL
+1994 secildi: indekste 2001 oncesinden de birkac belge OLCULDU (KK-35), ve
+varsayilanla onlari elemek yeni bir sessiz filtre olurdu.
+
+**2. Ticker zorunlulugu araci kendi ciktisindan mahrum birakiyordu.** Ayni gun
+olculdu: tam metin aramasi ticker'i OLMAYAN dosyalayanlar donduruyor -
+`company_tickers.json` yalnizca borsada islem goren sembolleri tasiyor. Arama
+"CHINA SUN GROUP HIGH-TECH CO (CIK 0001298195)" buluyor, `ticker: null`
+bildiriyor, ve okuma araclari o dosyalamayi acamiyordu. Arac kendi buldugu
+belgeye erisemiyorsa arama yarim bir yetenektir.
+
+Artik her `ticker` parametresi **CIK de kabul ediyor** (`320193`,
+`0000320193`, `CIK0000320193`). Sayisal girdi CIK sayiliyor; ABD borsalarinda
+yalnizca rakamdan olusan sembol yok, dolayisiyla belirsizlik uretmiyor.
+Iki incelik testle sabit:
+- **Sembol gosterimi girdiye sadik.** Kullanici `GOOGL` yazdiysa yanitta
+  `GOOGL` gorunur; ayni CIK'e bagli alfabetik ilk sembol (GOOG) donmez. CIK
+  ile soruldugunda sembol SEC'in dosyasindan aranir, bulunamazsa `None` kalir -
+  uydurulmaz. `CompanyProfile.ticker` ve `FilingPage.ticker` bu yuzden artik
+  opsiyonel.
+- **Bilinmeyen CIK eyleme donusturulebilir hata veriyor.** CIK ile adresleme
+  acildiktan sonra en olasi kullanici hatasi var olmayan bir numara; cig
+  `HTTPStatusError` modele ne yapacagini soylemez (§18/P-13). Donusum
+  `client.submissions()` icinde, yani butun cagiranlar icin bir kerede.
+
+Sahte veri de duzeltildi: mock her CIK'e ayni `submissions` yanitini
+donduruyordu, yani "bilinmeyen numara" yolu HIC sinanmiyordu (P-4). Artik
+`company_tickers.json`'da olmayan CIK'e 404 donuyor.
+
+Alti yeni enjeksiyon dogruluyor.

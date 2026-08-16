@@ -92,6 +92,18 @@ döndürür; ikinci çağrı tahmin etmek yerine birini adıyla ister. Doğru ba
 ne olduğu belli değilse `search` bir ifadenin kaç kez ve nerede geçtiğini
 bildirir; her konum doğrudan `offset` olarak geri verilebilir.
 
+### Sembolü olmayan bir dosyalayanı adreslemek
+
+`ticker` alan her araç CIK de kabul ediyor — `320193`, `0000320193` ya da
+`CIK0000320193`. Bu bir kolaylık değil: SEC'in ticker dosyası yalnızca işlem
+gören sembolleri tutuyor, dolayısıyla fonların ve yabancı ihraççıların sembolü
+yok ve tam metin araması onları `ticker: null` ile döndürüyor. CIK adreslemesi
+olmadan sunucu, bulduğu belgeyi açamıyordu.
+
+Sorulan sembol sorulduğu gibi geri dönüyor — `GOOGL` yazıldıysa aynı CIK'teki
+alfabetik ilk sembole (`GOOG`) dönüşmüyor. CIK ile sorulduğunda sembol SEC'in
+dosyasından aranıyor; yoksa uydurulmuyor, boş kalıyor.
+
 ### Metnin yanında tabloları da okumak
 
 Dosyalamaların en çok alıntılanan rakamları tablolarda duruyor — mali tablolar,
@@ -232,6 +244,13 @@ değiştirir:
 
 Uç, 10000 sıralı sonucun ötesine sayfalamayı reddediyor; şema bunu `offset`
 üst sınırı olarak ilan ediyor, modelin hatayla öğrenmesine bırakmıyor.
+
+Ölçülen bir tuhaflık daha, araç yayına girdikten bir gün sonra canlı kullanımda
+bulundu: SEC tek taraflı tarih aralığını **sessizce** düşürüyor. "2026'dan
+itibaren" diye sorulduğunda 162 sonuç dönüyordu ve en eskisi 2009 tarihliydi —
+filtrelenmiş görünen, filtrelenmemiş bir cevap. Eksik uç artık dolduruluyor
+(EDGAR'ın kendi başlangıcı ya da bugün) ve gönderilen aralık
+`date_range_applied` ile geri dönüyor.
 
 ### Son dosyalama akışının ötesindeki dosyalamalar
 

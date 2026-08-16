@@ -94,6 +94,19 @@ has, so the next call names one instead of guessing. When the right heading is
 not obvious, `search` reports how many times a phrase occurs and where; each
 position can be passed straight back as `offset`.
 
+### Addressing a filer that has no ticker
+
+Every tool that takes a `ticker` also takes a CIK — `320193`, `0000320193` or
+`CIK0000320193` all work. That is not a convenience: SEC's ticker file lists
+only symbols that trade, so funds and foreign private issuers have none, and
+full-text search returns those filers with a null ticker. Without CIK
+addressing the server could find a document it could not then open.
+
+A symbol asked for is echoed back as asked — `GOOGL` stays `GOOGL` rather than
+becoming the alphabetically first symbol on the same CIK. Ask by CIK and the
+symbol is looked up in SEC's file, and stays null when there is none rather
+than being invented.
+
 ### Reading the tables, not just the text
 
 Filings put their most quotable figures in tables — the financial statements,
@@ -237,6 +250,13 @@ the result should be read:
 The endpoint refuses to page past 10000 ranked results, which the schema
 declares as a bound on `offset` instead of leaving the model to discover it
 through an error.
+
+One more measured quirk, found in live use a day after this tool shipped: SEC
+drops a one-sided date range **silently**. Asking for filings from 2026 with no
+end date returned 162 matches reaching back to 2009 — a filtered-looking answer
+that was not filtered. The missing bound is now filled in (EDGAR's own
+beginning, or today) and the range actually sent comes back in
+`date_range_applied`.
 
 ### Filings older than the recent feed
 

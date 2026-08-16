@@ -681,8 +681,8 @@ ENJEKSIYONLAR = [
 
  ("D: ayni CIK'te ikinci sembolu yine ez",
   "src/edgar_mcp/server.py",
-  "            istenen.setdefault(await _c().cik_for_ticker(t), []).append(t.upper())",
-  "            istenen[await _c().cik_for_ticker(t)] = [t.upper()]",
+  "            istenen.setdefault((await _kimlik_coz(t))[0], []).append(t.strip().upper())",
+  "            istenen[(await _kimlik_coz(t))[0]] = [t.strip().upper()]",
   "test_ayni_cik_iki_sembol_tasiyorsa_ikisi_de_gorunuyor"),
 
  ("D: recent disindaki dosyalamalari yok say",
@@ -863,6 +863,42 @@ ENJEKSIYONLAR = [
   "            os.environ.setdefault(cift[0], cift[1])",
   "            os.environ[cift[0]] = cift[1]",
   "test_env_yukleyici_mevcut_degiskeni_ezmiyor"),
+
+ ("L: tek tarafli tarih araligini oldugu gibi gonder",
+  "src/edgar_mcp/server.py",
+  "    return (bas or EDGAR_BASLANGICI), (son or date.today().isoformat())",
+  "    return bas, son",
+  "test_tek_tarafli_tarih_araligi_tamamlaniyor"),
+
+ ("L: tarih verilmeden de aralik gonder",
+  "src/edgar_mcp/server.py",
+  "    if not bas and not son:\n        return None, None",
+  "    if False:\n        return None, None",
+  "test_tarih_verilmediginde_aralik_uydurulmuyor"),
+
+ ("L: uygulanan araligi bildirme",
+  "src/edgar_mcp/server.py",
+  '        date_range_applied=f"{bas}..{son}" if bas and son else None,',
+  "        date_range_applied=None,",
+  "test_tek_tarafli_tarih_araligi_tamamlaniyor"),
+
+ ("M: CIK girdisini ticker sayip aramaya git",
+  "src/edgar_mcp/client.py",
+  '        m = re.fullmatch(r"(?:cik)?[\\s-]*0*(\\d{1,10})", s, re.IGNORECASE)',
+  "        m = None",
+  "test_cik_ile_adresleme_calisiyor"),
+
+ ("M: CIK ile sorulunca sembolu girdiden uydur",
+  "src/edgar_mcp/server.py",
+  "        return cik, await c.ticker_for_cik(cik)",
+  "        return cik, (deger or \"\").strip().upper()",
+  "test_cik_ile_adresleme_calisiyor"),
+
+ ("M: bilinmeyen CIK'te cig HTTP hatasi birak",
+  "src/edgar_mcp/client.py",
+  "                if e.response.status_code == 404:\n                    raise ValueError(\n                        f\"SEC has no filer with CIK {cik}.",
+  "                if False:\n                    raise ValueError(\n                        f\"SEC has no filer with CIK {cik}.",
+  "test_bilinmeyen_cik_eyleme_donusturulebilir_hata"),
 
  ("K: tablolari her cagride don (parametreyi yoksay)",
   "src/edgar_mcp/server.py",

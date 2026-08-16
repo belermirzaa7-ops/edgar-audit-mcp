@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 from urllib.parse import quote
 
@@ -175,6 +176,25 @@ class EdgarClient:
             )
         return cik
 
+    async def cik_coz(self, deger: str) -> str:
+        """Ticker YA DA CIK -> 10 haneli sifir dolgulu CIK.
+
+        Neden gerekli (olculdu, 16 Agu 2026): tam metin aramasi ticker'i
+        OLMAYAN dosyalayanlar donduruyor - `company_tickers.json` yalnizca
+        borsada islem goren sembolleri tasiyor, fon ve yabanci ihraccilari
+        tasimiyor. Arama "CHINA SUN GROUP HIGH-TECH CO (CIK 0001298195)"
+        buluyordu ve okuma araclari o dosyalamayi acamiyordu: arac kendi
+        buldugu belgeye erisemiyordu.
+
+        Sayisal girdi CIK sayilir. ABD borsalarinda yalnizca rakamdan olusan
+        sembol yok, dolayisiyla belirsizlik uretmiyor.
+        """
+        s = (deger or "").strip()
+        m = re.fullmatch(r"(?:cik)?[\s-]*0*(\d{1,10})", s, re.IGNORECASE)
+        if m:
+            return m.group(1).zfill(10)
+        return await self.cik_for_ticker(s)
+
     async def ticker_for_cik(self, cik: str) -> str | None:
         """CIK -> ticker. Ayni CIK birden fazla sembol tasiyabilir (GOOG/GOOGL
         gibi hisse siniflari); alfabetik ilki doner ve bu bilincli bir
@@ -244,10 +264,25 @@ class EdgarClient:
 
     async def submissions(self, cik: str) -> dict:
         """1-2 MB, on aracin altisi kullaniyor. Onbelleksiz birakmak her
-        cagride yeniden indirmek demekti."""
+        cagride yeniden indirmek demekti.
+
+        404 burada EYLEME DONUSTURULEBILIR bir hataya cevriliyor: CIK ile
+        adresleme acildiktan sonra en olasi kullanici hatasi var olmayan bir
+        numara vermek ve cig `HTTPStatusError` modele ne yapacagini soylemez
+        (§18/P-13).
+        """
         if cik not in self._subs_cache:
-            self._sinirla(self._subs_cache, cik,
-                          await self._get(f"{SEC_DATA}/submissions/CIK{cik}.json"), 4)
+            try:
+                veri = await self._get(f"{SEC_DATA}/submissions/CIK{cik}.json")
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    raise ValueError(
+                        f"SEC has no filer with CIK {cik}. Check the number - a "
+                        "CIK is at most ten digits and identifies one registrant. "
+                        "A ticker symbol works here too."
+                    ) from e
+                raise
+            self._sinirla(self._subs_cache, cik, veri, 4)
         return self._subs_cache[cik]
 
     async def company_concept(self, cik: str, concept: str, taxonomy: str = "us-gaap") -> dict:

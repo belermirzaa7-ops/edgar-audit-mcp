@@ -210,6 +210,24 @@ async def _ilerleme(ctx: Context | None, adim: float, toplam: float, mesaj: str)
         await ctx.report_progress(adim, toplam, mesaj)
 
 
+_CIK_GIRDISI = re.compile(r"(?:cik)?[\s-]*0*\d{1,10}", re.IGNORECASE)
+
+
+async def _kimlik_coz(deger: str) -> tuple[str, str | None]:
+    """Ticker ya da CIK girdisi -> (10 haneli CIK, gosterilecek sembol).
+
+    Sembol gosterimi girdiye SADIK kalir: kullanici `GOOGL` yazdiysa yanitta
+    `GOOGL` gorunur. CIK verildiginde sembol SEC'in ticker dosyasindan
+    aranir ve bulunamazsa None kalir - uydurulmaz. Fonlarin ve yabanci
+    ihraccilarin sembolu yoktur ve bu bir eksiklik degil, gercektir.
+    """
+    c = _c()
+    cik = await c.cik_coz(deger)
+    if _CIK_GIRDISI.fullmatch((deger or "").strip()):
+        return cik, await c.ticker_for_cik(cik)
+    return cik, (deger or "").strip().upper()
+
+
 def _c() -> EdgarClient:
     global _client
     if _client is None:
@@ -221,7 +239,12 @@ def _c() -> EdgarClient:
 class CompanyProfile(BaseModel):
     cik: str = Field(description="10-digit zero-padded SEC Central Index Key")
     name: str = Field(description="Official registrant name as filed with the SEC")
-    ticker: str
+    ticker: str | None = Field(
+        default=None,
+        description="The symbol as it was asked for, or the one SEC's ticker "
+        "file lists for this CIK. None when that file has no symbol for the "
+        "filer, which is normal for funds and foreign private issuers",
+    )
     sic_description: str | None = Field(default=None, description="Standard Industrial Classification description")
     fiscal_year_end: str | None = Field(default=None, description="Fiscal year end as MMDD, e.g. 0927")
 
@@ -240,7 +263,10 @@ class Filing(BaseModel):
 
 
 class FilingPage(BaseModel):
-    ticker: str
+    ticker: str | None = Field(
+        default=None, description="The symbol asked for, or None when the "
+        "company was addressed by CIK and SEC lists no symbol for it"
+    )
     total_matching: int = Field(
         description="Total filings matching form_type in the feeds that were "
         "read - the recent feed alone unless include_older was set"
@@ -324,6 +350,13 @@ class FilingSearchResults(BaseModel):
         default=None,
         description="Set when the result can be read as absence of evidence "
         "although the index cannot support that reading",
+    )
+    date_range_applied: str | None = Field(
+        default=None,
+        description="The date range actually sent to SEC, as start..end. SEC "
+        "drops a one-sided range silently, so giving only one bound fills the "
+        "other: an unnamed start becomes EDGAR's own beginning and an unnamed "
+        "end becomes today",
     )
     results: list[SearchedDocument]
 
@@ -598,15 +631,15 @@ class ConceptCatalog(BaseModel):
     )
 )
 async def get_company_profile(
-    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL")],
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL. A ten-digit CIK works too, which is the only way to reach a filer SEC's ticker file does not list - funds and foreign private issuers, and the filers sec_edgar_search_filings returns with a null ticker")],
 ) -> CompanyProfile:
     c = _c()
-    cik = await c.cik_for_ticker(ticker)
+    cik, sembol = await _kimlik_coz(ticker)
     sub = await c.submissions(cik)
     return CompanyProfile(
         cik=cik,
         name=sub.get("name", ""),
-        ticker=ticker.upper(),
+        ticker=sembol,
         sic_description=sub.get("sicDescription"),
         fiscal_year_end=sub.get("fiscalYearEnd"),
     )
@@ -713,7 +746,7 @@ async def _tum_akislar(
     )
 )
 async def list_recent_filings(
-    ticker: Annotated[str, Field(description="Stock ticker symbol")],
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL. A ten-digit CIK works too, which is the only way to reach a filer SEC's ticker file does not list - funds and foreign private issuers, and the filers sec_edgar_search_filings returns with a null ticker")],
     form_type: Annotated[
         str | None,
         Field(default=None,
@@ -737,7 +770,7 @@ async def list_recent_filings(
     ctx: Context | None = None,
 ) -> FilingPage:
     c = _c()
-    cik = await c.cik_for_ticker(ticker)
+    cik, sembol = await _kimlik_coz(ticker)
     sub = await c.submissions(cik)
 
     dosyalamalar, atlanan = await _tum_akislar(cik, sub, form_type, include_older, ctx)
@@ -753,7 +786,7 @@ async def list_recent_filings(
     daha_eski = bool(sub.get("filings", {}).get("files"))
     eksik_kaldi = (daha_eski and not include_older) or atlanan > 0
     return FilingPage(
-        ticker=ticker.upper(),
+        ticker=sembol,
         total_matching=len(dosyalamalar),
         returned=min(limit, len(dosyalamalar)),
         older_filings_exist=daha_eski,
@@ -780,6 +813,11 @@ _ISO_TARIH = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # kaynak birbirini yalanlamiyor; belgelenen sinir pratikte dogru, sifir sonuc
 # ise "hic dosyalanmamis" demek DEGIL.
 KAPSAM_ESIGI = "2001-01-01"
+# EDGAR'in elektronik arsivinin baslangici. Tek tarafli aralik verildiginde
+# eksik ucu doldurmak icin kullaniliyor - "2001" degil, cunku indekste 2001
+# oncesinden de birkac belge OLCULDU ve varsayilanla onlari disarida birakmak
+# sessiz bir filtre olurdu.
+EDGAR_BASLANGICI = "1994-01-01"
 _KAPSAM_YOK = (
     "SEC states that this index holds filings since 2001. A measured search "
     "of annual reports from 1996 to 2000 for a word as common as revenue "
@@ -793,6 +831,24 @@ _KAPSAM_ESKI = (
     "returned only 14 filings. Read what comes back as a sample, never as the "
     "full set of filings that used this text."
 )
+
+
+def _aralik_tamamla(bas: str | None, son: str | None) -> tuple[str | None, str | None]:
+    """Tek tarafli aralik EDGAR'da SESSIZCE YOK SAYILIYOR - olculdu.
+
+    16 Agu 2026, canli olcum (`"lithium iron phosphate"`, forms=10-K):
+      - yalnizca `start_date=2026-01-01` -> 162 sonuc, en eskisi 2009 tarihli
+      - yalnizca `end_date=2012-12-31`   -> ayni 162 sonuc
+      - ikisi birlikte (2026-01-01..2026-08-16) -> 16 sonuc, hepsi 2026-03
+    Yani uc `dateRange=custom` icin iki siniri da istiyor; biri eksikse
+    aralik tumden dusuyor ve model filtrelenmis sandigi bir listeyi okuyor.
+    Bu, P-29'un ta kendisi: sessizce yok sayilan filtre, yanlis cevabi DOGRU
+    bicimde sunar. Eksik uc dolduruluyor ve hangi araligin gonderildigi
+    yanitta yaziyor.
+    """
+    if not bas and not son:
+        return None, None
+    return (bas or EDGAR_BASLANGICI), (son or date.today().isoformat())
 
 
 def _tarih_dogrula(deger: str | None, alan: str) -> str | None:
@@ -886,8 +942,9 @@ async def search_filings(
             f"start_date {bas} falls after end_date {son}, so no filing can "
             "match. Swap them."
         )
+    bas, son = _aralik_tamamla(bas, son)
 
-    ciks = await _c().cik_for_ticker(ticker) if ticker else None
+    ciks = (await _kimlik_coz(ticker))[0] if ticker else None
     await _ilerleme(ctx, 0, 2, "Searching the EDGAR full-text index")
     ham = await _c().full_text_search(ifade, forms=form_type, ciks=ciks,
                                       start=bas, end=son, frm=offset)
@@ -956,6 +1013,7 @@ async def search_filings(
         offset=offset,
         has_more=(offset + len(kayitlar) < toplam) or not kesin,
         coverage_note=not_,
+        date_range_applied=f"{bas}..{son}" if bas and son else None,
         results=kayitlar,
     )
 
@@ -1102,7 +1160,7 @@ async def _kavram_verisi(
     yazilirsa biri duzeltilip oteki unutulur. Doner:
     (cik, aday_etiketler, [(etiket, ham_yanit)], hangi_uc).
     """
-    cik = await _c().cik_for_ticker(ticker)
+    cik, _ = await _kimlik_coz(ticker)
     anahtar = concept.strip().lower()
     adaylar = CONCEPT_ALIASES.get(anahtar, [concept.strip()])
 
@@ -1179,7 +1237,7 @@ async def _kavram_verisi(
     ),
 )
 async def get_concept_series(
-    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL")],
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL. A ten-digit CIK works too, which is the only way to reach a filer SEC's ticker file does not list - funds and foreign private issuers, and the filers sec_edgar_search_filings returns with a null ticker")],
     concept: Annotated[
         str,
         Field(
@@ -1427,7 +1485,7 @@ async def _dosyalama_bul(cik: str, accession: str | None, form_type: str) -> dic
     ),
 )
 async def read_filing_text(
-    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL")],
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL. A ten-digit CIK works too, which is the only way to reach a filer SEC's ticker file does not list - funds and foreign private issuers, and the filers sec_edgar_search_filings returns with a null ticker")],
     accession_number: Annotated[
         str | None,
         Field(
@@ -1489,7 +1547,7 @@ async def read_filing_text(
     ctx: Context | None = None,
 ) -> FilingText:
     await _ilerleme(ctx, 0, 3, "Locating the filing")
-    cik = await _c().cik_for_ticker(ticker)
+    cik, _ = await _kimlik_coz(ticker)
     kayit = await _dosyalama_bul(cik, accession_number, form_type)
 
     dizin = (
@@ -1613,7 +1671,7 @@ async def read_filing_text(
     ),
 )
 async def get_fact_revisions(
-    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL")],
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL. A ten-digit CIK works too, which is the only way to reach a filer SEC's ticker file does not list - funds and foreign private issuers, and the filers sec_edgar_search_filings returns with a null ticker")],
     concept: Annotated[
         str,
         Field(
@@ -1750,7 +1808,7 @@ async def get_fact_revisions(
     ),
 )
 async def list_available_concepts(
-    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL")],
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL. A ten-digit CIK works too, which is the only way to reach a filer SEC's ticker file does not list - funds and foreign private issuers, and the filers sec_edgar_search_filings returns with a null ticker")],
     taxonomy: Annotated[
         str,
         Field(
@@ -1772,7 +1830,7 @@ async def list_available_concepts(
         ),
     ] = 25,
 ) -> ConceptCatalog:
-    cik = await _c().cik_for_ticker(ticker)
+    cik, _ = await _kimlik_coz(ticker)
     facts = await _c().company_facts(cik)
     tumu = facts.get("facts", {}) or {}
     mevcut = list(tumu)
@@ -2049,7 +2107,7 @@ async def compare_companies(
     istenen: dict[str, list[str]] = {}
     if tickers:
         for t in tickers:
-            istenen.setdefault(await _c().cik_for_ticker(t), []).append(t.upper())
+            istenen.setdefault((await _kimlik_coz(t))[0], []).append(t.strip().upper())
 
     secilenler: list[CompanyValue] = []
     gorulen: set[str] = set()
@@ -2200,7 +2258,7 @@ async def _dosyalama_ve_instance(
 ) -> tuple[dict, Instance, str, Etiketler, str | None]:
     adim_sayisi = 4 if etiket_iste else 3
     await _ilerleme(ctx, 0, adim_sayisi, "Locating the filing")
-    cik = await _c().cik_for_ticker(ticker)
+    cik, _ = await _kimlik_coz(ticker)
     kayit = await _dosyalama_bul(cik, accession, form_type)
     dizin = (
         f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
@@ -2426,7 +2484,7 @@ def _etiket_uyuyor(tag: str, adaylar: list[str]) -> bool:
     ),
 )
 async def list_fact_dimensions(
-    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. TSLA")],
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL. A ten-digit CIK works too, which is the only way to reach a filer SEC's ticker file does not list - funds and foreign private issuers, and the filers sec_edgar_search_filings returns with a null ticker")],
     accession_number: Annotated[
         str | None,
         Field(default=None, description="Exact filing to read. Omit to read the "
@@ -2524,7 +2582,7 @@ async def list_fact_dimensions(
     ),
 )
 async def get_dimensional_facts(
-    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. TSLA")],
+    ticker: Annotated[str, Field(description="Stock ticker symbol, e.g. AAPL. A ten-digit CIK works too, which is the only way to reach a filer SEC's ticker file does not list - funds and foreign private issuers, and the filers sec_edgar_search_filings returns with a null ticker")],
     concept: Annotated[
         str,
         Field(description="An alias (revenue, gross_profit, ...) or a tag, with "

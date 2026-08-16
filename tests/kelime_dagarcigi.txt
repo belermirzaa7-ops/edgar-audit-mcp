@@ -23,6 +23,7 @@ across
 active
 actually
 add
+addressed
 after
 again
 against
@@ -75,10 +76,12 @@ balance
 be
 became
 because
+becomes
 been
 before
 began
 begin
+beginning
 begins
 behind
 being
@@ -191,6 +194,7 @@ different
 differently
 differs
 digit
+digits
 diluted
 dimension
 dimensional
@@ -211,6 +215,7 @@ double
 down
 download
 dropped
+drops
 duplication
 duration
 each
@@ -277,6 +282,7 @@ files
 filing
 filings
 filled
+fills
 filter
 financial
 find
@@ -305,6 +311,7 @@ geographies
 geography
 get
 given
+giving
 gross
 guess
 guessed
@@ -461,6 +468,7 @@ normally
 not
 note
 nothing
+null
 number
 numbers
 numeric
@@ -630,6 +638,7 @@ segment
 segments
 selected
 self
+sent
 series
 server
 set
@@ -641,6 +650,7 @@ shortly
 should
 shown
 shows
+sided
 silence
 silently
 simplify
@@ -698,6 +708,7 @@ tax
 taxes
 taxonomy
 temporarily
+ten
 term
 text
 than
@@ -720,7 +731,9 @@ tickers
 time
 times
 to
+today
 together
+too
 tool
 tools
 total
@@ -749,6 +762,7 @@ units
 unknown
 unless
 unlike
+unnamed
 upstream
 url
 us
@@ -784,6 +798,7 @@ within
 without
 words
 working
+works
 would
 writes
 written
