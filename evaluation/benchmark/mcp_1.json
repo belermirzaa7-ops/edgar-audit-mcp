@@ -1,0 +1,62 @@
+[
+ {
+  "id": 10,
+  "cevap": "From the cover page (XBRL dei:EntityCommonStockSharesOutstanding) of Airbnb's FY2025 Form 10-K (filed 2026-02-12), as of January 31, 2026:\n\nClass A: 423,573,275 shares\nClass B: 175,940,683 shares\nClass C: 0 shares\nClass H: 9,200,000 shares\n\nTotal: 608,713,958 shares. (Class C is authorized/registered but none outstanding; Class H is held by an Airbnb subsidiary.)",
+  "arac_cagrisi": 2,
+  "bulunamadi": false
+ },
+ {
+  "id": 11,
+  "cevap": "Note: TSM's Q2 = Apr-Jun, so \"March seasonality\" does not apply; I used the same month-build method on Q2 monthly revenue 6-Ks.\n\nQ2 2026 guidance (Apr 16, 2026 6-K): US$39.0-40.2bn, midpoint $39.6bn (FX 31.7 NT/US$ = NT$1,236-1,274bn).\nMonthly 6-K revenue: Apr NT$410,726m + May NT$416,975m + Jun NT$442,680m = NT$1,270,381m.\nActual Q2 2026 (Jul 16, 2026 6-K): NT$1,270.38bn = US$40.20bn.\n\nBEAT: $40.20bn lands at the very top of the range, +$0.60bn (+1.5%) vs midpoint, +$1.20bn (+3.1%) vs low end. Driver was June (+6.2% m/m, +67.9% y/y), 34.8% of quarter revenue.",
+  "arac_cagrisi": 9,
+  "bulunamadi": false
+ },
+ {
+  "id": 12,
+  "cevap": "From 3D Systems' DEF 14A filed 2024-08-13 (\"Director Compensation for 2023\" table), total 2023 non-employee director compensation was $2,263,113.\n\nClinton $240,000; Curran $255,000; Drayton $218,113; Erickson $228,764; Kever $220,000; McClure $400,000; Moore $245,000; Padmanabhan $216,236; Tracy $240,000.\n\nEach director received $150,000 in stock (18,094 shares at $8.29 granted 5/16/2023); the rest was cash fees. No \"All Other Compensation\" was paid. CEO Jeffrey Graves is not in this table (compensated as an executive).",
+  "arac_cagrisi": 3,
+  "bulunamadi": false
+ },
+ {
+  "id": 13,
+  "cevap": "Zillow (CIK 1617640), XBRL, $M. FCF = CFO - capex:\nFY2023: 354 - 135 = 219; revenue 1,945 -> 11.3%\nFY2024: 428 - 143 = 285; revenue 2,236 -> 12.7%\nFY2025: 368 - 133 = 235; revenue 2,583 -> 9.1%\n\nTrend: not a clean trend. FCF margin improved ~140bps in 2024, then fell ~365bps in 2025. Absolute FCF is roughly flat ($219m -> $285m -> $235m) while revenue grew 33% over the period, so margin is compressing as CFO fails to keep pace with revenue growth. Capex is stable at ~$133-143m (5-7% of revenue).",
+  "arac_cagrisi": 6,
+  "bulunamadi": false
+ },
+ {
+  "id": 14,
+  "cevap": "United States Steel (CIK 1163302; ticker X delisted after the Nippon Steel deal, reached via CIK). FY2024 XBRL:\nCost of goods and services sold: $14,060m\nInventory, net: 12/31/2023 $2,128m; 12/31/2024 $2,168m; average $2,148m\n\nInventory turnover = 14,060 / 2,148 = 6.55x (about 56 days of inventory).\nOn an ending-inventory basis: 14,060 / 2,168 = 6.49x.\n\nFor context, FY2023 turnover was 15,803 / ((2,359+2,128)/2 = 2,243.5) = 7.04x, so turnover slowed in 2024 as COGS fell 11% while inventory was flat.",
+  "arac_cagrisi": 6,
+  "bulunamadi": false
+ },
+ {
+  "id": 15,
+  "cevap": "KKR 6.25% Series D Mandatory Convertible Preferred (FWP 3/4/25, 8-K 3/7/25):\nSize: 45,000,000 shares (upsized from 30m) at $50.00 = $2.25bn; +6,750,000 over-allotment; 51,750,000 designated.\nPriced 3/5/25; settled/closed 3/7/25. NYSE \"KKR PR D\".\nLiquidation preference $50.00/share; par $0.01; underwriting discount $1.125.\nDividends: 6.25% p.a. ($3.125/yr), payable 3/1, 6/1, 9/1, 12/1 from 6/1/2025 through 3/1/2028; first dividend ~$0.7292, then $0.78125.\nConversion: mandatory 3/1/2028; rate 0.3312-0.4140 shares; initial price ~$120.7729, threshold appreciation price ~$150.9662, floor $42.2705. Early conversion at minimum rate; fundamental-change conversion with make-whole.\nVoting: none except as in Section 7 (elect 2 directors if dividends unpaid), Delaware law or charter.\nUse of proceeds: ~$2.20bn net for additional equity in Strategic Holdings core PE portfolio companies and general corporate purposes.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 16,
+  "cevap": "Take rate = revenue / GBV (GBV from 10-K MD&A key business metrics; revenue from XBRL):\nFY2022: $8,399m / $63,212m = 13.29%\nFY2023: $9,917m / $73,252m = 13.54%\nFY2024: $11,102m / $81,784m = 13.57%\n\nTrend: modestly rising and then flattening. +25bps in 2023, only +3bps in 2024. Over three years take rate expanded ~28bps, i.e. revenue grew slightly faster than GBV (revenue +32% vs GBV +29% 2022-2024). Effectively a stable ~13.3-13.6% monetisation rate rather than meaningful take-rate expansion.",
+  "arac_cagrisi": 5,
+  "bulunamadi": false
+ },
+ {
+  "id": 17,
+  "cevap": "Yes. Workday historically disclosed BOTH in MD&A of its 10-K/10-Q: \"gross and net revenue retention rates exceeding 95% and 100%, respectively\" (e.g. 10-Q for Q2 FY2025). After SEC comment letters, Workday stated (CORRESP 9/19/2024) it would stop disclosing net revenue retention and would disclose the actual then-current gross rate.\n\nCurrent definition (FY2026 10-K, filed 3/6/2026): gross revenue retention rate ~97% as of 1/31/2026 - \"measures the percentage of recurring revenue retained from existing customers... calculated by taking total annual recurring revenue (ARR) of our customers as of the corresponding prior period-end and comparing it to ARR for the current period from that same set of customers.\" It captures churn but excludes add-ons/net expansion (volume and price).",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 18,
+  "cevap": "MSCI FY2025 10-K (filed 2026-02-06), Maturity of Lease Liabilities, operating leases, $ thousands, as of 12/31/2025:\n2026 $33,616; 2027 $29,113; 2028 $28,276; 2029 $17,862; 2030 $14,345; thereafter $29,070.\nTotal lease payments $152,282 (less interest $16,162 = present value $136,120).\n\nNext three years (2026-2028) = 33,616 + 29,113 + 28,276 = $90,005 thousand.\nPercentage of total undiscounted lease payments = 90,005 / 152,282 = 59.1%.\n(As a share of the $136,120 present value it is 66.1%.)",
+  "arac_cagrisi": 2,
+  "bulunamadi": false
+ },
+ {
+  "id": 19,
+  "cevap": "Oracle FY2024 (year ended 5/31/2024) 10-K, MD&A: GAAP effective tax rate as derived from the consolidated statements of operations was 10.9%, versus 6.8% in FY2023 - an increase of about 4.1 percentage points.\n\nOracle also cites adjusted (non-GAAP) effective rates excluding certain items and the deferred tax effects of a prior legal-entity realignment benefit: 19.2% for FY2024 vs 16.3% for FY2023 (+2.9pp).\n\nCross-check from XBRL: FY2024 income tax expense $1,274m; FY2023 $623m. Both years' GAAP rates were far below the 21% US statutory rate.",
+  "arac_cagrisi": 5,
+  "bulunamadi": false
+ }
+]

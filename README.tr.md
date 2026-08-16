@@ -440,6 +440,25 @@ Mock'lar gerçek sisteme karşı davranışı kanıtlayamaz. `dogrula.py`, mali 
 türetmesini ve etiket birleştirmeyi canlı SEC verisine karşı sınar — takvim
 yılı, bitiş yılı ve başlangıç yılı geleneklerini kullanan şirketlerle.
 
+### Benchmark
+
+[`evaluation/benchmark.md`](evaluation/benchmark.md) bu sunucunun neyi
+değiştirdiğini ölçüyor: aynı model,
+[Vals AI Finance Agent Benchmark](https://huggingface.co/datasets/vals-ai/finance_agent_benchmark)
+setinin açık 50 sorusunu iki kez cevapladı — bir kez hiçbir araç olmadan, bir
+kez yalnızca bu on araçla.
+
+| | doğru | kısmen | yanlış | cevap yok |
+|---|---|---|---|---|
+| **Bu sunucuyla** | **41 (%82)** | 8 | 0 | 1 |
+| Araçsız | 12 (%24) | 20 | 0 | 18 |
+
+Cevaplayan kolların hiçbiri beklenen cevabı görmedi; notlandırmayı, iki cevabı
+rastgele sırayla ve hangisinin hangi koldan geldiğini bilmeden gören ayrı bir
+değerlendirici yaptı. Bütün ham veri — iki kolun cevapları, notlandırma girdisi,
+notlar, kol anahtarı — `evaluation/benchmark/` altında, ve sayının sınırları
+raporun içinde yazılı.
+
 ### Değerlendirme seti
 
 [`evaluation/questions.xml`](evaluation/questions.xml), yalnızca araçlar

@@ -1,0 +1,62 @@
+[
+ {
+  "id": 40,
+  "cevap": "Floor & Decor's Q4 fiscal 2024 (quarter ended Dec 26, 2024) comparable store sales DECREASED 0.8%, per the earnings release furnished as Exhibit 99.1 to the 8-K filed 2025-02-20. Net sales that quarter were $1,107.4M, up 5.7% from $1,048.1M, so growth came from new stores (10 opened, ending at 251) rather than comps. Management called Q4 comps better-than-expected. For full fiscal 2024 comparable store sales fell 7.1% on net sales of $4,455.8M (+0.9%). FY2025 guidance was comps of approximately flat to +3.0%.",
+  "arac_cagrisi": 3,
+  "bulunamadi": false
+ },
+ {
+  "id": 41,
+  "cevap": "Payout ratio = dividends paid / net income, both FY2024 XBRL facts. Ranking, highest to lowest: 1) Keurig Dr Pepper $1,194M / $1,441M = 82.9%; 2) Coca-Cola $8,359M / $10,631M = 78.6%; 3) PepsiCo $7,229M / $9,578M = 75.5%. So KO sits between KDP and PEP - a high but not peer-leading payout. Monster Beverage returned no dividend data in the CY2024 frame (it pays none) and Constellation Brands' comparable fiscal year showed a net loss, so neither yields a meaningful ratio. Note KDP's 2024 net income was depressed by charges, inflating its ratio.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 42,
+  "cevap": "Essentially all of it was volume, not take rate. Uber's FY2024 10-K shows Gross Bookings of $162,773M vs $137,865M (+18%) and revenue of $43,978M vs $37,281M (+18%). Implied revenue margin (take rate) was 27.04% in 2023 and 27.02% in 2024 - flat to 2bps lower. Trips rose 19% (11,273M) and MAPCs 14%. Management states the revenue increase was 'primarily attributable to an increase in Gross Bookings of 18%,' driven by Mobility and Delivery trip volumes, partially offset by business-model changes reclassifying certain sales and marketing costs as contra revenue ($863M Mobility, $713M Delivery).",
+  "arac_cagrisi": 5,
+  "bulunamadi": false
+ },
+ {
+  "id": 43,
+  "cevap": "3.3 nights. Airbnb's FY2024 10-K (Item 7) states: 'Average nights per booking in 2024 was 4.1 for North America, 3.8 for EMEA, 3.7 for Latin America, and 3.3 for Asia Pacific,' versus a total-company average of 3.8 (3.9 in 2023). Asia Pacific was the shortest-stay region. Context from the same table: APAC Nights and Experiences Booked were 61M (+20% YoY, 12% of total), APAC Gross Booking Value $7,126M (+18%) and APAC revenue $992M (+18%).",
+  "arac_cagrisi": 2,
+  "bulunamadi": false
+ },
+ {
+  "id": 44,
+  "cevap": "Airbnb's stock-based compensation add-back in the FY2024 cash flow statement was $1,407 million (us-gaap:ShareBasedCompensation, period 2024-01-01 to 2024-12-31). That is up from $1,120M in 2023 and $930M in 2022. For reference the series continues to $1,592M in 2025.",
+  "arac_cagrisi": 1,
+  "bulunamadi": false
+ },
+ {
+  "id": 45,
+  "cevap": "Zillow's 2023-2024 M&A was small, software/services tuck-ins aimed at owning the whole transaction rather than buying homes: Aryeo (Jul 2023, ~$35M, real-estate photography/media software), Spruce (Sep 2023, ~$19M, tech-enabled title and escrow), and Follow Up Boss (Dec 8, 2023, $399M cash net + up to $100M contingent, agent CRM; $402M goodwill, $86M intangibles). No material 2024 acquisitions are disclosed. This fits the revenue mix shift: FY2024 revenue $2,236M vs $1,945M, with Rentals up to $453M (from $357M/$274M) and Mortgages $145M (from $96M), while Residential grew only to $1,594M - i.e., diversification into software, rentals and adjacent transaction services.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 46,
+  "cevap": "MISS of about 7.4%. In its Q1 2024 shareholder letter (8-K filed 2024-05-09) Shift4 gave quarterly guidance for the balance of the year, including Q3 2024 end-to-end payment volume of $46.0B to $48.0B - midpoint $47.0B. Actual Q3 2024 E2E volume, reported in the Q3 letter (8-K filed 2024-11-12), was $43.5B, up 56% YoY. That is $3.5B below the midpoint, a 7.4% miss (and 5.4% below the low end). Shift4 also cut FY24 E2E guidance from $167-175B to $164-166B at Q3.",
+  "arac_cagrisi": 7,
+  "bulunamadi": false
+ },
+ {
+  "id": 47,
+  "cevap": "Lemonade beat or met every FY2024 metric it guided in the Q3 2024 letter (8-K, 2024-10-30). Guidance vs FY2024 actuals (Q4 letter, 8-K 2025-02-25): In force premium $940-944M vs $943.7M (top of range); gross earned premium $823-826M vs $827.3M (above high end); revenue $522-524M vs $526.5M (above high end); adjusted EBITDA loss $(155)-(151)M vs $(149.7)M (smaller loss than guided). Net loss was $(202.2)M and adjusted free cash flow was positive $48M for the year. Q4 gross loss ratio was 63%, its best ever.",
+  "arac_cagrisi": 6,
+  "bulunamadi": false
+ },
+ {
+  "id": 48,
+  "cevap": "Twice - both of the last two fiscal years. FY2023: initial guidance (June 2022) was adjusted diluted EPS flat to +3% in constant currency off a $3.94 base; actual was $4.30, up 10% cc - a clear beat. FY2024: initial guidance (June 2023) was +4% to +6% cc off $4.30; actual was $4.52, up 6% cc - at the top of the range, above the midpoint. Fiscal 2025 guidance, given 2024-06-26, is adjusted diluted EPS ranging between down 1% and up 1% in constant currency from the $4.52 fiscal 2024 base (roughly $4.47-$4.57), with organic net sales flat to +1%, adjusted operating profit flat to down 2% cc, and free cash flow conversion at least 95%.",
+  "arac_cagrisi": 8,
+  "bulunamadi": false
+ },
+ {
+  "id": 49,
+  "cevap": "AMD guides revenue and non-GAAP gross margin, so the implied gross profit guide is midpoint revenue x guided margin. FY2024 quarters: Q1 guide $5.4B x 52% = $2,808M vs actual $2,861M, beat $53M (+1.9%); Q2 $5.7B x 53% = $3,021M vs $3,101M, beat $80M (+2.6%); Q3 $6.7B x 53.5% = $3,585M vs $3,657M, beat $72M (+2.0%); Q4 $7.5B x 54% = $4,050M vs $4,140M, beat $90M (+2.2%). AMD beat all four quarters; average beat about $74M, or roughly +2.2%.",
+  "arac_cagrisi": 12,
+  "bulunamadi": false
+ }
+]

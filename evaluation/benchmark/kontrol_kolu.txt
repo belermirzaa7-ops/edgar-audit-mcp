@@ -1,0 +1,50 @@
+0|true|US Steel signed a merger agreement with Nippon Steel in December 2023 at $55.00 per share cash (~$14+ billion equity value); deal blocked by executive order Jan 2025, later cleared June 2025 with golden share; risk-factor style answer.
+1|true|ARM roughly $10.8-11.0 in 2019 and roughly $11.5-12.0 in 2024; only modest growth; regional divergence; explicitly says numbers are approximations to verify.
+2|true|Says TJX beat; guided ~11.3-11.4% pre-tax margin, reported ~11.6%, so ~20-30bps beat; not confident.
+3|false|Q2 2024 $5.4-6.0B 10.5%; Q3 2024 $6.4-7.0B 9.0%; Q4 2024 $7.2-7.8B 8.0%; Q1 2025 $6.8-7.4B 8.5%; midpoint +/- $300M convention.
+4|true|Does not know; will not guess names; points to DEF 14A.
+5|false|AMZN most (~$100-105B), GOOG ~$75B, META ~$60-65B; ranking AMZN > GOOG > META.
+6|false|Ellie Mertz, appointed 2024, succeeded Dave Stephenson.
+7|true|Headline ~$3.25 billion but says accounting consideration at close differs and cannot verify.
+8|true|Says MU beat; guided ~26.5% +/-1.5pp, reported ~26.9%, so ~40bps beat; not confident.
+9|false|Uses 2021 $1.542B and 2024 $2.866B; CAGR ~22.9%.
+10|true|Does not know per-class counts; describes four-class structure; total low-to-mid 600 millions.
+11|true|Cannot do the calculation from memory; no figures.
+12|true|Does not know; points to DEF 14A director compensation table.
+13|true|Directional only; says FCF margin rose to low-to-mid teens by 2024; not confident; no per-year numbers.
+14|true|Cannot give verified number; estimates turnover on the order of 6-7x; COGS mid-$14 billions, inventories around $2 billion.
+15|true|Recalls generic structure ($50 liquidation preference, quarterly dividend, 2028 mandatory conversion) but not size, coupon, date or conversion range.
+16|false|2022 ~13.3%; 2023 ~13.5%; 2024 ~13.6%; incremental expansion.
+17|true|Says Workday reports gross revenue retention above 95%; definition paraphrased loosely; not confident on wording.
+18|true|Does not know; guesses next three years likely roughly a third of total; no figures.
+19|true|Does not have a reliable figure; no rate given.
+20|true|Cannot cite the disclosure; gives generic sponsor-bank/card-network concentration discussion; does not mention the single North America processing vendor language.
+21|false|2022 ~$160; 2023 ~$164; 2024 ~$166.
+22|true|Not confident; no date given.
+23|true|No verified figure; guesses roughly $8.5 billion after excluding a ~$1.0B sustainability tranche.
+24|true|Generic Paylocity risk list from memory; explicitly says may not match FY2024 10-K.
+25|true|45% (102,000/228,000) but flags the split as unverified.
+26|true|Does not know specific terms; generic hybrid capital description.
+27|true|Does not have the figure; describes where it is disclosed.
+28|true|Lists plausible KPI names but says it does not know any FY2024 values and will not guess.
+29|true|Does not know; describes method.
+30|true|Cannot give a reliable number; computes 2026 revenue ~$2.17B but refuses gross profit for lack of margin base.
+31|true|Does not know; describes where disclosed.
+32|true|Approach only; estimates ~$1.6B pre-tax impact, roughly 13-14%; flags inputs unverified.
+33|true|Does not know; guesses roughly a fifth to a quarter; cannot confirm metric definition.
+34|true|Says stock-based compensation ~$1.9B is largest; not confident on exact amounts.
+35|true|$12.50 per Redfin share all-stock, ~$1.75B equity value; enterprise value $2.0-2.4B range, not pinned; note per-share price is stock ratio in expected answer.
+36|true|Does not know cumulative figure.
+37|true|Says Lyft slightly ahead, ~15-25bps better than guided midpoint; all figures flagged unverified.
+38|false|Lists adjusted EPS, revenue growth, operating margin, CASM-ex, fuel price, capacity, plus full-year FCF, capex, leverage.
+39|false|Lists taxes, D&A, SBC, acquisition-related items, lodging tax reserves, interest income/expense, other income.
+40|true|Not confident; says small negative low single digits or roughly breakeven; no figure stated.
+41|true|Cannot produce verified ranking; guesses KO ~75-80%, PEP similar, KDP lower, and adds MNST (0%) which is not in the expected peer set.
+42|true|Cannot decompose reliably; says both grew ~18% so growth essentially volume-driven; no take rate values.
+43|true|Does not know and doubts it is disclosed; refuses to estimate.
+44|true|Says on the order of $1.4 billion; not confident on exact figure.
+45|true|Follow Up Boss ~$400 million in late 2023 plus smaller deals; mentions Aryeo; misses Spruce and the exact amounts/dates; flags verification needed.
+46|true|Does not know; questions the premise; will not fabricate.
+47|true|Cannot verify; recalls IFP around $944 million and a beat across metrics; flags all figures unverified.
+48|true|Cannot answer with confidence; no count, no 2025 range.
+49|true|Cannot compute reliably; recalls gross margin guides ~53-54% and revenue midpoints; no dollar beats or average.

@@ -1130,3 +1130,51 @@ donduruyordu, yani "bilinmeyen numara" yolu HIC sinanmiyordu (P-4). Artik
 `company_tickers.json`'da olmayan CIK'e 404 donuyor.
 
 Alti yeni enjeksiyon dogruluyor.
+
+### KK-39: Dis benchmark - sunucunun neyi degistirdigi olculdu
+
+16 Agu 2026. Bu depo bugune kadar KENDI olcumleriyle konusuyordu: testler,
+enjeksiyonlar, kendi degerlendirme seti. Hepsi ic tutarlilik kaniti; hicbiri
+"bu sunucu cevabi degistiriyor mu" sorusunu yanitlamiyor. Disaridan, bizim
+yazmadigimiz bir soru kumesi gerekiyordu.
+
+Secilen: **Vals AI Finance Agent Benchmark** (CC-BY-4.0), 537 soruluk uzman
+yazimi setin acik 50 soruluk dilimi. Secim gerekcesi: acik lisansli, AJANSAL
+(araci olan bir model icin yazilmis, bir arama indeksi icin degil), ve bu
+depoyla ilgisi olmayan biri tarafindan hazirlanmis. Veri setinin kendi uzman
+sure tahmini 631 dakika (10,5 saat).
+
+**Sonuc: araçsiz %24 dogru, bu sunucuyla %82 dogru.** Iki kolda da "kendinden
+emin yanlis rakam" yok; fark, kontrol kolunun sorularin %36'sini hic
+cevaplayamamasi, arac kolunun ise yalnizca birini cevaplayamamasi. En keskin
+ayrim "Beat or Miss" turunde: 7/7'ye karsi 0/7. O sorular, sirketin bir onceki
+ceyrekte verdigi kilavuzlukla gerceklesen sonucu karsilastirmayi gerektiriyor,
+yani aylar arayla dosyalanmis IKI 8-K ekini bulup icindeki sayilari
+karsilastirmayi. Dosyalamaya erisimi olmayan bir model yalnizca YONU
+hatirlayabiliyor - nitekim TJX ve Micron icin "beat" dedi ve yonu iki kez de
+tutturdu, buyuklugu iki kez de kacirdi (20-30bps'e karsi 70, 40bps'e karsi 140).
+
+**Yontem kararlari, hepsi onyargiyi azaltmak icin:**
+- Cevaplayan iki kol da beklenen cevaplari HIC gormedi.
+- Notlandirmayi ayri bir ajan yapti; iki cevabi rastgele sirayla gordu ve
+  hangisinin hangi koldan geldigi soylenmedi.
+- Kontrol kolu "bilmiyorsan bilmedigini soyle, uydurma rakam verme" diye
+  talimatlandirildi - yani karsimizdaki kontrol, zayif degil GUCLU surumu.
+  Bunun bedeli acik: kontrol kolunun sifir "kendinden emin yanlis"i bu
+  talimattan geliyor, olcumden degil, ve rapor bunu boyle yaziyor.
+- Ham veri tumuyle depoda (`evaluation/benchmark/`): iki kolun cevaplari,
+  notlandiriciya verilen girdi, notlar, kol anahtari. Sayi tartisilabilir
+  olmali; tartisilmasi icin verinin gorunmesi gerekiyor.
+
+**Rapor edilen sinirlar** (rapora yazildi, dipnot degil govde): n=50; notlandirici
+bir dil modeli; kontrol kolunun cevaplari notlandirmadan once olgu iddialarina
+INDIRGENDI (arac kolu birebir notlandirildi) - bu asimetri olculemiyor; bes
+soruda donem uyusmazligi var (veri seti 2025'te yazildi, kosu 2026'da yapildi -
+bunlar dogru sayilsa arac kolu %92); iki beklenen cevap kendi icinde tutarsiz
+gorunuyor; ve baska veri setlerinin yayinlanmis skorlariyla (orn. Fin-RATE'in
+GPT-5 + web aramasi icin ~%43 baseline'i) YAN YANA KONULAMAZ - farkli sorular,
+farkli notlandirma.
+
+Bu sayinin degeri teknik degil ticari: sekiz rakip sunucunun hicbirinde boyle
+bir olcum yok (KK-38 oncesi yapilan tarama). Ama abartilmamali - olculen sey
+"bu sunucu rakiplerinden iyi" degil, "bu sunucu modelin cevabini degistiriyor".

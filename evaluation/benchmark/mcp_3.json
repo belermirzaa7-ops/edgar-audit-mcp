@@ -1,0 +1,62 @@
+[
+ {
+  "id": 30,
+  "cevap": "FY2024 (10-K XBRL): revenue $1,281.0M, cost of sales $940.9M -> gross profit $340.1M, gross margin 26.55%. Applying 30% revenue CAGR: 2025 = $1,665.3M, 2026 = $2,164.9M. Gross margin compressed 500bps = 21.55%. 2026 gross profit = $2,164.9M x 21.55% = ~$467 million (~$466.6M). Note: BROS does not tag GrossProfit; gross profit derived as RevenueFromContractWithCustomerExcludingAssessedTax minus CostOfGoodsAndServicesSold.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 31,
+  "cevap": "From loanDepot's 10-Q filed 11/12/2024 (Q3 2024, Item 2 MD&A), loan originations by purpose for the nine months ended 9/30/2024: Purchase $12,057,993K (~$12.06B, 69.7%); Refinance $5,250,321K (~$5.25B, 30.3%); Total $17,308,314K (~$17.31B). Prior-year nine months: Purchase $12,403,166K, Refinance $4,897,857K, total $17,301,023K - so volume was flat YoY but the mix shifted toward refinance.",
+  "arac_cagrisi": 3,
+  "bulunamadi": false
+ },
+ {
+  "id": 32,
+  "cevap": "Boeing FY2024 XBRL: total debt (DebtAndCapitalLeaseObligations) $53,864M at 12/31/2024; net loss $11,817M; income tax was a $381M benefit on a large pre-tax loss (~3% effective rate). Refinancing all debt at +300bps adds $53,864M x 3% = ~$1,616M of annual interest expense. With essentially no tax shield at Boeing's 2024 effective rate, net loss widens from $11,817M to roughly $13,433M - about $1.6B, or ~13.7% worse. If a 21% statutory shield were assumed, the after-tax hit would be ~$1,277M (~10.8%).",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 33,
+  "cevap": "Not found via these tools. Cloudflare's FY2024 10-K (filed 2/20/2025) describes selling 'indirectly through our ecosystem of channel partners that includes managed service providers, resellers, distributors, and global system integrators' and flags channel-partner dependence as a risk, but nowhere quantifies what percentage of customers (or revenue) came from channel partners. Searches of the FY2024 10-K for 'channel partners', 'through channel partners', 'partners accounted' and 'portion of our revenue', plus a full-text search across 2025 NET filings, returned no such percentage.",
+  "arac_cagrisi": 10,
+  "bulunamadi": true
+ },
+ {
+  "id": 34,
+  "cevap": "In Uber's FY2023 Adjusted EBITDA reconciliation (Q4'23 earnings 8-K, EX-99.1, 2/7/2024), the largest single adjustment to net income was stock-based compensation expense of $1,935 million (~$1.9 billion). The next largest was other (income) expense, net of $(1,844) million (~$(1.8) billion), a deduction driven mainly by equity-investment revaluation gains. FY2023 net income attributable to Uber was $1,887M and Adjusted EBITDA was $4,052M.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 35,
+  "cevap": "Rocket Companies (RKT) agreed on 3/9/2025 to acquire Redfin in an all-stock deal: $12.50 per Redfin share, or approximately $1.75 billion of equity value, via a fixed exchange ratio of 0.7926 Rocket Class A shares per Redfin share (63% premium to the 30-day VWAP through 3/7/2025). No enterprise value figure is stated in the SEC filings. The closest proxy: Rocket's pro forma preliminary estimated merger consideration was $1,652 million (stock $1,333M + converted awards $53M + $250M cash to retire Redfin's term loan + $17M costs) at Rocket's $13.16 share price on 4/24/2025.",
+  "arac_cagrisi": 7,
+  "bulunamadi": false
+ },
+ {
+  "id": 36,
+  "cevap": "In its FY2024 10-K (filed 2/27/2025), Warner Bros. Discovery states that for the restructuring and transformation framework finalized in 2022 in connection with the 2022 WarnerMedia Merger, it expected approximately $4.1-$5.3 billion of pre-tax restructuring charges, 'of which we have incurred $4.7 billion as of December 31, 2024.' Total expected cash expenditures within that were $1.0-$1.5 billion. WBD noted the Merger-related restructuring program was substantially completed at the end of 2024.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 37,
+  "cevap": "Lyft beat its own guidance. In the Q3'24 press release (8-K, 11/6/2024) management guided Q4'24 to Gross Bookings of $4.28-$4.35B and Adjusted EBITDA of $100-$105M, an Adjusted EBITDA margin of ~2.3%-2.4% (midpoint ~2.35%, ~$102.5M). Actual Q4'24 (8-K, 2/11/2025): Gross Bookings $4.3B, Adjusted EBITDA $112.8M, Adjusted EBITDA margin 2.6%. So the margin came in ~25bps above the guidance midpoint, and Adjusted EBITDA was ~$10.3M (~10%) above midpoint; margin also rose from 1.8% in Q4'23.",
+  "arac_cagrisi": 5,
+  "bulunamadi": false
+ },
+ {
+  "id": 38,
+  "cevap": "Per Delta's quarterly earnings 8-K 'Financial Guidance' tables (e.g. 1/13/2026 and 7/10/2026 releases), Delta guides on: for the next quarter - total revenue growth year-over-year (%), operating margin (%), and earnings per share; and for the full year - earnings per share (and EPS YoY growth), free cash flow ($B), and gross leverage (adjusted debt/EBITDAR). Guidance is on an adjusted (non-GAAP) basis and includes a stated fuel price assumption (forward curve plus a refinery benefit, giving an all-in fuel price per gallon). Long-term targets for EPS growth and FCF are also shown.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 39,
+  "cevap": "Per Airbnb's 10-K non-GAAP disclosure, Adjusted EBITDA is net income adjusted for: (1) provision for income taxes; (2) other expense, net; (3) interest income; (4) depreciation and amortization; (5) stock-based compensation expense; (6) acquisition-related impacts (gains/losses on changes in fair value of contingent consideration arrangements); (7) settlements and reserves for lodging, host withholding, transactional and other non-income taxes where significant uncertainty exists; and (8) stock-settlement obligations (employer and related taxes tied to the IPO). Example FY2025: net income $2,511M -> Adjusted EBITDA $4,297M (35% margin).",
+  "arac_cagrisi": 2,
+  "bulunamadi": false
+ }
+]

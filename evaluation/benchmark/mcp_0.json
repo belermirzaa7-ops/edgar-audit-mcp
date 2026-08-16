@@ -1,0 +1,62 @@
+[
+ {
+  "id": 0,
+  "cevap": "U.S. Steel (CIK 1163302) disclosed the Nippon Steel merger in its FY2024 10-K: Dec 18, 2023 Merger Agreement with Nippon Steel North America; $55.00/share cash; 98.8% shareholder approval Apr 12, 2024; HSR waiting period expired and all non-US approvals received. On Jan 3, 2025 the President ordered the deal blocked on CFIUS referral; deadline extended to June 18, 2025, and U.S. Steel/NSC sued in the D.C. Circuit plus a racketeering suit against Cleveland-Cliffs and the USW. Merger-related risk factors cite significant transaction/legal expenses, ordinary-course operating restrictions, management distraction, customer/supplier/employee uncertainty and retention risk, and loss of NSC's committed $2.7bn capital investment if terminated. The 8-K filed 2025-06-25 confirms the merger closed June 18, 2025, with a Golden Share issued to the U.S. Government under a National Security Agreement; a Form 15 deregistration followed June 30, 2025.",
+  "arac_cagrisi": 6,
+  "bulunamadi": false
+ },
+ {
+  "id": 1,
+  "cevap": "Netflix global average monthly revenue per paying membership (ARM), per 10-K MD&A: 2019 $10.82, 2020 $10.91, 2021 $11.67 (FY2021 10-K, consolidated incl. DVD), then streaming-only in the FY2024 10-K: 2022 $11.76, 2023 $11.64, 2024 $11.70. So ARPU rose ~$0.88 (+8.1%) over 2019-2024, but almost all of the gain came in 2020-2022; it has been essentially flat around $11.6-11.8 since 2021, with growth since then driven by membership volume (average paying memberships 222.9m in 2022 to 277.7m in 2024) rather than price per member. Constant-currency ARM grew 4% in 2024 while reported ARM grew only 1%, i.e. FX was the main drag.",
+  "arac_cagrisi": 5,
+  "bulunamadi": false
+ },
+ {
+  "id": 2,
+  "cevap": "TJX beat. In its Q3 FY25 release (8-K, Nov 20, 2024) TJX guided Q4 FY25 pretax profit margin to 10.8%-10.9%. Actual Q4 FY25 (13 weeks, 8-K Feb 26, 2025) pretax profit margin was 11.6%. Beat versus the high end of guidance = +70 bps (the release itself states margin was 'above the high-end of its plan by 0.7 percentage points'); +80 bps vs the low end and +75 bps vs the 10.85% midpoint. Drivers cited: lower-than-expected inventory shrink expense and expense leverage on above-plan sales, partly offset by higher incentive compensation accruals.",
+  "arac_cagrisi": 7,
+  "bulunamadi": false
+ },
+ {
+  "id": 3,
+  "cevap": "All guidance was \"approximately $X billion, plus or minus $300 million\" (range width $600m):\nQ2 2024: $5.4 billion (low) to $6.0 billion (high), 10.5% of midpoint\nQ3 2024: $6.4 billion (low) to $7.0 billion (high), 9.0% of midpoint\nQ4 2024: $7.2 billion (low) to $7.8 billion (high), 8.0% of midpoint\nQ1 2025: $6.8 billion (low) to $7.4 billion (high), 8.5% of midpoint\nSources: AMD 8-K earnings exhibits filed 2024-04-30, 2024-07-30, 2024-10-29 and 2025-02-04.",
+  "arac_cagrisi": 5,
+  "bulunamadi": false
+ },
+ {
+  "id": 4,
+  "cevap": "BBSI's DEF 14A filed 2024-04-22 (annual meeting June 3, 2024) nominated eight directors, all incumbents: Thomas J. Carley (director since 2000), Joseph S. Clabby (2022), Thomas B. Cusick (2016), Gary E. Kramer (2020, President & CEO), Anthony Meeker (1993), Carla A. Moradi (2021), Alexandra Morehouse (2022) and Vincent P. Price (2017). The proxy states 'All of our director nominees are currently serving on the Board' - no new outside nominee was added in 2024. The only 2024 board change disclosed by 8-K was governance, not a new member: on Dec 17, 2024 BBSI announced it created a Vice Chairman role and appointed sitting director Joseph S. Clabby to it, effective Dec 13, 2024.",
+  "arac_cagrisi": 7,
+  "bulunamadi": false
+ },
+ {
+  "id": 5,
+  "cevap": "Amazon. Stated 2025 plans in SEC filings: Meta's Q4 2024 8-K (Jan 29, 2025) - 'full year 2025 capital expenditures will be in the range of $60-65 billion'; Alphabet's Q4 2024 8-K (Feb 4, 2025) - 'we expect to invest approximately $75 billion in capital expenditures in 2025'; Amazon's FY2024 10-K gives no dollar figure but says cash capex was $77.7 billion in 2024 and 'We expect cash capital expenditures to increase in 2025.' Since Amazon's baseline already exceeds both peers' 2025 plans and it guided higher, Amazon plans the most. Actual FY2025 outturns confirm the ordering at the top: Alphabet $91.4 billion and Meta $69.7 billion of purchases of property and equipment (XBRL).",
+  "arac_cagrisi": 10,
+  "bulunamadi": false
+ },
+ {
+  "id": 6,
+  "cevap": "Elinor ('Ellie') Mertz is Airbnb's Chief Financial Officer. She signs Airbnb's most recent Form 10-K (fiscal year 2025, accession 0001559720-26-000004, filed Feb 12, 2026) as 'Chief Financial Officer (Principal Financial Officer).' The same signature page shows Brian Chesky as CEO and David Bernstein as Chief Accounting Officer (Principal Accounting Officer). Airbnb's CIK is 0001559720.",
+  "arac_cagrisi": 3,
+  "bulunamadi": false
+ },
+ {
+  "id": 7,
+  "cevap": "Per TKO's FY2025 10-K, under the Endeavor Asset Acquisition Agreement the TKO Parties acquired the IMG business, On Location and PBR for total consideration of approximately $3.25 billion plus a $50 million purchase price adjustment (roughly $3.30 billion), valued using the volume-weighted average sale price of TKO Class A common stock for the 25 trading days ended October 23, 2024. Consideration was all equity: the Endeavor parties received approximately 26.54 million TKO OpCo common units and subscribed for an equal number of TKO Class B shares. The deal closed February 28, 2025 and raised Endeavor's TKO voting control from ~54% to ~61%. Because it was a common-control merger, no purchase-price fair-value step-up was recorded; net assets were carried at historical amounts. TKO expensed $41.3m (2025) and $19.3m (2024) of transaction costs.",
+  "arac_cagrisi": 3,
+  "bulunamadi": false
+ },
+ {
+  "id": 8,
+  "cevap": "Micron beat. In the FQ2-24 release (8-K filed 2024-03-20) Micron guided FQ3-24 GAAP gross margin to 25.5% +/- 1.5% (24.0%-27.0%). Actual FQ3-24 (quarter ended May 30, 2024) GAAP gross margin was 26.9% ($1,832m on $6,811m revenue), per the 8-K filed 2024-06-26. That is a beat of 140 basis points versus the 25.5% midpoint (+290 bps vs the 24.0% low end, and 10 bps below the 27.0% high end). Non-GAAP gross margin was 28.1% versus 26.5% +/- 1.5% guidance, a 160 bps beat versus midpoint.",
+  "arac_cagrisi": 5,
+  "bulunamadi": false
+ },
+ {
+  "id": 9,
+  "cevap": "Using Palantir's XBRL revenue (RevenueFromContractWithCustomerExcludingAssessedTax): FY2022 $1,905.9m, FY2023 $2,225.0m, FY2024 $2,865.5m, FY2025 $4,475.4m. Most recent 3-year CAGR (FY2022 to FY2025) = (4,475.4/1,905.9)^(1/3) - 1 = 32.9% per year. If the window ends at FY2024 (FY2021 $1,541.9m to FY2024 $2,865.5m), the 3-year CAGR is 22.9%. Growth accelerated sharply in the last year (+56% in FY2025 vs +29% in FY2024), which is why the newer window is far higher.",
+  "arac_cagrisi": 1,
+  "bulunamadi": false
+ }
+]

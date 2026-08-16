@@ -1,0 +1,62 @@
+[
+ {
+  "id": 20,
+  "cevap": "Shift4's FY2024 10-K (filed 2025-02-19) states in its 'Concentration Risk' accounting-policy note: the Company's merchant processing activity in North America is facilitated by ONE vendor. Shift4 believes that vendor maintains appropriate backup systems and alternative arrangements to avoid a significant disruption of processing in an unforeseen event. Related concentration: a majority of revenue comes from processing card transactions, and because Shift4 is not a 'member bank' in North America it relies on a sponsorship agreement with a single member bank. The agreement requires Shift4 to abide by the card networks' by-laws and regulations; if Shift4 breaches it, the bank sponsor may terminate, and Shift4 would then have 180 days to identify an alternative bank sponsor. So the FY2024 vendor concentration is single-vendor processing plus single sponsor-bank dependence.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 21,
+  "cevap": "From ABNB 10-K key-business-metrics tables (FY2023 10-K for 2022/2023; FY2024 10-K for 2023/2024): Nights and Experiences Booked 394M (2022), 448M (2023), 492M (2024). Gross Booking Value $63,212M (2022), $73,252M (2023), $81,784M (2024). GBV per Night and Experience Booked = GBV / nights: 2022 = 63,212/394 = ~$160.4; 2023 = 73,252/448 = ~$163.5; 2024 = 81,784/492 = ~$166.2. That is roughly +1.9% in 2023 and +1.7% in 2024, i.e. modest ADR/mix-driven growth. 2024 FY2024 10-K commentary: revenue +12% to $11.1B on a 10% rise in nights plus higher Average Daily Rate driving a 12% GBV increase.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 22,
+  "cevap": "Production at the McCalla, Alabama facility was expected to begin during 2025. Per J.M. Smucker's FY2024 10-K (fiscal year ended April 30, 2024, filed 2024-06-18): in November 2021 Smucker announced plans to invest $1.1 billion to build a new manufacturing facility and distribution center in McCalla, Alabama dedicated to Smucker's Uncrustables frozen sandwiches; construction began in 2022, 'with production expected to begin in 2025.' The Properties footnote repeats: 'Production is expected to begin at the McCalla facility during 2025,' noting it complements existing Longmont, Colorado and Scottsville, Kentucky facilities. The later FY2026 10-K lists McCalla as an operating frozen-sandwich plant, confirming start-up.",
+  "arac_cagrisi": 3,
+  "bulunamadi": false
+ },
+ {
+  "id": 23,
+  "cevap": "The closest reported figure is Salesforce's FY2025 10-K (FYE January 31, 2025, filed March 5, 2025). Total outstanding principal of debt was $8,500 million (no revolver borrowings; the $5.0B credit facility was undrawn). The 2028 Senior Sustainability Notes (issued July 2021, 1.50%, due July 2028) had $1,000 million outstanding principal. Excluding those, face value = $7,500 million ($7.5 billion), comprised of: 2028 Senior Notes 3.70% $1,500M; 2031 Senior Notes 1.95% $1,500M; 2041 Senior Notes 2.70% $1,250M; 2051 Senior Notes 2.90% $2,000M; 2061 Senior Notes 3.05% $1,250M. The 2024 Senior Notes ($999M carrying) were repaid in full in Q2 FY2025.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 24,
+  "cevap": "Paylocity's FY2024 10-K (FYE June 30, 2024) groups these under 'Governmental Regulation' and 'Risks Related to Legal and Regulatory Matters': (1) Changing regulatory requirements - tax, benefit, wage-and-hour and employment law changes may force product redesign, raise costs, delay launches, or eliminate demand; new/reinterpreted state and federal money transmitter / money services business statutes could require licensing or limit activities, hurting interest income on client funds, with civil and criminal fines if deemed an unlicensed money transmitter. (2) AI/machine learning - evolving US, EU and other AI legislation, potential IP, privacy, employment and civil-rights claims, regulatory scrutiny and fines. (3) Data privacy - HIPAA, GDPR (fines up to 4% of worldwide revenue), CCPA/CPRA, BIPA, state breach-notification laws; rising enforcement actions and reputational damage. (4) Adverse tax laws - sales/use tax on electronically delivered services, possibly retroactive, plus past-tax, interest and penalty exposure. (5) Litigation risk generally.",
+  "arac_cagrisi": 5,
+  "bulunamadi": false
+ },
+ {
+  "id": 25,
+  "cevap": "Microsoft's FY2024 10-K (fiscal year ended June 30, 2024) states: 'As of June 30, 2024, we employed approximately 228,000 people on a full-time basis, 126,000 in the U.S. and 102,000 internationally.' So the share of full-time employees located outside the United States is 102,000 / 228,000 = approximately 44.7% (about 45%); the U.S. share is 126,000 / 228,000 = approximately 55.3%. For context the same disclosure splits the total by function: 86,000 in operations (product support, consulting, datacenter operations, manufacturing and distribution), 81,000 in product research and development, 45,000 in sales and marketing, and the remainder in general and administration.",
+  "arac_cagrisi": 3,
+  "bulunamadi": false
+ },
+ {
+  "id": 26,
+  "cevap": "Allstate's FY2024 10-K (Note 14, Capital Structure) shows $500 million outstanding of Series A 6.500% Fixed-to-Floating Rate Junior Subordinated Debentures (listed as 'due 2067'). Terms: scheduled maturity May 15, 2057, final maturity May 15, 2067. Interest is payable semi-annually at the fixed 6.500% rate to May 15, 2037, then quarterly at three-month LIBOR plus 2.120%, replaced by CME Term SOFR (3-month) plus a 0.26161% spread adjustment. Redeemable in whole or part on/after May 15, 2037 at principal plus accrued interest, or earlier in certain circumstances at principal plus accrued interest or, if greater, a make-whole price. Allstate may defer interest for consecutive periods up to 10 years (interest compounds); during deferral it cannot pay dividends or repurchase common/preferred. 75 million authorized unissued common shares are reserved for the deferral obligation. A replacement capital covenant applies, with the $800M 2053 Subordinated Debentures as covered debt.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 27,
+  "cevap": "Netflix's FY2024 10-K (as of December 31, 2024) discloses material cash requirements from known contractual obligations due in the Next 12 Months (i.e. 2025) of $14,426,266 thousand, about $14.4 billion. Components: content obligations $11,424,696K (~$11.4B), debt (principal plus interest) $2,486,945K (~$2.5B), and operating lease obligations $514,625K (~$0.5B). Total obligations across all periods were $45,851,513K (~$45.9B), with $31,425,247K beyond 12 months. Netflix notes the table excludes unknown future-title content obligations, which it believes could total roughly $1-4 billion over the next three years, with the vast majority payable after the next twelve months.",
+  "arac_cagrisi": 2,
+  "bulunamadi": false
+ },
+ {
+  "id": 28,
+  "cevap": "Spirit Airlines FY2024 10-K (CIK 0001498710, filed 2025-03-03) 'Comparative Operating Statistics', FY2024 totals: Average aircraft 209.9; Aircraft at end of period 213; Average daily aircraft utilization 9.9 hours; Departures 288,180; Passenger flight segments 44,180 thousand; Revenue passenger miles (RPMs) 43,671,009 thousand; Available seat miles (ASMs) 53,017,948 thousand; Load factor 82.4%; Total revenue per passenger flight segment $111.21; Average yield 11.25 cents; TRASM 9.27 cents; CASM 11.35 cents; Adjusted CASM 10.76 cents; Adjusted CASM ex-fuel 7.97 cents; Fuel gallons consumed 551,819 thousand; Average fuel cost per gallon $2.68. Related FY2024 revenue: passenger $4,811,752K, other $101,669K, total $4,913,421K.",
+  "arac_cagrisi": 4,
+  "bulunamadi": false
+ },
+ {
+  "id": 29,
+  "cevap": "Snap's FY2024 10-K does not print a single 'maximum dilution' figure, but it gives principal outstanding at 12/31/2024 and each initial conversion rate (shares per $1,000 principal): 2025 Notes $36.240M at 46.1233 = ~1.67M shares; 2026 Notes $249.754M at 43.8481 = ~10.95M; 2027 Notes $1,150M at 11.2042 = ~12.88M; 2028 Notes $1,500M at 17.7494 = ~26.62M; 2030 Notes $750M at 45.0846 = ~33.81M. Total principal $3,685.994M implies approximately 85.9 million Class A shares maximum at initial conversion rates (rates can rise on make-whole fundamental changes/redemption). Capped calls on the 2026-2030 Notes (cap prices $32.58/$121.02/$93.90/$33.48) offset dilution above the conversion price up to the cap; the 2025 capped calls were terminated in May 2024. All were out-of-the-money and if-converted value did not exceed principal at 12/31/2024.",
+  "arac_cagrisi": 9,
+  "bulunamadi": false
+ }
+]

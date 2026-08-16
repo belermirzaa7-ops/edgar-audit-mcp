@@ -440,6 +440,24 @@ Mocks cannot prove behaviour against the real system. `dogrula.py` checks the
 fiscal-year derivation and the tag-merging logic against live SEC data for
 companies with calendar-year, ending-year and starting-year fiscal conventions.
 
+### Benchmark
+
+[`evaluation/benchmark.md`](evaluation/benchmark.md) reports what changes when a
+model has this server: the same model answered the 50 public questions of the
+[Vals AI Finance Agent Benchmark](https://huggingface.co/datasets/vals-ai/finance_agent_benchmark)
+twice — once with no tools, once with only these ten.
+
+| | correct | partial | wrong | no answer |
+|---|---|---|---|---|
+| **With this server** | **41 (82%)** | 8 | 0 | 1 |
+| Without tools | 12 (24%) | 20 | 0 | 18 |
+
+Neither answering arm saw the expected answers; a separate grader saw the two
+answers in randomised order without being told which produced which. Every
+artifact — both arms' raw answers, the grading input, the grades, the arm key —
+is in `evaluation/benchmark/`, and the limits of the number are written out in
+the report rather than left for the reader to find.
+
 ### Evaluation set
 
 [`evaluation/questions.xml`](evaluation/questions.xml) holds twenty questions that
