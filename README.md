@@ -94,6 +94,32 @@ has, so the next call names one instead of guessing. When the right heading is
 not obvious, `search` reports how many times a phrase occurs and where; each
 position can be passed straight back as `offset`.
 
+### Reading the tables, not just the text
+
+Filings put their most quotable figures in tables — the financial statements,
+the tax reconciliation, the production and delivery release that XBRL never
+tags. Converted to plain text a table becomes cells joined by ` | `, and
+whoever reads it has to align the columns by eye.
+
+Passing `tables` to `sec_edgar_read_filing_text` returns the tables that begin
+inside the text being returned, as rows and cells. Some care is in it:
+
+- A table's `text_offset` is in the same coordinate space as `offset`, so a
+  table can be matched to the passage it belongs to rather than to the document
+  as a whole. Ask for a section and the offsets move with it.
+- EDGAR filings use tables for page layout as much as for data. Tables with a
+  single row or a single column are left out — and counted in
+  `layout_tables_skipped`, because silence about them would read as "this
+  filing has no tables".
+- Nested tables come back separately rather than merged, and the inner table's
+  text is not copied into the outer cell: the same figures returned twice would
+  invite a model to count them twice.
+- Row and cell limits exist, and each says so: `total_rows` against
+  `row_count`, plus `rows_truncated` and `cells_truncated`.
+
+Nothing here is new data — the same numbers are in the text. It is the
+structure, returned so the model does not have to reconstruct it.
+
 ### Comparing across companies
 
 The other tools answer about one company. `sec_edgar_compare_companies` reads
@@ -165,6 +191,23 @@ in the filer's own document, not just a row in SEC's extraction. Filings from be
 (fiscal periods ending 2019-06-15 for large accelerated filers, 2020 and 2021
 for smaller ones) carry a filer-submitted instance instead, and that is read
 instead.
+
+That fallback used to be described here as untested, which was honest but
+unsatisfying. It was measured on 15 Aug 2026 against Tesla's 10-K for fiscal
+2011, filed February 2012: the filing has no `_htm.xml` at all, carries a
+769 KB instance the company submitted itself, and that instance holds
+dimensional facts in the same shape as a modern one — `xbrldi:explicitMember`
+inside `entity/segment`, including contexts qualified by two axes at once. Its
+label linkbase resolved too, and doing so proved a design decision right: the
+2011 file declares no namespace prefix and names its locators
+`us-gaap_Assets` against label resources named `us-gaap_Assets_lbl`, so a
+reader that matched labels by naming convention rather than by following the
+arc would have returned nothing at all for that filing.
+
+The real boundary is earlier and it is not ours to move: XBRL was phased in
+from fiscal periods ending after 15 June 2009, and nothing before that carries
+tagged data in any form. For those filings the figures exist only as text, and
+the text tools are the whole answer.
 
 ### Searching the text of every filer
 
@@ -379,7 +422,7 @@ companies with calendar-year, ending-year and starting-year fiscal conventions.
 
 ### Evaluation set
 
-[`evaluation/questions.xml`](evaluation/questions.xml) holds nineteen questions that
+[`evaluation/questions.xml`](evaluation/questions.xml) holds twenty questions that
 can only be answered by calling the tools: cross-company fiscal year labels,
 tag merges across an accounting standard change, ratios that need two series,
 and the pagination fields. Every answer was produced by running the tools
@@ -387,7 +430,7 @@ against live SEC data and reading the result — none is written from memory —
 and each question records the exact calls used, so the measurement can be
 repeated instead of trusted.
 
-A test keeps the file structurally honest: nineteen pairs, every pair carrying a
+A test keeps the file structurally honest: twenty pairs, every pair carrying a
 question, an answer and a verification block, every tool it names actually
 existing on the server, and no question anchored to "the latest" period.
 

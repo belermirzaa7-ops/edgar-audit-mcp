@@ -161,9 +161,21 @@ BELGE_UZUN_TOC = """<html><body>
 # Ucuncu belge: basliklar TABLO icinde. Gercek 10-K'larin cogu boyle yerlesir;
 # metne cevrilince satir " | " ile basladigi icin satir-basi capasi tutmaz.
 TABLO_ISARET = "TABLE LAYOUT SECTION BODY"
+# Bolum SIFIRDAN ILERIDE basliyor (once kapak paragrafi) ve ICINDE gercek bir
+# tablo var. Ikisi birlikte olmazsa "bolum kesilince tablo konumu kayiyor mu"
+# sorusu olculemez: bolum 0'dan basliyorsa kaydirma zaten kimlik islemidir ve
+# kaldirilsa bile hicbir test kirmiziya donmez (15 Agu 2026, enjeksiyon
+# "KORUMASIZ" dedi).
 BELGE_TABLO = """<html><body>
+<p>""" + "Cover page filler. " * 30 + """</p>
 <table><tr><td>Item 7.</td><td>Management's Discussion and Analysis</td></tr></table>
 <p>""" + TABLO_ISARET + """. """ + "Discussion filler. " * 60 + """</p>
+<table>
+  <tr><td>Segment</td><td>Revenue</td></tr>
+  <tr><td>Automotive</td><td>71,462</td></tr>
+  <tr><td>Energy</td><td>10,086</td></tr>
+</table>
+<p>""" + "More discussion. " * 40 + """</p>
 <table><tr><td>Item 8.</td><td>Financial Statements</td></tr></table>
 <p>""" + "Statements filler. " * 60 + """</p>
 </body></html>"""
@@ -189,9 +201,26 @@ BELGE_8K_KAPAK = """<html><body>
 <div>Item 9.01 Financial Statements and Exhibits</div>
 <p>99.1 Press Release dated July 2, 2026. """ + "Exhibit index filler. " * 12 + """</p>
 </body></html>"""
+# Ek belgeye GERCEK bir tablo eklendi: bu isin asil ornegi teslimat/uretim
+# tablosu (adetler XBRL'de yok, metinde ve TABLODA var). Uc sey birlikte
+# duruyor, cunku ucunun de ayri bir kod yolu var:
+#   (1) veri tasiyan tablo (satir/hucre olarak donmeli),
+#   (2) yerlesim icin kullanilan tek satirlik tablo (elenmeli ama SAYILMALI),
+#   (3) gizli blok icindeki tablo (ne metne ne yapiya girmeli).
+GIZLI_TABLO_ISARET = "HIDDEN TABLE CELL"
 BELGE_8K_EK = """<html><body>
 <p>Tesla reported production of 451,758 vehicles and """ + EK_ISARET + """
 in the second quarter of 2026, and deployed 13.5 GWh of energy storage.</p>
+<table><tr><td colspan="3">Quarterly summary</td></tr></table>
+<table>
+  <tr><td>Period</td><td>Production</td><td>Deliveries</td></tr>
+  <tr><td>Q2 2026</td><td>451,758</td><td>480,126</td></tr>
+  <tr><td>Q1 2026</td><td>362,615</td><td>336,681</td></tr>
+  <tr><td></td><td></td><td></td></tr>
+  <tr><td>Q2 2025</td><td>410,244</td><td>384,122</td></tr>
+</table>
+<div style="display:none"><table><tr><td>""" + GIZLI_TABLO_ISARET + """</td><td>x</td></tr>
+<tr><td>y</td><td>z</td></tr></table></div>
 <p>""" + "Press release filler. " * 60 + """</p>
 </body></html>"""
 
@@ -1648,13 +1677,13 @@ async def test_belge_metne_bir_kez_cevriliyor(srv, monkeypatch):
     from edgar_mcp import server as s
 
     sayac = {"n": 0}
-    gercek = b.metne_cevir
+    gercek = b.cevir
 
-    def sayan(govde: str) -> str:
+    def sayan(govde: str, gizliyi_atla: bool = True):
         sayac["n"] += 1
-        return gercek(govde)
+        return gercek(govde, gizliyi_atla=gizliyi_atla)
 
-    monkeypatch.setattr(s, "metne_cevir", sayan)
+    monkeypatch.setattr(s, "cevir", sayan)
 
     await srv.read_filing_text(ticker="AAPL", max_characters=500)
     await srv.read_filing_text(ticker="AAPL", offset=500, max_characters=500)
@@ -2875,3 +2904,170 @@ def test_etiket_ayristirici_bozuk_xml_de_cokmuyor():
     from edgar_mcp.xbrl import etiketleri_ayristir
     e = etiketleri_ayristir("<link:linkbase><link:loc kapanmamis")
     assert e.qname == {} and e.bul("us-gaap:Revenues") is None
+
+
+# ------------------------------------------------------------------- tablolar
+async def _ek_tablolu(srv, **kw):
+    return await srv.read_filing_text(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        document="exhibit991.htm", **kw)
+
+
+@pytest.mark.anyio
+async def test_tablolar_istenmedikce_donmuyor(srv):
+    """Varsayilan kapali: yapiya ihtiyaci olmayan her cagriya yuzlerce hucre
+    eklemek, sayfalama butcesini bosa harcar."""
+    b = await _ek_tablolu(srv, max_characters=40000)
+    assert b.tables == [] and b.total_tables == 0
+
+
+@pytest.mark.anyio
+async def test_tablo_satir_ve_hucre_olarak_donuyor(srv):
+    """Asil kazanc: duz metinde sayilar ` | ` ile birbirine yapisik geliyor ve
+    modelin sutunlari goz kararı hizalamasi gerekiyordu."""
+    b = await _ek_tablolu(srv, tables=True, max_characters=40000)
+    veri = [t for t in b.tables if t.column_count == 3]
+    assert veri, [t.rows for t in b.tables]
+    t = veri[0]
+    assert t.rows[0] == ["Period", "Production", "Deliveries"]
+    assert t.rows[1] == ["Q2 2026", "451,758", "480,126"]
+    # Tamami bos satir atiliyor (yerlesim artigi), bos HUCRE atilmiyor.
+    assert ["", "", ""] not in t.rows
+    assert t.row_count == 4 and t.total_rows == 4 and t.rows_truncated is False
+
+
+@pytest.mark.anyio
+async def test_yerlesim_tablosu_sessizce_dusurulmuyor(srv):
+    """EDGAR sayfa yerlesimi icin de tablo kullaniyor. Elemek dogru, ama
+    "tablo yok" ile "tablolarin hepsi yerlesimdi" ayni sey degil."""
+    b = await _ek_tablolu(srv, tables=True, max_characters=40000)
+    assert b.layout_tables_skipped >= 1
+    assert all(t.row_count >= 2 for t in b.tables)
+
+
+@pytest.mark.anyio
+async def test_gizli_bloktaki_tablo_yapiya_da_girmiyor(srv):
+    """Gizli blok filtresini metinde uygulayip yapida uygulamamak, filtreyi bir
+    kapidan kovup otekinden almak olurdu."""
+    b = await _ek_tablolu(srv, tables=True, max_characters=40000)
+    assert GIZLI_TABLO_ISARET not in b.text
+    hucreler = [h for t in b.tables for satir in t.rows for h in satir]
+    assert GIZLI_TABLO_ISARET not in hucreler
+    # Gizli tablo hic KURULMAMALI. Kurulup sonra "yerlesim" diye elenirse
+    # sayac sisiyor ve model olmayan bir tablodan haberdar ediliyor: belgede
+    # bir yerlesim tablosu var (colspan'li ozet seridi), gizli olan sayilmaz.
+    assert b.layout_tables_skipped == 1, b.layout_tables_skipped
+
+
+@pytest.mark.anyio
+async def test_tablo_konumu_dondurulen_metne_denk_geliyor(srv):
+    """`text_offset` `offset` ile AYNI koordinatta olmali; degilse model
+    tabloyu yanlis pasaja baglar."""
+    b = await _ek_tablolu(srv, tables=True, max_characters=40000)
+    t = [x for x in b.tables if x.column_count == 3][0]
+    yerel = t.text_offset - b.offset
+    assert b.text[yerel:yerel + 40].startswith("| Period")
+
+
+@pytest.mark.anyio
+async def test_tablolar_sayfalama_penceresiyle_sinirli(srv):
+    """Pencerenin disinda BASLAYAN tablo dondurulmuyor, ama toplam sayi tum
+    bolumu bildiriyor - "bu belgede tablo yok" yanilgisi olusmasin."""
+    tam = await _ek_tablolu(srv, tables=True, max_characters=40000)
+    assert tam.tables, "kontrol: tam okumada tablo var"
+    konum = tam.tables[0].text_offset
+    # Tablonun BASLADIGI yerden SONRA acilan bir pencere: tablo donmemeli, ama
+    # toplam sayi degismemeli - yoksa model "bu belgede tablo yok" sanir.
+    sonra = await _ek_tablolu(srv, tables=True, offset=konum + 10, max_characters=500)
+    assert sonra.tables == [], sonra.tables
+    assert sonra.total_tables == tam.total_tables == 1
+
+
+@pytest.mark.anyio
+async def test_bolum_secilince_tablo_konumu_bolume_gore(srv):
+    """Bolum kesildiginde metin kayiyor; tablo konumu kaymazsa dogru tablo
+    yanlis yerde gorunur."""
+    b = await srv.read_filing_text(ticker="AAPL", section="Item 7",
+                                   accession_number="0000320193-25-000058",
+                                   tables=True, max_characters=40000)
+    for t in b.tables:
+        yerel = t.text_offset - b.offset
+        assert 0 <= yerel < len(b.text)
+        assert b.text[yerel:yerel + 2] == "| ", b.text[yerel:yerel + 20]
+
+
+def test_bosluk_sadelestirme_eski_regex_zinciriyle_ayni():
+    """Sadelestirme regex zincirinden tek gecise tasindi (tablo konumlari
+    onunla birlikte tasinsin diye). Davranis BIREBIR ayni kalmali; bu test iki
+    uygulamayi ayni girdilerle karsilastiriyor."""
+    import re as _re
+
+    from edgar_mcp.belge import _topla
+
+    def eski(metin: str) -> str:
+        metin = metin.replace("\xa0", " ").replace("​", "")
+        metin = _re.sub(r"[ \t]+", " ", metin)
+        metin = _re.sub(r" *\n *", "\n", metin)
+        metin = _re.sub(r"\n{3,}", "\n\n", metin)
+        return metin.strip()
+
+    ornekler = [
+        "  a \n\n b ", "a\t\t b", "a\n\n\n\n\nb", "a\xa0​b", "\n\n", "",
+        "a \n \n \n b", "a\r\n\r\nb", " | a | b \n | c ", "tek",
+        BELGE_HTML, BELGE_TABLO, BELGE_8K_EK, BELGE_UZUN_TOC,
+    ]
+    for o in ornekler:
+        yeni, _ = _topla(o, [])
+        assert yeni == eski(o), repr(o[:80])
+
+
+def test_uzun_tablo_kirpiliyor_ve_bunu_soyluyor():
+    from edgar_mcp.belge import SATIR_SINIRI, cevir
+
+    satirlar = "".join(f"<tr><td>r{i}</td><td>{i}</td></tr>"
+                       for i in range(SATIR_SINIRI + 25))
+    c = cevir(f"<html><body><table>{satirlar}</table></body></html>")
+    t = c.tablolar[0]
+    assert len(t.satirlar) == SATIR_SINIRI
+    assert t.toplam_satir == SATIR_SINIRI + 25 and t.kirpildi is True
+
+
+def test_uzun_hucre_kirpiliyor_ve_bunu_soyluyor():
+    from edgar_mcp.belge import HUCRE_SINIRI, cevir
+
+    uzun = "söz " * 200
+    c = cevir(f"<html><body><table><tr><td>{uzun}</td><td>b</td></tr>"
+              "<tr><td>c</td><td>d</td></tr></table></body></html>")
+    t = c.tablolar[0]
+    assert len(t.satirlar[0][0]) == HUCRE_SINIRI and t.hucre_kirpildi is True
+
+
+def test_ic_ice_tablolar_ayri_ayri_donuyor():
+    """EDGAR yerlesim icin tablo ICINE tablo koyuyor. Ic teki tablonun
+    hucreleri disaridakine yazilirsa iki tablo tek bir karisim olur."""
+    from edgar_mcp.belge import cevir
+
+    c = cevir("<html><body><table>"
+              "<tr><td><table><tr><td>ic1</td><td>ic2</td></tr>"
+              "<tr><td>ic3</td><td>ic4</td></tr></table></td><td>dis2</td></tr>"
+              "<tr><td>dis3</td><td>dis4</td></tr>"
+              "</table></body></html>")
+    kumeler = [[h for satir in t.satirlar for h in satir] for t in c.tablolar]
+    assert ["ic1", "ic2", "ic3", "ic4"] in kumeler, kumeler
+    assert any("dis3" in k and "ic3" not in k for k in kumeler), kumeler
+    # Ic tablonun metni dis hucreye KOPYALANMIYOR: ayni sayilari iki tabloda
+    # birden dondurmek, toplam alan bir modele veriyi iki kez saydirir.
+    dis = [k for k in kumeler if "dis3" in k][0]
+    assert dis[0] == "", dis
+
+
+def test_kapanmamis_tablo_da_donuyor():
+    """EDGAR HTML'i kapanis etiketlerini atlayabiliyor ve belgenin son tablosu
+    tam da mali tablolar olabiliyor."""
+    from edgar_mcp.belge import cevir
+
+    # Belge tablonun ORTASINDA bitiyor: hicbir kapanis etiketi yok, dolayisiyla
+    # yigini bosaltan tek yol `close()`. `</body>` yazsaydik `_kapat` tabloyu
+    # zaten bitirirdi ve bu yol hic sinanmazdi.
+    c = cevir("<html><body><table><tr><td>a<td>b<tr><td>c<td>d")
+    assert c.tablolar and c.tablolar[0].satirlar == [["a", "b"], ["c", "d"]]

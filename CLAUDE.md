@@ -1009,3 +1009,73 @@ burada guvenlik degil, olculemezlik uretiyor. `lstrip` kaldirildi; BOM tek
 yerde, ve o yer artik sinaniyor.
 
 P-30 olarak kayda gecti. Uc yeni enjeksiyon dogruluyor.
+
+### KK-37: Tablo yapisi (madde 2) ve 2019 oncesi olcumu (madde 6)
+
+15 Agu 2026. Yedi sinirdan ikisi daha kapandi; biri kod, oteki yalnizca olcum
+isiydi ve ikisi de "veri yok" degil "veriye giden yol dolambacli" sinifindaydi.
+
+**Madde 2 - `read_filing_text(tables=true)`.** Adetler (teslimat, uretim, ASP)
+XBRL'de yok, metinde var; ama metinde tablo ` | ` ile birlestirilmis hucrelere
+donusuyor ve sutunlari hizalamak modele kaliyordu. Sirkete ozel bir ayristirici
+yazmak yerine YAPI donduruluyor, yorum modele birakiliyor - EDGAR'da tablo
+bicimi dosyalayandan dosyalayana degistigi icin bu daha az kirilgan.
+
+Tasarim kararlari ve sebepleri:
+- **Tek gecis.** Tablolar metinle ayni ayristirmada toplaniyor. Ikinci bir
+  gecis daha basit olurdu ama tablonun metindeki KONUMU kaybolurdu; o konum
+  olmadan "su an okudugun parcanin tablolari" sorusu sorulamaz ve model
+  ilgisiz bir tabloyu okudugu pasaja ait sanar.
+- **Bosluk sadelestirmesi regex zincirinden tek gecise tasindi.** Konumlar ham
+  metinde olculuyor, sadelestirme karakter siliyor; iki ayri uygulama zamanla
+  birbirinden ayrilir. Simdi tek uygulama var ve konumlar onunla tasiniyor.
+  Davranisin BIREBIR ayni kaldigini bir test her fixture uzerinde eski regex
+  zinciriyle karsilastirarak sabitliyor.
+- **Yerlesim tablolari elenir ama SAYILIR.** EDGAR sayfa duzeni icin de tablo
+  kullaniyor; tek satir/tek sutun olanlar veri tasimiyor. Elemek dogru, sessiz
+  elemek degil - `layout_tables_skipped` var.
+- **Ic ice tablolar ayri ayri doner ve ic tablonun metni dis hucreye
+  KOPYALANMAZ.** Ayni rakamlari iki tabloda birden dondurmek, toplam alan bir
+  modele veriyi iki kez saydirirdi.
+- Satir/hucre sinirlari kendilerini soyluyor (`total_rows`, `rows_truncated`,
+  `cells_truncated`).
+
+**Bu is sirasinda ONCEDEN VAR OLAN bir hata bulundu.** Ortulu kapanis kurali
+(`<td>a<td>b`) tablo sinirini asiyordu: ic tablonun `<tr>`'si DIS tablonun acik
+`<td>`'sini kapatiyordu. Tarayicilar bunu yapmaz - ic tablo yeni bir baglam
+acar. Sonuc olculdu: dis tablonun satirlari tumden kayboluyor ve METIN de
+bozuluyor. Tablo modu yazilmasaydi bu hata gorunmezdi; yeni bir yuzey acmak,
+eski yuzeydeki hatayi gorunur kildi.
+
+**Madde 6 - 2019 oncesi: sinir varsayimdi, olculdu.** Dokumantasyon "2009-2019
+arasi dosyalayanin instance'i okunuyor ama bu hic sinanmadi" diyordu. TSLA'nin
+Subat 2012'de dosyaladigi FY2011 10-K'si uzerinden olculdu:
+- `_htm.xml` YOK (inline XBRL oncesi), dosyalayanin sundugu `tsla-20111231.xml`
+  **768.935 bayt** var - yani yedek yolun aradigi dosya gercekten orada.
+- Instance boyutlu gercekleri MODERN dosyalamayla ayni yapida tasiyor:
+  `entity/segment` icinde `xbrldi:explicitMember`, ve ayni anda iki eksene
+  bagli context'ler.
+- Etiket linkbase'i (208.484 bayt) da var ve bir tasarim kararini dogruladi:
+  2011 dosyasi **hic onek bildirmiyor** (`<loc>`, `<label>`, `<labelArc>`
+  varsayilan ad alaninda) ve konumlarini `us-gaap_Assets`, etiket kaynaklarini
+  `us-gaap_Assets_lbl` diye adlandiriyor. Yani `loc_`/`lab_` kalibina bakan bir
+  okuyucu bu dosyada HICBIR etiket cozemezdi; yayi takip etme karari (KK-35)
+  burada tek calisan yol.
+
+Asil sinir daha geride ve kaldirilamaz: XBRL 15 Haziran 2009'dan sonra biten
+donemlerden itibaren kademeli zorunlu oldu; oncesinde etiketli veri hic yok.
+O dosyalamalarda cevap tumuyle metin araclarinda.
+
+**Arac katmani olcumu hala eksik:** kullanicinin masaustundeki MCP sunucusu
+guncellenmeden eski surumu calistiriyor ve eski surum `recent` akisinin
+disindaki bir erisim numarasini acamiyor. v34 acabiliyor (KK-35 madde 2);
+Claude Desktop yeniden baslatildiginda `sec_edgar_list_fact_dimensions(ticker=
+"TSLA", accession_number="0001193125-12-081990")` cagrisi bunu uctan uca
+gosterecek. Veri tarafi olculdu, arac tarafi olculmedi - ikisi ayri ayri
+yaziliyor.
+
+On bir yeni enjeksiyon tablo korumalarini dogruluyor. Ucu ilk turda
+"KORUMASIZ" dondu ve ucu de testin ne olctugunu duzeltti: bolum kaydirmasi
+sifirdan baslayan bir bolumde kimlik islemiydi, gizli tablo zaten bos
+kaliyordu, kapanmamis tablo `</body>` sayesinde baska bir yoldan bitiyordu.
+Harness bir kez daha testin kendisini denetledi.

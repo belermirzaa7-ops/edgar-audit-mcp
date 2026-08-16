@@ -92,6 +92,32 @@ döndürür; ikinci çağrı tahmin etmek yerine birini adıyla ister. Doğru ba
 ne olduğu belli değilse `search` bir ifadenin kaç kez ve nerede geçtiğini
 bildirir; her konum doğrudan `offset` olarak geri verilebilir.
 
+### Metnin yanında tabloları da okumak
+
+Dosyalamaların en çok alıntılanan rakamları tablolarda duruyor — mali tablolar,
+vergi mutabakatı, XBRL'in hiç etiketlemediği üretim/teslimat bülteni. Düz metne
+çevrildiğinde tablo ` | ` ile birleştirilmiş hücrelere dönüşüyor ve sütunları
+göz kararı hizalamak okuyana kalıyor.
+
+`sec_edgar_read_filing_text`'e `tables` verildiğinde, döndürülen metnin içinde
+**başlayan** tablolar satır/hücre olarak geliyor. Dikkat edilen noktalar:
+
+- Tablonun `text_offset` değeri `offset` ile aynı koordinatta; böylece tablo
+  belgenin tamamına değil, ait olduğu pasaja bağlanabiliyor. Bölüm seçilirse
+  konumlar bölümle birlikte kayıyor.
+- EDGAR dosyalamaları tabloyu veri kadar sayfa yerleşimi için de kullanıyor.
+  Tek satırlık ya da tek sütunluk tablolar dışarıda bırakılıyor — ve
+  `layout_tables_skipped` ile sayılıyor, çünkü hiç söylememek "bu dosyalamada
+  tablo yok" diye okunur.
+- İç içe tablolar birleştirilmeden ayrı ayrı dönüyor ve iç tablonun metni dış
+  hücreye kopyalanmıyor: aynı rakamları iki kez döndürmek, toplam alan bir
+  modele veriyi iki kez saydırır.
+- Satır ve hücre sınırları var ve her biri kendini söylüyor: `row_count`
+  yanında `total_rows`, ayrıca `rows_truncated` ve `cells_truncated`.
+
+Burada yeni bir veri yok — aynı sayılar metinde de var. Dönen şey yapı; model
+onu yeniden kurmak zorunda kalmıyor.
+
 ### Şirketler arası karşılaştırma
 
 Diğer araçlar tek şirket hakkında konuşur. `sec_edgar_compare_companies` SEC'in
@@ -161,6 +187,22 @@ parçayı gösteriyor — SEC'in ayıklamasındaki bir satırı değil. Inline X
 oldu (büyük hızlandırılmış dosyalayanlar için 2019-06-15, diğerleri için 2020
 ve 2021'de biten dönemler); öncesindeki dosyalamalarda dosyalayanın sunduğu
 instance okunuyor.
+
+Bu yedek yol burada bir süre "sınanmadı" diye yazıyordu — dürüsttü ama eksikti.
+15 Ağu 2026'da ölçüldü: Tesla'nın Şubat 2012'de dosyaladığı FY2011 10-K'sında
+`_htm.xml` hiç yok, şirketin kendi sunduğu 769 KB'lık instance var ve o
+instance boyutlu gerçekleri modern bir dosyalamayla **aynı yapıda** taşıyor —
+`entity/segment` içinde `xbrldi:explicitMember`, hatta aynı anda iki eksene
+bağlı context'ler. Etiket linkbase'i de çözüldü ve bu bir tasarım kararını
+doğruladı: 2011 dosyası hiç önek bildirmiyor ve konumlarını `us-gaap_Assets`,
+etiket kaynaklarını `us-gaap_Assets_lbl` diye adlandırıyor. Yani etiketi yay
+yerine isimlendirme kalıbıyla eşleştiren bir okuyucu, o dosyalamada hiçbir şey
+bulamazdı.
+
+Asıl sınır daha geride ve bizim kaldırabileceğimiz bir sınır değil: XBRL,
+15 Haziran 2009'dan sonra biten dönemlerden itibaren kademeli olarak zorunlu
+oldu; öncesinde hiçbir dosyalama etiketli veri taşımıyor. O dosyalamalarda
+rakamlar yalnızca metinde var ve cevap tümüyle metin araçları.
 
 ### Tüm dosyalayanların metninde arama
 
@@ -382,13 +424,13 @@ yılı, bitiş yılı ve başlangıç yılı geleneklerini kullanan şirketlerle
 ### Değerlendirme seti
 
 [`evaluation/questions.xml`](evaluation/questions.xml), yalnızca araçlar
-çağrılarak cevaplanabilecek on dokuz soru tutuyor: şirketler arası mali yıl
+çağrılarak cevaplanabilecek yirmi soru tutuyor: şirketler arası mali yıl
 adlandırması, muhasebe standardı değişiminde etiket birleştirme, iki seri
 gerektiren oranlar ve sayfalama alanları. Her cevap araçlar canlı SEC verisine
 karşı çalıştırılarak üretildi — hiçbiri ezberden yazılmadı — ve her soru hangi
 çağrılarla ölçüldüğünü kaydediyor, böylece ölçüm tekrarlanabilir.
 
-Bir test dosyayı yapısal olarak dürüst tutuyor: on dokuz çift, her çiftte soru, cevap
+Bir test dosyayı yapısal olarak dürüst tutuyor: yirmi çift, her çiftte soru, cevap
 ve ölçüm bloğu, adı geçen her aracın sunucuda gerçekten var olması ve hiçbir
 sorunun "en son dönem" gibi bayatlayacak bir ifadeye bağlanmaması.
 
@@ -413,7 +455,7 @@ src/edgar_mcp/client.py   SEC HTTP istemcisi, hız sınırlayıcı, önbellek
 tests/                    mock'lu birim testleri
 tests/dil.py              dışa bakan yüzey için dil kontrolü
 tests/test_http_tasima.py belgelenen HTTP ve stdio taşımalarını çalıştırır
-evaluation/questions.xml  ölçülmüş on dokuz soru ve hangi çağrılarla ölçüldükleri
+evaluation/questions.xml  ölçülmüş yirmi soru ve hangi çağrılarla ölçüldükleri
 arac/enjeksiyon.py        hata enjeksiyonu harness'ı
 arac/sir_tarama.py        sır tarayıcı
 arac/tani.py              tek bir SEC yanıtını ham haliyle ölçen tanı aracı

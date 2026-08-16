@@ -730,8 +730,8 @@ ENJEKSIYONLAR = [
 
  ("F: gizli blok icinde ayirici uret",
   "src/edgar_mcp/belge.py",
-  "        elif self._atla:\n            pass\n        elif tag in (\"td\", \"th\"):",
-  "        elif tag in (\"td\", \"th\"):",
+  "        if self._atla:\n            pass\n        elif tag in (\"td\", \"th\"):",
+  "        if False:\n            pass\n        elif tag in (\"td\", \"th\"):",
   "test_gizli_blok_icinde_ayirici_uretilmiyor"),
 
  ("F: anlik sinirini yine takvim yilinda kur",
@@ -863,6 +863,72 @@ ENJEKSIYONLAR = [
   "            os.environ.setdefault(cift[0], cift[1])",
   "            os.environ[cift[0]] = cift[1]",
   "test_env_yukleyici_mevcut_degiskeni_ezmiyor"),
+
+ ("K: tablolari her cagride don (parametreyi yoksay)",
+  "src/edgar_mcp/server.py",
+  "               if offset <= t.baslangic < offset + len(parca)] if tables else []",
+  "               if offset <= t.baslangic < offset + len(parca)]",
+  "test_tablolar_istenmedikce_donmuyor"),
+
+ ("K: tablo penceresini yoksay (hepsini don)",
+  "src/edgar_mcp/server.py",
+  "    pencere = [t for t in tum_tablolar\n               if offset <= t.baslangic < offset + len(parca)] if tables else []",
+  "    pencere = list(tum_tablolar) if tables else []",
+  "test_tablolar_sayfalama_penceresiyle_sinirli"),
+
+ ("K: bolum kesilince tablo konumunu kaydirma",
+  "src/edgar_mcp/server.py",
+  "        tum_tablolar = [_tabloyu_kaydir(t, vurus[1]) for t in tum_tablolar\n                        if vurus[1] <= t.baslangic < vurus[2]]",
+  "        tum_tablolar = [t for t in tum_tablolar\n                        if vurus[1] <= t.baslangic < vurus[2]]",
+  "test_bolum_secilince_tablo_konumu_bolume_gore"),
+
+ ("K: yerlesim tablolarini sessizce dusur",
+  "src/edgar_mcp/server.py",
+  "        layout_tables_skipped=cikti.yerlesim_tablolari if tables else 0,",
+  "        layout_tables_skipped=0,",
+  "test_yerlesim_tablosu_sessizce_dusurulmuyor"),
+
+ ("K: gizli bloktaki tabloyu da topla",
+  "src/edgar_mcp/belge.py",
+  "        elif not self._atla:\n            # Gizli bir blogun icindeki tablo toplanmiyor",
+  "        elif True:\n            # Gizli bir blogun icindeki tablo toplanmiyor",
+  "test_gizli_bloktaki_tablo_yapiya_da_girmiyor"),
+
+ ("K: satir sinirini sessizce uygula",
+  "src/edgar_mcp/belge.py",
+  "        t.kirpildi = len(dolu) > SATIR_SINIRI",
+  "        t.kirpildi = False",
+  "test_uzun_tablo_kirpiliyor_ve_bunu_soyluyor"),
+
+ ("K: hucre kirpmasini sessizce uygula",
+  "src/edgar_mcp/belge.py",
+  "            self.hucre_kirpildi = True",
+  "            self.hucre_kirpildi = False",
+  "test_uzun_hucre_kirpiliyor_ve_bunu_soyluyor"),
+
+ ("K: ortulu kapanisi tablo sinirini asacak sekilde birak",
+  "src/edgar_mcp/belge.py",
+  "        alt = self._tablo_kapsami() if tag in (\"tr\", \"td\", \"th\") else 0",
+  "        alt = 0",
+  "test_ic_ice_tablolar_ayri_ayri_donuyor"),
+
+ ("K: kapanmamis tabloyu dusur",
+  "src/edgar_mcp/belge.py",
+  "        while self._acik:\n            self._tablo_bitir(self._acik.pop())",
+  "        self._acik.clear()",
+  "test_kapanmamis_tablo_da_donuyor"),
+
+ ("K: tablo konumlarini sadelestirmeden once dondur",
+  "src/edgar_mcp/belge.py",
+  "        t.baslangic = esleme.get(t.baslangic, 0)",
+  "        pass",
+  "test_tablo_konumu_dondurulen_metne_denk_geliyor"),
+
+ ("K: bosluk sadelestirmesinde ucuncu satiri da birak",
+  "src/edgar_mcp/belge.py",
+  'parca = "\\n" * min(satir, 2) if satir else " "',
+  'parca = "\\n" * satir if satir else " "',
+  "test_bosluk_sadelestirme_eski_regex_zinciriyle_ayni"),
 
  ("I: etiket rol sirasinda kisa etiketi one al",
   "src/edgar_mcp/xbrl.py",

@@ -16,7 +16,7 @@ from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
-from .belge import bolum_sec, bolumler, metne_cevir
+from .belge import Cikti, Tablo, bolum_sec, bolumler, cevir
 from .client import SEC_WWW, EdgarClient
 from .xbrl import (
     BOS_BAGLAM,
@@ -459,6 +459,34 @@ class SearchHit(BaseModel):
     context: str = Field(description="Text around the match")
 
 
+class FilingTable(BaseModel):
+    text_offset: int = Field(
+        description="Where this table begins in the text, in the same "
+        "coordinates as offset, so a table can be matched to the passage it "
+        "belongs to"
+    )
+    row_count: int = Field(description="Rows in this response")
+    column_count: int = Field(description="Cells in the widest row returned")
+    total_rows: int = Field(
+        description="Rows the table has in the filing. Higher than row_count "
+        "means the table was cut; rows_truncated says so"
+    )
+    rows_truncated: bool = Field(
+        default=False, description="True when the table has more rows than were returned"
+    )
+    cells_truncated: bool = Field(
+        default=False,
+        description="True when at least one cell held more text than a cell "
+        "normally does and was cut. A table like that is usually prose laid "
+        "out in a table rather than figures",
+    )
+    rows: list[list[str]] = Field(
+        description="Cells as the filing lays them out, left to right. Empty "
+        "strings are kept because column alignment depends on them; rows whose "
+        "cells are all empty are dropped as spacing"
+    )
+
+
 class FilingText(BaseModel):
     accession_number: str
     form: str
@@ -510,6 +538,23 @@ class FilingText(BaseModel):
         "offset = offset + returned_characters"
     )
     text: str
+    tables: list[FilingTable] = Field(
+        default_factory=list,
+        description="Tables that begin inside the returned text, as rows and "
+        "cells. Empty unless tables was set. The same figures are in text as "
+        "cells joined by ' | ', so this is the structure rather than new data",
+    )
+    total_tables: int = Field(
+        default=0,
+        description="Tables in the whole selected section or document, not "
+        "only in this chunk",
+    )
+    layout_tables_skipped: int = Field(
+        default=0,
+        description="Tables left out because they hold a single row or a "
+        "single column. EDGAR filings use tables for page layout, and those "
+        "carry no figures - but silence about them would read as 'no tables'",
+    )
 
 
 class ConceptInfo(BaseModel):
@@ -1208,18 +1253,21 @@ async def get_concept_series(
 # 2,2 MB HTML'in metne cevrilmesi 0,61 saniye suruyor ve sayfalama ayni belgeyi
 # defalarca ister - her cagride yeniden cevirmek bir bolumu bes parcada okurken
 # saniyeleri bosa harciyordu. Metin ayrica HTML'den ~20 kat kucuk.
-_BELGE_METNI: dict[str, str] = {}
+_BELGE_METNI: dict[str, Cikti] = {}
 BELGE_METNI_SINIRI = 3
 
 
-async def _belge_metni(url: str) -> str:
+async def _belge_metni(url: str) -> Cikti:
+    """Cevrilmis belge: metin VE tablolar. Onbellek ikisini birlikte tutuyor -
+    tablolari ayri bir cagride cikarmak, 2,2 MB'lik HTML'i ikinci kez indirip
+    ikinci kez ayristirmak demekti (olculdu, 14 Agu 2026: cevirme 0,61 sn)."""
     if url in _BELGE_METNI:
         return _BELGE_METNI[url]
-    metin = metne_cevir(await _c().filing_document(url))
+    cikti = cevir(await _c().filing_document(url))
     if len(_BELGE_METNI) >= BELGE_METNI_SINIRI:
         _BELGE_METNI.pop(next(iter(_BELGE_METNI)))
-    _BELGE_METNI[url] = metin
-    return metin
+    _BELGE_METNI[url] = cikti
+    return cikti
 
 
 OKUNABILIR_UZANTILAR = (".htm", ".html", ".txt")
@@ -1267,6 +1315,15 @@ async def _okunabilir_belgeler(dizin_url: str, birincil: str) -> list[FilingDocu
         ))
     out.sort(key=lambda b: (b.size_bytes or 0), reverse=True)
     return out
+
+
+def _tabloyu_kaydir(t: Tablo, kayma: int) -> Tablo:
+    """Tabloyu yeni bir koordinat sistemine tasir. Yeni nesne uretiliyor:
+    onbellekteki `Cikti` paylasilan durumdur, uzerinde oynamak bir sonraki
+    cagriyi bozar."""
+    return Tablo(baslangic=t.baslangic - kayma, satirlar=t.satirlar,
+                 toplam_satir=t.toplam_satir, kirpildi=t.kirpildi,
+                 hucre_kirpildi=t.hucre_kirpildi)
 
 
 def _ara(metin: str, ifade: str) -> tuple[int, list[SearchHit]]:
@@ -1421,6 +1478,14 @@ async def read_filing_text(
         Field(default=6000, ge=500, le=40000,
               description="Maximum characters of text to return in one call"),
     ] = 6000,
+    tables: Annotated[
+        bool,
+        Field(default=False, description="Also return the tables that begin in "
+              "the returned text as rows and cells. Set it when the answer is a "
+              "figure laid out in a table - the financial statements, the tax "
+              "reconciliation, a production and delivery table - where reading "
+              "cells joined by ' | ' means aligning columns by eye"),
+    ] = False,
     ctx: Context | None = None,
 ) -> FilingText:
     await _ilerleme(ctx, 0, 3, "Locating the filing")
@@ -1459,7 +1524,8 @@ async def read_filing_text(
 
     url = f"{dizin}/{ad}"
     await _ilerleme(ctx, 1, 3, f"Downloading {ad}")
-    metin = await _belge_metni(url)
+    cikti = await _belge_metni(url)
+    metin, tum_tablolar = cikti.metin, cikti.tablolar
     await _ilerleme(ctx, 2, 3, "Extracting text and headings")
 
     bulunanlar = bolumler(metin)
@@ -1476,6 +1542,10 @@ async def read_filing_text(
             )
         secilen = vurus[0]
         metin = metin[vurus[1]:vurus[2]]
+        # Tablo konumlari da bolume goreleniyor: kaydirmadan birakmak, bolumun
+        # disindaki tablolari icerideymis gibi gosterirdi.
+        tum_tablolar = [_tabloyu_kaydir(t, vurus[1]) for t in tum_tablolar
+                        if vurus[1] <= t.baslangic < vurus[2]]
 
     vurgular: list[SearchHit] = []
     toplam_vurus = 0
@@ -1483,6 +1553,11 @@ async def read_filing_text(
         toplam_vurus, vurgular = _ara(metin, search)
 
     parca = metin[offset:offset + max_characters]
+    # Yalnizca DONDURULEN parcada BASLAYAN tablolar. Parcanin disindakileri de
+    # vermek, modelin okudugu metinle ilgisiz bir tabloyu o pasaja ait
+    # sanmasina yol acar; sayfalama zaten kalanini getiriyor.
+    pencere = [t for t in tum_tablolar
+               if offset <= t.baslangic < offset + len(parca)] if tables else []
     return FilingText(
         accession_number=kayit["accession_number"],
         form=kayit["form"],
@@ -1501,6 +1576,20 @@ async def read_filing_text(
         returned_characters=len(parca),
         has_more=offset + len(parca) < len(metin),
         text=parca,
+        tables=[
+            FilingTable(
+                text_offset=t.baslangic,
+                row_count=len(t.satirlar),
+                column_count=max((len(r) for r in t.satirlar), default=0),
+                total_rows=t.toplam_satir,
+                rows_truncated=t.kirpildi,
+                cells_truncated=t.hucre_kirpildi,
+                rows=t.satirlar,
+            )
+            for t in pencere
+        ],
+        total_tables=len(tum_tablolar) if tables else 0,
+        layout_tables_skipped=cikti.yerlesim_tablolari if tables else 0,
     )
 
 

@@ -21,6 +21,10 @@
   (https://efts.sec.gov/LATEST/search-index) directly and reading every hit it
   returned.
 
+  Question 20, covering the tables mode added on 15 Aug 2026, was measured the
+  same day by fetching the exhibit itself from sec.gov and reading the table out
+  of it.
+
   Design rules applied to each question:
     - answerable only through the tools, not from general knowledge
     - needs more than one tool call
@@ -263,6 +267,28 @@
       from that response, in which hits.total was {"value":12,"relation":"eq"}.
       This answer moves as Tesla files further annual reports that use the word, so the
       count is the part to re-measure before treating a mismatch as a regression.
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Tesla's press release on second-quarter 2026 production and deliveries breaks the figures out by model line. How many vehicles other than Model 3/Y did it produce and deliver, and what share of deliveries was subject to operating lease accounting?</question>
+    <answer>Other Models: 8,822 produced and 12,364 delivered. Two percent of deliveries were subject to operating lease accounting — the release gives that same 2% for Model 3/Y, for Other Models and for the total of 451,758 produced and 480,126 delivered. The figures are in a table inside an exhibit, not in the 8-K's primary document, and not in XBRL at all.</answer>
+    <verification>
+      sec_edgar_list_filings(ticker="TSLA", form_type="8-K") -> accession 0001628280-26-046717
+      sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-26-046717")
+        -> available_documents lists exhibit99111111.htm alongside the primary tsla-20260702.htm
+      sec_edgar_read_filing_text(ticker="TSLA", accession_number="0001628280-26-046717",
+                                 document="exhibit99111111.htm", tables=true)
+        -> a table whose rows are
+           ["", "Production", "Deliveries", "Subject to operating lease accounting"],
+           ["Model 3/Y", "442,936", "467,762", "2%"],
+           ["Other Models", "8,822", "12,364", "2%"],
+           ["Total", "451,758", "480,126", "2%"]
+      Measured 15 Aug 2026 by fetching
+      https://www.sec.gov/Archives/edgar/data/1318605/000162828026046717/exhibit99111111.htm
+      directly and reading the table out of the HTML; the cells above are quoted from it.
+      The directory listing at .../index.json was read the same way and gives the exhibit's
+      size as 13243 bytes against 26572 for the primary document.
     </verification>
   </qa_pair>
 
