@@ -18,6 +18,13 @@ from pydantic import BaseModel, Field
 
 from .belge import Cikti, Tablo, bolum_sec, bolumler, cevir
 from .client import SEC_WWW, EdgarClient
+from .sahiplik import (
+    BIRIM_SINIRI,
+    ISLEM_KODLARI,
+    bilgi_tablosu_ayristir,
+    form4_ayristir,
+    kapak_ayristir,
+)
 from .xbrl import (
     BOS_BAGLAM,
     Baglam,
@@ -2787,6 +2794,452 @@ def _mutabakat(
             agrees=None if fark is None else abs(fark) <= esik,
         ))
     return out
+
+
+
+# --------------------------------------------------------------- sahiplik
+class InsiderTransaction(BaseModel):
+    owner_name: str = Field(description="Person or entity that filed the form")
+    owner_cik: str | None = None
+    is_director: bool = False
+    is_officer: bool = False
+    officer_title: str | None = Field(
+        default=None, description="Title as the filer wrote it, when an officer"
+    )
+    is_ten_percent_owner: bool = False
+    security: str = Field(description="Security as named in the filing, e.g. Common Stock")
+    transaction_date: str | None = None
+    code: str | None = Field(
+        default=None,
+        description="SEC transaction code. P and S are market purchases and "
+        "sales; A is a grant and F is tax withholding, and neither is a "
+        "decision to buy or sell",
+    )
+    code_meaning: str | None = Field(
+        default=None, description="What the code stands for, in words"
+    )
+    shares: float | None = None
+    price_per_share: float | None = Field(
+        default=None, description="Zero on grants and on tax withholding"
+    )
+    acquired_or_disposed: str | None = Field(
+        default=None, description="A when shares came in, D when they went out"
+    )
+    shares_owned_after: float | None = Field(
+        default=None,
+        description="Holding after this transaction, as the filer reports it. "
+        "It covers only the ownership form on this line - direct and indirect "
+        "holdings are reported separately and do not add up to one number",
+    )
+    direct_or_indirect: str | None = Field(
+        default=None, description="D for directly held, I for held through a trust or entity"
+    )
+    nature_of_ownership: str | None = Field(
+        default=None, description="How an indirect holding is held, e.g. By Trust"
+    )
+    is_derivative: bool = Field(
+        default=False,
+        description="True for options, restricted units and other derivatives. "
+        "Counting these together with share transactions counts the same "
+        "economic event twice, since exercising one turns into the other",
+    )
+    is_holding: bool = Field(
+        default=False,
+        description="True when the line reports an existing position rather "
+        "than a transaction - nothing was bought or sold",
+    )
+    accession_number: str
+    filing_url: str
+
+
+class InsiderCodeTotal(BaseModel):
+    code: str
+    meaning: str | None = None
+    transactions: int
+    shares: float = Field(description="Shares summed across transactions with this code")
+
+
+class InsiderReport(BaseModel):
+    issuer_cik: str
+    issuer_name: str | None = None
+    ticker: str | None = None
+    filings_read: int = Field(description="Form 4 filings actually downloaded")
+    filings_available: int = Field(
+        description="Form 4 filings in the feeds that were searched"
+    )
+    total_matching: int = Field(description="Lines found in the filings that were read")
+    returned: int
+    has_more: bool
+    transactions: list[InsiderTransaction]
+    code_totals: list[InsiderCodeTotal] = Field(
+        default_factory=list,
+        description="Share counts grouped by transaction code, over every line "
+        "read - not only the ones returned. They are NOT netted into a single "
+        "buy or sell figure on purpose: a grant, a tax withholding and an "
+        "open-market purchase are different events and adding them produces a "
+        "number that means nothing",
+    )
+    coverage_note: str = Field(
+        description="What this report does and does not cover"
+    )
+
+
+class InstitutionalPosition(BaseModel):
+    issuer: str
+    cusip: str | None = None
+    title_of_class: str | None = None
+    value_usd: float | None = Field(
+        default=None,
+        description="Position value in whole US dollars. Filings before 2023 "
+        "report thousands and are converted here; value_basis says which "
+        "convention the filing itself used",
+    )
+    shares_or_principal: float | None = None
+    share_type: str | None = Field(
+        default=None, description="SH for shares, PRN for principal amount of a note"
+    )
+    rows_combined: int = Field(
+        default=1,
+        description="How many rows of the filing were added together for this "
+        "position. A manager files one row per sub-manager, so a single holding "
+        "often spans several rows",
+    )
+    voting_sole: float | None = None
+    voting_shared: float | None = None
+    voting_none: float | None = None
+
+
+class InstitutionalHoldings(BaseModel):
+    manager_name: str | None = None
+    manager_cik: str
+    accession_number: str
+    filing_date: str
+    report_type: str | None = Field(
+        default=None, description="13F HOLDINGS REPORT, or an amendment"
+    )
+    period_of_report: str | None = Field(
+        default=None, description="Quarter end the holdings are as of"
+    )
+    value_basis: str = Field(
+        description="whole_dollars or thousands - the convention the filing "
+        "itself used. SEC changed this in 2023 and the same position can look "
+        "a thousand times larger or smaller across that boundary"
+    )
+    total_value_usd: float | None = Field(
+        default=None, description="Sum of every row, in whole US dollars"
+    )
+    reported_value_total: float | None = Field(
+        default=None,
+        description="The total the filing states on its cover page, converted "
+        "to whole dollars. It should match total_value_usd; a gap means the "
+        "table and the cover page disagree, which is the filer's disagreement, "
+        "not this tool's",
+    )
+    reported_entry_count: int | None = Field(
+        default=None, description="Row count the cover page states"
+    )
+    rows_in_table: int = Field(description="Rows actually found in the table")
+    unique_positions: int = Field(
+        description="Positions after rows for the same security are combined"
+    )
+    total_matching: int
+    returned: int
+    has_more: bool
+    positions: list[InstitutionalPosition]
+    coverage_note: str = Field(
+        description="What a 13F does and does not show"
+    )
+
+
+
+# ---------------------------------------------------------- sahiplik araclari
+# Form 4'un makine okunur XML'i, `primaryDocument` alanindaki `xsl.../` onekli
+# yolun ONEKSIZ halidir. Olculdu (16 Agu 2026, iki ayri dosyalama):
+#   primaryDocument = "xslF345X06/wk-form4_1786569187.xml"
+#   gercek XML      = "wk-form4_1786569187.xml"
+# Onek atilamazsa dizin listesi okunur - stil dosyasinin adi degisebilir ve
+# bir isimlendirme kalibina korlemesine guvenmek, KK-35'te ayni gun ceza
+# kesilen hatanin ta kendisi.
+_STIL_ONEKI = re.compile(r"^xsl[^/]*/", re.IGNORECASE)
+FORM4_SINIRI = 40
+
+
+def _xml_yolu(birincil: str) -> str:
+    return _STIL_ONEKI.sub("", birincil or "")
+
+
+async def _xml_belgesi(dizin: str, birincil: str) -> tuple[str, str]:
+    """Dosyalamanin makine okunur XML'ini indirir. (govde, url) doner."""
+    ad = _xml_yolu(birincil)
+    if ad:
+        try:
+            return await _c().filing_document(f"{dizin}/{ad}"), f"{dizin}/{ad}"
+        except (ValueError, httpx.HTTPStatusError):
+            pass
+    veri = await _c().filing_index(dizin)
+    adaylar = [str(x.get("name", ""))
+               for x in (veri.get("directory") or {}).get("item", [])
+               if str(x.get("name", "")).lower().endswith(".xml")
+               and "/" not in str(x.get("name", ""))]
+    for aday in adaylar:
+        if aday.lower() != "primary_doc.xml":
+            return await _c().filing_document(f"{dizin}/{aday}"), f"{dizin}/{aday}"
+    raise ValueError(
+        "This filing holds no machine-readable XML document. Files present: "
+        f"{', '.join(adaylar[:10]) or 'none'}."
+    )
+
+
+@mcp.tool(
+    name="sec_edgar_get_insider_transactions",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
+    description=(
+        "Reads Form 4 filings - what a company's directors, officers and "
+        "ten percent owners did with its shares. Each filing is due within two "
+        "business days of the trade, so this is the closest thing to a live "
+        "signal in SEC data.\n"
+        "Read the transaction code before drawing a conclusion. Only P and S "
+        "are decisions to buy or sell in the market; A is a grant from the "
+        "company and F is shares withheld to pay tax on a vesting grant, and "
+        "treating either as a trade is the usual way this data is misread. "
+        "The response therefore groups share counts by code instead of netting "
+        "them into one number."
+    ),
+)
+async def get_insider_transactions(
+    ticker: Annotated[str, Field(description="Stock ticker symbol, or a "
+                                "ten-digit CIK. This is the COMPANY whose "
+                                "shares were traded, not the person trading")],
+    limit: Annotated[
+        int,
+        Field(default=40, ge=1, le=200, description="Maximum transaction lines to return"),
+    ] = 40,
+    filings: Annotated[
+        int,
+        Field(default=10, ge=1, le=FORM4_SINIRI,
+              description="How many recent Form 4 filings to open. Each one is "
+              "a separate download, so this is the cost knob"),
+    ] = 10,
+    include_derivative: Annotated[
+        bool,
+        Field(default=False, description="Also return option, restricted unit "
+              "and other derivative lines. They describe the same holding at a "
+              "different stage, so mixing them with share lines double counts"),
+    ] = False,
+    include_holdings: Annotated[
+        bool,
+        Field(default=False, description="Also return lines that report an "
+              "existing position rather than a transaction"),
+    ] = False,
+    ctx: Context | None = None,
+) -> InsiderReport:
+    cik, sembol = await _kimlik_coz(ticker)
+    sub = await _c().submissions(cik)
+    kayitlar = _akis_kayitlari(sub.get("filings", {}).get("recent", {}), cik, "4")
+
+    okunacak = kayitlar[:filings]
+    islemler: list[InsiderTransaction] = []
+    ihrac_adi = None
+    for n, f in enumerate(okunacak):
+        await _ilerleme(ctx, n, len(okunacak) + 1, f"Reading Form 4 {f.accession_number}")
+        dizin = (f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
+                 f"{f.accession_number.replace('-', '')}")
+        ad = (f.primary_document_url or "").split(f"{f.accession_number.replace('-', '')}/")[-1]
+        govde, url = await _xml_belgesi(dizin, ad)
+        belge = form4_ayristir(govde)
+        ihrac_adi = ihrac_adi or belge.issuer_name
+        for i in belge.islemler:
+            if i.is_derivative and not include_derivative:
+                continue
+            if i.is_holding and not include_holdings:
+                continue
+            islemler.append(InsiderTransaction(
+                owner_name=i.owner_name,
+                owner_cik=i.owner_cik,
+                is_director=i.is_director,
+                is_officer=i.is_officer,
+                officer_title=i.officer_title,
+                is_ten_percent_owner=i.is_ten_percent_owner,
+                security=i.security,
+                transaction_date=i.transaction_date,
+                code=i.code,
+                code_meaning=ISLEM_KODLARI.get(i.code or ""),
+                shares=i.shares,
+                price_per_share=i.price_per_share,
+                acquired_or_disposed=i.acquired_or_disposed,
+                shares_owned_after=i.shares_owned_after,
+                direct_or_indirect=i.direct_or_indirect,
+                nature_of_ownership=i.nature_of_ownership,
+                is_derivative=i.is_derivative,
+                is_holding=i.is_holding,
+                accession_number=f.accession_number,
+                filing_url=url,
+            ))
+
+    # Kod bazinda toplam. TEK BIR "net alim" sayisi bilincli olarak
+    # URETILMIYOR: odul (A), vergi kesintisi (F) ve piyasadan alim (P) farkli
+    # olaylar ve toplami hicbir seyi olcmez (KK-31'deki mutabakat ilkesi).
+    sayaclar: dict[str, list[float]] = {}
+    for t in islemler:
+        # `is_holding` BURADA KONTROL EDILMIYOR: pozisyon satirinin `shares`
+        # alani zaten yok (`nonDerivativeHolding` icinde `transactionAmounts`
+        # yok). Iki kontrolu birden yazmak, enjeksiyonun "KORUMASIZ" demesine
+        # yol aciyordu - birini bozmak otekini devrede birakiyor ve hicbir test
+        # kirmiziya donmuyordu (P-30'un dersi).
+        if t.shares is None:
+            continue
+        kutu = sayaclar.setdefault(t.code or "?", [0.0, 0.0])
+        kutu[0] += 1
+        kutu[1] += t.shares
+    toplamlar = [
+        InsiderCodeTotal(code=k, meaning=ISLEM_KODLARI.get(k), transactions=int(v[0]), shares=v[1])
+        for k, v in sorted(sayaclar.items(), key=lambda kv: (-kv[1][1], kv[0]))
+    ]
+
+    return InsiderReport(
+        issuer_cik=cik,
+        issuer_name=ihrac_adi or sub.get("name"),
+        ticker=sembol,
+        filings_read=len(okunacak),
+        filings_available=len(kayitlar),
+        total_matching=len(islemler),
+        returned=min(limit, len(islemler)),
+        has_more=len(islemler) > limit or len(kayitlar) > len(okunacak),
+        transactions=islemler[:limit],
+        code_totals=toplamlar,
+        coverage_note=(
+            "Form 4 covers people the company has to report on - directors, "
+            "officers and holders of more than ten percent. It does not show "
+            "trading by anyone else, and a filing describes what was traded, "
+            "never why. Only the most recent filings feed was searched here."
+        ),
+    )
+
+
+@mcp.tool(
+    name="sec_edgar_get_institutional_holdings",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    ),
+    description=(
+        "Reads a 13F filing - the US-listed equity positions an investment "
+        "manager held at the end of a quarter. Managers over $100 million must "
+        "file within 45 days of quarter end.\n"
+        "Managers usually have no ticker, so address them by CIK. A manager "
+        "reports one row per sub-manager, so a single holding is often spread "
+        "over several rows; rows for the same security are combined here and "
+        "rows_combined says how many were added.\n"
+        "Values before 2023 are filed in thousands and later ones in whole "
+        "dollars. Both are returned in whole dollars and value_basis says which "
+        "convention the filing used - across that boundary the same position "
+        "otherwise looks a thousand times larger."
+    ),
+)
+async def get_institutional_holdings(
+    ticker: Annotated[str, Field(description="The MANAGER, as a ten-digit CIK "
+                                "or a ticker. Berkshire Hathaway is 0001067983")],
+    accession_number: Annotated[
+        str | None,
+        Field(default=None, description="Exact 13F filing to read. Omit for the "
+              "most recent one"),
+    ] = None,
+    search: Annotated[
+        str | None,
+        Field(default=None, description="Keep only positions whose issuer name "
+              "contains this text"),
+    ] = None,
+    limit: Annotated[
+        int,
+        Field(default=25, ge=1, le=200,
+              description="Maximum positions to return, largest value first"),
+    ] = 25,
+    ctx: Context | None = None,
+) -> InstitutionalHoldings:
+    cik, _ = await _kimlik_coz(ticker)
+    kayit = await _dosyalama_bul(cik, accession_number, "13F-HR")
+    dizin = (f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
+             f"{kayit['accession_number'].replace('-', '')}")
+
+    await _ilerleme(ctx, 0, 3, "Reading the cover page")
+    kapak = kapak_ayristir(await _c().filing_document(f"{dizin}/primary_doc.xml"))
+    await _ilerleme(ctx, 1, 3, "Reading the holdings table")
+    govde, _url = await _xml_belgesi(dizin, "")
+    satirlar = bilgi_tablosu_ayristir(govde)
+
+    # Birim: SEC 2023'te bin dolardan tam dolara gecti. Olculdu (Berkshire,
+    # ayni 669.429.166 Apple hissesi): Kas 2022 dosyalamasinda 92.515.111,
+    # Sub 2023 dosyalamasinda 86.841.985.318 - bin kat.
+    bin_mi = kayit["filing_date"] < BIRIM_SINIRI
+    carpan = 1000.0 if bin_mi else 1.0
+
+    birlesik: dict[tuple[str, str | None], InstitutionalPosition] = {}
+    for r in satirlar:
+        anahtar = (r.issuer.upper(), r.cusip)
+        mevcut = birlesik.get(anahtar)
+        if mevcut is None:
+            birlesik[anahtar] = InstitutionalPosition(
+                issuer=r.issuer,
+                cusip=r.cusip,
+                title_of_class=r.title_of_class,
+                value_usd=(r.value_as_filed or 0) * carpan,
+                shares_or_principal=r.shares_or_principal,
+                share_type=r.share_type,
+                rows_combined=1,
+                voting_sole=r.voting_sole,
+                voting_shared=r.voting_shared,
+                voting_none=r.voting_none,
+            )
+        else:
+            mevcut.value_usd = (mevcut.value_usd or 0) + (r.value_as_filed or 0) * carpan
+            mevcut.shares_or_principal = ((mevcut.shares_or_principal or 0)
+                                          + (r.shares_or_principal or 0))
+            mevcut.rows_combined += 1
+            for alan in ("voting_sole", "voting_shared", "voting_none"):
+                yeni = getattr(r, alan)
+                if yeni is not None:
+                    setattr(mevcut, alan, (getattr(mevcut, alan) or 0) + yeni)
+
+    pozisyonlar = sorted(birlesik.values(), key=lambda p: -(p.value_usd or 0))
+    if search:
+        q = search.strip().lower()
+        pozisyonlar = [p for p in pozisyonlar if q in p.issuer.lower()]
+
+    await _ilerleme(ctx, 2, 3, f"Read {len(satirlar)} rows")
+    return InstitutionalHoldings(
+        manager_name=kapak.manager_name,
+        manager_cik=cik,
+        accession_number=kayit["accession_number"],
+        filing_date=kayit["filing_date"],
+        report_type=kapak.report_type,
+        period_of_report=kapak.period_of_report,
+        value_basis="thousands" if bin_mi else "whole_dollars",
+        total_value_usd=sum((p.value_usd or 0) for p in birlesik.values()),
+        reported_value_total=(kapak.table_value_total * carpan
+                              if kapak.table_value_total is not None else None),
+        reported_entry_count=kapak.table_entry_total,
+        rows_in_table=len(satirlar),
+        unique_positions=len(birlesik),
+        total_matching=len(pozisyonlar),
+        returned=min(limit, len(pozisyonlar)),
+        has_more=len(pozisyonlar) > limit,
+        positions=pozisyonlar[:limit],
+        coverage_note=(
+            "A 13F shows long positions in US-listed equities and some options "
+            "and convertible notes, as of the quarter end and no sooner than "
+            "45 days later. It does not show short positions, cash, bonds, "
+            "foreign-listed holdings or anything traded since the quarter "
+            "closed, so it is a partial and dated view of a portfolio rather "
+            "than the portfolio."
+        ),
+    )
 
 
 def main() -> None:

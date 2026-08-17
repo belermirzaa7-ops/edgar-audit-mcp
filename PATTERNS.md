@@ -43,6 +43,7 @@ can verify rather than remember.
 | [P-28](#p-28) | Does any behaviour depend on the iteration order of a set? | `test_metin_cikarimi_surecten_surece_ayni_sonucu_veriyor` |
 | [P-29](#p-29) | Does a filter compare strings the caller wrote by hand, and does a miss look like an empty answer? | `test_form_filtresi_buyuk_kucuk_harf_duyarsiz` |
 | [P-30](#p-30) | Does a missing optional dependency turn a loader into a silent no-op? | `test_env_yukleyici_bagimlilik_olmadan_da_yukluyor`, `test_env_yukleyici_bom_lu_dosyayi_okuyor` |
+| [P-31](#p-31) | Does my cleanup depend on my process getting a chance to run it? | `test_enjeksiyon_kontrol_modu_yarim_kalan_kosuyu_goruyor`, `test_enjeksiyon_parcali_kosu_hicbir_enjeksiyonu_dusurmuyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -833,6 +834,66 @@ command excluded directories but not files. Recreating the file did not fix the
 error, which is what exposed the loader. Both halves are the same lesson: a step
 that can quietly do nothing will eventually do nothing quietly at the worst
 moment.
+
+---
+
+<a id="p-31"></a>
+### P-31 · Cleanup that only runs if the process gets to run it
+
+**Symptom.** A fault-injection sweep stopped producing output. The process was
+gone; the log's last line was `[32/163]`, written 43 minutes earlier. Nothing
+announced a failure — there was no traceback, no non-zero exit, no message at
+all. The working tree looked normal and the test suite was green, because the
+injection that happened to be applied (`belge.py`, the longest-match rule for
+duplicate section headings) only turns one test red, and that test was not the
+one being run in the moment the process died.
+
+**Root cause.** Every restoration path in the harness was built on the process
+surviving long enough to execute it: a `finally` block, an `atexit` handler, and
+handlers for `SIGINT` and `SIGTERM`. A hard kill — `SIGKILL`, an out-of-memory
+reaper, a container being reclaimed — runs none of them. The repository's own
+decision record (KK-6) called the harness "crash resilient", and that claim was
+true for exceptions and for signals a process can catch. It was never true for
+the case where the process is not asked to stop but simply ceases.
+
+The harness did restore leftovers, but only at the start of *its next run*. That
+made the recovery invisible to every other step: running the tests, packaging a
+release, or committing does not invoke the harness. A sweep could die at 32/163
+and the next thing to touch the repository would see an injected source file
+with no indication that anything had gone wrong.
+
+**Detection.** Three changes, each addressing a different part of the failure:
+
+- `enjeksiyon.py --kontrol` reports whether a previous run left anything behind
+  and exits 2 if so. It deliberately does **not** repair: detection and repair
+  are separate, because a check that silently fixes the state hides exactly the
+  event worth seeing. CI runs it after the sweep, which also turns the
+  harness's own cleanup claim into something that is verified rather than
+  asserted.
+- The name of the applied injection is written to disk *before* the file is
+  broken and removed after it is restored, so a leftover identifies itself
+  instead of having to be reconstructed by diffing against the backups.
+- `--parca k/n` splits the sweep into contiguous shards. The full run is 163
+  injections and each one runs the entire suite; how long that takes depends
+  heavily on the machine's load — a single suite run measured 14 s on an idle
+  container, around 40 minutes for the sweep, while the run that died was
+  averaging some 80 s per injection, which projects past three hours. That
+  spread is itself the argument: the longer a process lives, the likelier it is
+  to be killed. Four shards keep each process short and make a lost shard cheap
+  to repeat. The split is checked for completeness by a test —
+  a sharding bug that dropped injections would quietly verify less than the
+  harness claims, which is a worse failure than the one being fixed.
+
+A per-run timeout was added at the same time, reported as its own outcome
+rather than as an absent guard: a measurement that could not be taken is not
+the same as a guard that does not exist (the same distinction as KK-10's
+`ENJEKSIYON SOZDIZIMI BOZDU`).
+
+**Incident.** 16 Aug 2026, during the v38 sweep. Recovery was manual: the files
+were diffed against `.enjeksiyon_yedek/`, `belge.py` was found to differ by one
+line, and it was restored by hand. That recovery worked only because the
+backups were still on disk and someone thought to look. Nothing in the
+repository would have raised the question.
 
 ---
 

@@ -352,6 +352,73 @@ def test_enjeksiyon_parametreli_testi_de_taniyor():
     assert not mod.yakalandi("test_x", [])
 
 
+def test_enjeksiyon_parcali_kosu_hicbir_enjeksiyonu_dusurmuyor():
+    """KK-41 (16 Agu 2026): tam kosu ~3,4 saat tek surecte ve bir kez sert
+    oldurmeyle 32/163'te oldu. Parcali kosu sureci kisaltiyor - ama bolme
+    kaybederse harness sessizce daha az sey dogrular, yani cozdugunden buyuk
+    bir sorun uretir. Birlesim TAM ve ORTUSMESIZ olmali."""
+    import importlib
+
+    mod = importlib.import_module("arac.enjeksiyon")
+    for n in (1, 2, 3, 4, 7, 163):
+        parcalar = [mod.bol(mod.ENJEKSIYONLAR, f"{k}/{n}") for k in range(1, n + 1)]
+        birlesim = [e for p in parcalar for e in p]
+        assert birlesim == mod.ENJEKSIYONLAR, f"n={n}: bolme sirayi/kapsami bozdu"
+
+    # Parca sayisi listeden buyukse bos parcalar cikar; kayip olmamali.
+    cok = [mod.bol(mod.ENJEKSIYONLAR, f"{k}/500") for k in range(1, 501)]
+    assert [e for p in cok for e in p] == mod.ENJEKSIYONLAR
+
+    # `--aday` ile birlikte de calismali: once daralt, sonra bol.
+    ad = mod.ENJEKSIYONLAR[0][0]
+    dar = mod.secilenler(["--aday", ad[:20]])
+    assert mod.secilenler(["--aday", ad[:20], "--parca", "1/1"]) == dar
+
+    for bozuk in ("2", "0/3", "4/3", "a/b", "1/0"):
+        with pytest.raises(ValueError):
+            mod.bol(mod.ENJEKSIYONLAR, bozuk)
+
+
+def test_enjeksiyon_kontrol_modu_yarim_kalan_kosuyu_goruyor(tmp_path, monkeypatch):
+    """KK-41 (16 Agu 2026 olayi): harness sert oldurulunce `finally`, `atexit`
+    ve sinyal isleyicilerinin hicbiri calismadi; `belge.py` enjekte edilmis
+    halde kaldi. Kendi geri yuklemesi yalnizca BIR SONRAKI harness kosusunda
+    devreye giriyor - paketleyen ya da commit eden adim harness'i calistirmiyor.
+    `--kontrol` bu boslugu kapatir ve ONARMAZ: durumun gorunmesi gerekiyor."""
+    import importlib
+
+    mod = importlib.import_module("arac.enjeksiyon")
+    kok, yedek = tmp_path / "kok", tmp_path / "yedek"
+    (kok / "src").mkdir(parents=True)
+    (kok / "src/a.py").write_text("x = 1\n")
+    monkeypatch.setattr(mod, "KOK", kok)
+    monkeypatch.setattr(mod, "YEDEK_DIZIN", yedek)
+    monkeypatch.setattr(mod, "KILIT", tmp_path / "kilit")
+    monkeypatch.setattr(mod, "UYGULANAN", yedek / "_uygulanan.txt")
+    monkeypatch.setattr(mod, "DOSYALAR", ["src/a.py"])
+
+    assert mod.kontrol() == 0, "artik yokken kirli raporlandi"
+
+    mod.yedekle()
+    assert mod.kontrol() == 2, "yarim kalan kosu (yedek duruyor) gorulmedi"
+    yedek_var, _, farkli, _ = mod.artiklar()
+    assert yedek_var and farkli == [], "enjeksiyon uygulanmadan cokme yanlis okundu"
+
+    mod.UYGULANAN.write_text("[32/163] gizli blok filtresi -> src/a.py")
+    (kok / "src/a.py").write_text("x = 2\n")
+    _, _, farkli, not_ = mod.artiklar()
+    assert farkli == ["src/a.py"], "enjekte halde kalan dosya gorulmedi"
+    assert "32/163" in not_, "hangi enjeksiyonun kaldigi kaydedilmemis"
+    assert mod.kontrol() == 2
+
+    mod.geri_al()
+    assert (kok / "src/a.py").read_text() == "x = 1\n"
+    assert not mod.UYGULANAN.exists(), "geri alma sonrasi isaret dosyasi kaldi"
+    assert mod.kontrol() == 2, "yedek dizini dururken temiz denemez"
+    mod.temizle()
+    assert mod.kontrol() == 0
+
+
 def test_tani_ixbrl_modu_zincirin_kapali_olup_olmadigini_soyluyor(monkeypatch, capsys):
     """--ixbrl, tasarim sirasinda olculemeyen soruyu bu makinede olcer: SEC'in
     ayikladigi instance'taki fact id'leri, dosyalayanin kendi inline

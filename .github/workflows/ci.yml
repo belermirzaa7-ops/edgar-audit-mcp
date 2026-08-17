@@ -54,18 +54,28 @@ jobs:
     # guarantee. Every protection is deliberately broken and the matching test
     # must turn red. Run on both OSes: the harness shells out to pytest, so it
     # is exposed to the same platform differences as the code it checks.
+    #
+    # Sharded: the full sweep is 163 injections and each one runs the whole test
+    # suite, so a single process lives a long time -- and on 16 Aug 2026 one was
+    # killed part-way through, leaving an injected file behind. Four shards keep
+    # each process short and make a failed shard cheap to repeat. `fail-fast` is
+    # off deliberately: one broken guard should not hide the state of the rest.
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        shard: ["1/4", "2/4", "3/4", "4/4"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
-      - run: python arac/enjeksiyon.py
+      - run: python arac/enjeksiyon.py --parca ${{ matrix.shard }}
+      # The harness restores every file it breaks. That claim is checked here
+      # rather than assumed: a leftover backup or an injected file exits 2.
+      - run: python arac/enjeksiyon.py --kontrol
 
   docker:
     # The README advertises running this server over streamable HTTP in a

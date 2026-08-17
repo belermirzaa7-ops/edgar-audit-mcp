@@ -22,7 +22,7 @@ def _ciftler() -> list[ET.Element]:
 
 def test_xml_gecerli_ve_beklenen_sayida_soru_var():
     ciftler = _ciftler()
-    assert len(ciftler) == 20, f"20 soru bekleniyordu, {len(ciftler)} var"
+    assert len(ciftler) == 22, f"22 soru bekleniyordu, {len(ciftler)} var"
 
 
 def test_her_arac_degerlendirme_setinde_temsil_ediliyor():
@@ -86,9 +86,11 @@ def test_readme_soru_sayisi_dosyayla_ayni():
     import re
 
     yazi = {10: "ten", 15: "fifteen", 16: "sixteen", 17: "seventeen",
-            18: "eighteen", 19: "nineteen", 20: "twenty"}
+            18: "eighteen", 19: "nineteen", 20: "twenty",
+            21: "twenty-one", 22: "twenty-two"}
     tr_yazi = {10: "on", 15: "on beş", 16: "on altı", 17: "on yedi",
-               18: "on sekiz", 19: "on dokuz", 20: "yirmi"}
+               18: "on sekiz", 19: "on dokuz", 20: "yirmi",
+               21: "yirmi bir", 22: "yirmi iki"}
     n = len(_ciftler())
     assert n in yazi, f"{n} icin yazi karsiligi tabloya eklenmeli"
 
@@ -118,3 +120,32 @@ def test_readme_takma_ad_listesi_kodla_ayni():
     eksik = [a for a in CONCEPT_ALIASES if f"`{a}`" not in en]
     assert not eksik, f"README bu takma adlari saymiyor: {eksik}"
     del asyncio
+
+
+def test_kayit_defteri_kimligi_uc_dosyada_da_ayni():
+    """MCP registry sunucu adi UC yerde birden geciyor ve ucu de birbirine
+    esit OLMAK ZORUNDA: `server.json`'daki `name`, PyPI paketinin sahiplik
+    isareti (README'deki `mcp-name:` yorumu, PyPI aciklamasina bu dosyadan
+    geciyor) ve OCI imajinin `io.modelcontextprotocol.server.name` etiketi.
+
+    Kayit defteri bunlari karsilastiriyor; tutmazsa yayin "Registry validation
+    failed for package" ile reddediliyor (16 Agu 2026'da kayit defterinin kendi
+    paket-turu dokumaninda olculdu). Bir yeniden adlandirma uc dosyanin ikisini
+    guncelleyip ucuncusunu unutursa hata YAYIN aninda cikar - o an geri bildirim
+    dongusu en pahalidir. Burada tek bir test yeter.
+    """
+    import json
+
+    ad = json.loads((KOK / "server.json").read_text(encoding="utf-8"))["name"]
+    assert re.fullmatch(r"[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+", ad), (
+        f"server.json adi kayit defterinin desenine uymuyor: {ad}")
+
+    okuma = (KOK / "README.md").read_text(encoding="utf-8")
+    assert f"<!-- mcp-name: {ad} -->" in okuma, (
+        "README'deki mcp-name isareti server.json'daki adla ayni degil "
+        "(PyPI sahiplik dogrulamasi bu satiri okuyor)")
+
+    docker = (KOK / "Dockerfile").read_text(encoding="utf-8")
+    assert f'LABEL io.modelcontextprotocol.server.name="{ad}"' in docker, (
+        "Dockerfile etiketi server.json'daki adla ayni degil "
+        "(OCI sahiplik dogrulamasi bu etiketi okuyor)")

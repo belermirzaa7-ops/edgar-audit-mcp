@@ -25,6 +25,10 @@
   same day by fetching the exhibit itself from sec.gov and reading the table out
   of it.
 
+  Questions 21 and 22, covering the ownership tools added on 16 Aug 2026, were
+  measured the same day by fetching the Form 4 and 13F documents from sec.gov
+  and reading them.
+
   Design rules applied to each question:
     - answerable only through the tools, not from general knowledge
     - needs more than one tool call
@@ -289,6 +293,40 @@
       directly and reading the table out of the HTML; the cells above are quoted from it.
       The directory listing at .../index.json was read the same way and gives the exhibit's
       size as 13243 bytes against 26572 for the primary document.
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Berkshire Hathaway reported the same holding of 669,429,166 Apple shares in the 13F it filed on 14 November 2022 and in the one it filed on 14 February 2023. What value does each filing put on that position, and why do the two numbers differ by a factor of about a thousand?</question>
+    <answer>The November 2022 filing reports the value as 92,515,111 and the February 2023 filing reports it as 86,841,985,318 for the same share count. Neither is a mistake and the position did not change: SEC required 13F values in THOUSANDS of dollars until it changed the requirement for filings made from January 2023, after which values are in whole dollars. Read literally, the two filings would say a roughly $92.5 million position became an $86.8 billion one in a single quarter. The share counts, which are unaffected by the change, are identical in both.</answer>
+    <verification>
+      sec_edgar_get_institutional_holdings(ticker="0001067983", accession_number="0000950123-22-012275")
+        -> value_basis = "thousands", Apple position value_usd normalised by x1000
+      sec_edgar_get_institutional_holdings(ticker="0001067983", accession_number="0000950123-23-002585")
+        -> value_basis = "whole_dollars"
+      Measured 16 Aug 2026 by fetching the two information tables directly:
+      https://www.sec.gov/Archives/edgar/data/1067983/000095012322012275/18337.xml
+      https://www.sec.gov/Archives/edgar/data/1067983/000095012323002585/20651.xml
+      The 2022 row gives 92,515,111 against 669,429,166 shares, which is $0.14 per share
+      if read as whole dollars; the 2023 row gives 86,841,985,318 against the same share
+      count, which is $129.72 per share. Apple closed 2022-12-30 at about $129.93, so the
+      later filing is the one in whole dollars.
+    </verification>
+  </qa_pair>
+
+  <qa_pair>
+    <question>In the Form 4 that Suzanne M Nora Johnson filed for NVIDIA on 12 August 2026, what transaction code does the filing use, how many shares does it cover, and does that transaction mean she bought NVIDIA stock in the market?</question>
+    <answer>Code A, for 1,262 shares of common stock, at a stated price of zero. It is not a market purchase: code A is an acquisition from the issuer - a grant or award - and the zero price is the tell. She is reported as a director and not an officer, and the shares are held directly. Counting a code A line as insider buying is the ordinary way this data is misread, which is why the transaction code has to be read before the share count.</answer>
+    <verification>
+      sec_edgar_get_insider_transactions(ticker="NVDA", filings=5)
+        -> a line with code "A", code_meaning naming it a grant with no cash paid,
+           shares 1262, price_per_share 0, is_director true, is_officer false
+      Measured 16 Aug 2026 by fetching the Form 4 XML directly:
+      https://www.sec.gov/Archives/edgar/data/1045810/000131026426000008/wk-form4_1786569187.xml
+      The transactionCode, transactionShares, transactionPricePerShare and the
+      isDirector/isOfficer flags above are quoted from that file. Note SEC's
+      primaryDocument field points at a styled copy under xslF345X06/; the
+      machine-readable XML is the same file name without that prefix.
     </verification>
   </qa_pair>
 

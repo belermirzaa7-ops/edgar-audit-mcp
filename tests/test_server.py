@@ -21,12 +21,17 @@ SUBS = {"name": "Apple Inc.", "sicDescription": "Electronic Computers",
         "filings": {"recent": {
             "accessionNumber": ["0000320193-25-000073","0000320193-25-000058",
                                 "0000320193-25-000041","0000320193-24-000123",
-                                "0000320193-25-000012"],
-            "form":            ["10-K","10-Q","8-K","10-K","4"],
-            "filingDate":      ["2025-10-31","2025-08-01","2025-06-10","2024-11-01","2025-02-03"],
-            "reportDate":      ["2025-09-27","2025-06-28","2025-06-09","2024-09-28",""],
+                                "0000320193-25-000012","0000320193-26-000110",
+                                "0000320193-26-000900"],
+            "form":            ["10-K","10-Q","8-K","10-K","4","4","13F-HR"],
+            "filingDate":      ["2025-10-31","2025-08-01","2025-06-10","2024-11-01",
+                                "2025-02-03","2026-02-20","2026-05-15"],
+            "reportDate":      ["2025-09-27","2025-06-28","2025-06-09","2024-09-28",
+                                "","2026-02-18","2026-03-31"],
             "primaryDocument": ["aapl-20250927.htm","aapl-20250628.htm","aapl-8k.htm",
-                                "aapl-20240928.htm","xslF345X05/form4.xml"],
+                                "aapl-20240928.htm","xslF345X05/form4.xml",
+                                "xslF345X03/wf-form4_123.xml",
+                                "xslForm13F_X02/primary_doc.xml"],
         },
         # SEC `recent` akisini ~1000 dosyalamada keser ve gerisini AYRI JSON
         # dosyalarina koyar. Sahte veri bunu tasimadigi surece "bu sirketin
@@ -643,6 +648,106 @@ FTS_HATA = {"error": "Result window is too large, from + size must be less "
             "errorType": "illegal_argument_exception"}
 
 
+
+# ---- Form 4 (icerideki islemleri). Yapi 16 Agu 2026'da GERCEK dosyalamalardan
+# olculdu (NVDA 0001310264-26-000008 ve 0001197647-26-000007). Taklit edilmesi
+# sart olan ozellikler:
+#   (1) degerler `<value>` sarmalayicisi icinde - eleman metnini dogrudan
+#       okuyan kod bos alir,
+#   (2) fiyat alani `<footnoteId>` de tasiyabiliyor,
+#   (3) `nonDerivativeHolding` (islem DEGIL, mevcut pozisyon) ayni tabloda,
+#   (4) turev tablosu ayri: opsiyon/RSU satirlari hisse satirlariyla ayni
+#       listeye konursa ayni olay iki kez sayilir,
+#   (5) dolayli sahiplikte `natureOfOwnership` ("By Trust").
+FORM4_XML = """<?xml version="1.0"?><ownershipDocument>
+<documentType>4</documentType><periodOfReport>2026-02-18</periodOfReport>
+<issuer><issuerCik>0000320193</issuerCik><issuerName>Apple Inc.</issuerName>
+<issuerTradingSymbol>AAPL</issuerTradingSymbol></issuer>
+<reportingOwner><reportingOwnerId><rptOwnerCik>0001214128</rptOwnerCik>
+<rptOwnerName>COOK TIMOTHY D</rptOwnerName></reportingOwnerId>
+<reportingOwnerRelationship><isDirector>1</isDirector><isOfficer>1</isOfficer>
+<isTenPercentOwner>0</isTenPercentOwner><officerTitle>Chief Executive Officer</officerTitle>
+</reportingOwnerRelationship></reportingOwner>
+<nonDerivativeTable>
+<nonDerivativeTransaction><securityTitle><value>Common Stock</value></securityTitle>
+<transactionDate><value>2026-02-18</value></transactionDate>
+<transactionCoding><transactionCode>A</transactionCode></transactionCoding>
+<transactionAmounts><transactionShares><value>511000</value></transactionShares>
+<transactionPricePerShare><value>0</value><footnoteId id="F1"/></transactionPricePerShare>
+<transactionAcquiredDisposedCode><value>A</value></transactionAcquiredDisposedCode></transactionAmounts>
+<postTransactionAmounts><sharesOwnedFollowingTransaction><value>3789000</value></sharesOwnedFollowingTransaction></postTransactionAmounts>
+<ownershipNature><directOrIndirectOwnership><value>D</value></directOrIndirectOwnership></ownershipNature>
+</nonDerivativeTransaction>
+<nonDerivativeTransaction><securityTitle><value>Common Stock</value></securityTitle>
+<transactionDate><value>2026-02-18</value></transactionDate>
+<transactionCoding><transactionCode>F</transactionCode></transactionCoding>
+<transactionAmounts><transactionShares><value>240000</value></transactionShares>
+<transactionPricePerShare><value>243.15</value></transactionPricePerShare>
+<transactionAcquiredDisposedCode><value>D</value></transactionAcquiredDisposedCode></transactionAmounts>
+<postTransactionAmounts><sharesOwnedFollowingTransaction><value>3549000</value></sharesOwnedFollowingTransaction></postTransactionAmounts>
+<ownershipNature><directOrIndirectOwnership><value>D</value></directOrIndirectOwnership></ownershipNature>
+</nonDerivativeTransaction>
+<nonDerivativeTransaction><securityTitle><value>Common Stock</value></securityTitle>
+<transactionDate><value>2026-02-19</value></transactionDate>
+<transactionCoding><transactionCode>S</transactionCode></transactionCoding>
+<transactionAmounts><transactionShares><value>100000</value></transactionShares>
+<transactionPricePerShare><value>245.00</value></transactionPricePerShare>
+<transactionAcquiredDisposedCode><value>D</value></transactionAcquiredDisposedCode></transactionAmounts>
+<postTransactionAmounts><sharesOwnedFollowingTransaction><value>3449000</value></sharesOwnedFollowingTransaction></postTransactionAmounts>
+<ownershipNature><directOrIndirectOwnership><value>I</value></directOrIndirectOwnership>
+<natureOfOwnership><value>By Trust</value></natureOfOwnership></ownershipNature>
+</nonDerivativeTransaction>
+<nonDerivativeHolding><securityTitle><value>Common Stock</value></securityTitle>
+<postTransactionAmounts><sharesOwnedFollowingTransaction><value>57378</value></sharesOwnedFollowingTransaction></postTransactionAmounts>
+<ownershipNature><directOrIndirectOwnership><value>I</value></directOrIndirectOwnership>
+<natureOfOwnership><value>By 401(k) plan</value></natureOfOwnership></ownershipNature></nonDerivativeHolding>
+</nonDerivativeTable>
+<derivativeTable>
+<derivativeTransaction><securityTitle><value>Restricted Stock Unit</value></securityTitle>
+<transactionDate><value>2026-02-18</value></transactionDate>
+<transactionCoding><transactionCode>M</transactionCode></transactionCoding>
+<transactionAmounts><transactionShares><value>511000</value></transactionShares>
+<transactionPricePerShare><value>0</value></transactionPricePerShare>
+<transactionAcquiredDisposedCode><value>D</value></transactionAcquiredDisposedCode></transactionAmounts>
+<ownershipNature><directOrIndirectOwnership><value>D</value></directOrIndirectOwnership></ownershipNature>
+</derivativeTransaction>
+</derivativeTable></ownershipDocument>"""
+
+# ---- 13F. Ad alani ve alan adlari Berkshire'in 2026 Q2 dosyalamasindan
+# olculdu. Iki satir AYNI ihracci: bir yonetici her alt yonetici icin ayri
+# satir yaziyor ve bunlar mukerrer DEGIL, ayni pozisyonun parcalari.
+T13F_TABLO = """<?xml version="1.0"?><informationTable xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.sec.gov/edgar/document/thirteenf/informationtable">
+<infoTable><nameOfIssuer>APPLE INC</nameOfIssuer><titleOfClass>COM</titleOfClass><cusip>037833100</cusip>
+<value>86841985318</value><shrsOrPrnAmt><sshPrnamt>669429166</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>
+<investmentDiscretion>DFND</investmentDiscretion><otherManager>4,11</otherManager>
+<votingAuthority><Sole>669429166</Sole><Shared>0</Shared><None>0</None></votingAuthority></infoTable>
+<infoTable><nameOfIssuer>APPLE INC</nameOfIssuer><titleOfClass>COM</titleOfClass><cusip>037833100</cusip>
+<value>1000000000</value><shrsOrPrnAmt><sshPrnamt>7708000</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>
+<investmentDiscretion>DFND</investmentDiscretion><otherManager>4</otherManager>
+<votingAuthority><Sole>7708000</Sole><Shared>0</Shared><None>0</None></votingAuthority></infoTable>
+<infoTable><nameOfIssuer>ALLY FINL INC</nameOfIssuer><titleOfClass>COM</titleOfClass><cusip>02005N100</cusip>
+<value>577211815</value><shrsOrPrnAmt><sshPrnamt>12561737</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>
+<investmentDiscretion>DFND</investmentDiscretion>
+<votingAuthority><Sole>12561737</Sole><Shared>0</Shared><None>0</None></votingAuthority></infoTable>
+</informationTable>"""
+
+T13F_KAPAK = """<?xml version="1.0"?><edgarSubmission>
+<formData><coverPage><filingManager><name>Apple Asset Management</name></filingManager>
+<reportType>13F HOLDINGS REPORT</reportType></coverPage>
+<summaryPage><otherIncludedManagersCount>14</otherIncludedManagersCount>
+<tableEntryTotal>3</tableEntryTotal><tableValueTotal>88419197133</tableValueTotal></summaryPage></formData>
+<headerData><filerInfo><periodOfReport>03-31-2026</periodOfReport></filerInfo></headerData>
+</edgarSubmission>"""
+
+# 13F dizininde bilgi tablosunun adi RASTGELE ("56757.xml", "18337.xml"
+# olculdu). Bu yuzden ad tahmin edilemez, dizinden bulunmasi gerekiyor.
+DIZIN_13F = {"directory": {"item": [
+    {"name": "0000320193-26-000900-index.html", "type": "text.gif", "size": ""},
+    {"name": "primary_doc.xml", "type": "text.gif", "size": "5555"},
+    {"name": "77219.xml", "type": "text.gif", "size": "44724"},
+]}}
+
+
 ISTEK_KAYDI: list[str] = []
 
 
@@ -686,6 +791,8 @@ def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json=CERCEVE_GELIR)
         return httpx.Response(404, json={"error": "not found"})
     if u.endswith("/index.json"):
+        if "000032019326000900" in u:
+            return httpx.Response(200, json=DIZIN_13F)
         if "000032019324000123" in u:
             return httpx.Response(200, json=DIZIN_ESKI_JSON)
         if "000032019325000058" in u:
@@ -694,6 +801,15 @@ def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json=DIZIN_XBRLSIZ_JSON)
         return httpx.Response(200, json=DIZIN_JSON)
     if "/Archives/edgar/data/" in u:
+        if "wf-form4_123.xml" in u:
+            return httpx.Response(200, text=FORM4_XML,
+                                  headers={"Content-Type": "application/xml"})
+        if u.endswith("/primary_doc.xml"):
+            return httpx.Response(200, text=T13F_KAPAK,
+                                  headers={"Content-Type": "application/xml"})
+        if u.endswith("/77219.xml"):
+            return httpx.Response(200, text=T13F_TABLO,
+                                  headers={"Content-Type": "application/xml"})
         if "exhibit991.htm" in u:
             return httpx.Response(200, text=BELGE_8K_EK,
                                   headers={"Content-Type": "text/html"})
@@ -771,7 +887,7 @@ async def test_filings_filtresiz_hepsini_dondurur(srv):
     """Kontrol testi: filtre yokken gercekten baska turler var mi?
     Bu olmadan yukaridaki test bos bir kumeyi 'filtrelenmis' sanabilir."""
     s = await srv.list_recent_filings(ticker="AAPL", limit=10)
-    assert {x.form for x in s.filings} == {"10-K", "10-Q", "8-K", "4"}
+    assert {x.form for x in s.filings} == {"10-K", "10-Q", "8-K", "4", "13F-HR"}
 
 
 @pytest.mark.anyio
@@ -785,13 +901,13 @@ async def test_filings_sayfalama_bilgisi_verir(srv):
     """Standart §16: limit tek basina yetmez. Model, listenin tamami mi yoksa
     kirpilmis mi oldugunu bilmeden 'sirketin N dosyalamasi var' diyebilir."""
     kirpik = await srv.list_recent_filings(ticker="AAPL", limit=2)
-    assert kirpik.total_matching == 5
+    assert kirpik.total_matching == 7
     assert kirpik.returned == 2
     assert kirpik.has_more is True
 
     tam = await srv.list_recent_filings(ticker="AAPL", limit=50)
-    assert tam.total_matching == 5
-    assert tam.returned == 5
+    assert tam.total_matching == 7
+    assert tam.returned == 7
     # Sayfa tamamlandi ama SEC'in `recent` akisi disinda dosyalamalar var:
     # `has_more` yine True, sebebi ayri alanda. "Hepsini gordum" sonucuna
     # varmak, otuz yillik gecmisi olan bir sirkette yanlis olurdu.
@@ -1001,6 +1117,8 @@ async def test_arac_isimleri_servis_onekli():
         "sec_edgar_compare_companies",
         "sec_edgar_list_fact_dimensions",
         "sec_edgar_get_dimensional_facts",
+        "sec_edgar_get_insider_transactions",
+        "sec_edgar_get_institutional_holdings",
     }, f"beklenmeyen arac isimleri: {isimler}"
 
 
@@ -2597,7 +2715,7 @@ async def test_eski_akis_include_older_ile_birlesiyor(srv):
     assert "0000320193-97-000005" in numaralar
     assert s.older_filings_read is True
     assert s.older_feeds_skipped == 0
-    assert s.total_matching == 7, numaralar   # 5 recent + 2 eski
+    assert s.total_matching == 9, numaralar   # 7 recent + 2 eski
     # Birlesik liste TARIHE gore siralanmali: iki akisin kendi ic sirasi,
     # birlestirildiginde dogru sirayi vermez.
     tarihler = [x.filing_date for x in s.filings]
@@ -3160,3 +3278,158 @@ async def test_aramada_cik_filtresi_de_kabul_ediliyor(srv):
     await srv.search_filings(query="tariff", ticker="1318605")
     u = [x for x in ISTEK_KAYDI if "efts" in x][0]
     assert "ciks=0001318605" in u
+
+
+# ------------------------------------------------- Form 4 (icerideki islemler)
+@pytest.mark.anyio
+async def test_form4_islemleri_kod_anlamiyla_donuyor(srv):
+    """En sik yapilan analiz hatasi: hisse ODULUNU (A) ya da vergi icin
+    KESILEN hisseyi (F) piyasadan alim/satim sanmak. Kod tek basina bunu
+    anlatmiyor; anlami yanitin icinde gitmeli (§18)."""
+    r = await srv.get_insider_transactions(ticker="AAPL")
+    assert r.issuer_name == "Apple Inc." and r.ticker == "AAPL"
+    kodlar = {t.code for t in r.transactions}
+    assert kodlar == {"A", "F", "S"}, kodlar
+    odul = [t for t in r.transactions if t.code == "A"][0]
+    assert odul.code_meaning and "no cash" in odul.code_meaning
+    assert odul.price_per_share == 0 and odul.shares == 511000
+    assert odul.officer_title == "Chief Executive Officer"
+    assert odul.is_director is True and odul.is_officer is True
+    kesinti = [t for t in r.transactions if t.code == "F"][0]
+    assert kesinti.code_meaning and "not a market sale" in kesinti.code_meaning
+
+
+@pytest.mark.anyio
+async def test_form4_turev_satirlari_varsayilan_olarak_disarida(srv):
+    """Turev satiri (RSU) ile hisse satiri AYNI olayin iki asamasi: RSU
+    vesting'i hem `M` turev satiri hem `A` hisse satiri olarak gorunur.
+    Ikisini birden saymak ayni hisseyi iki kez sayar."""
+    varsayilan = await srv.get_insider_transactions(ticker="AAPL")
+    assert all(t.is_derivative is False for t in varsayilan.transactions)
+    genis = await srv.get_insider_transactions(ticker="AAPL", include_derivative=True)
+    turevler = [t for t in genis.transactions if t.is_derivative]
+    assert len(turevler) == 1 and turevler[0].security == "Restricted Stock Unit"
+
+
+@pytest.mark.anyio
+async def test_form4_pozisyon_bildirimi_islem_sanilmiyor(srv):
+    """`nonDerivativeHolding` alinip satilan bir sey DEGIL, yalnizca mevcut
+    pozisyon. Islem listesine karistirmak "bugun 57.378 hisse aldi" dedirtir."""
+    varsayilan = await srv.get_insider_transactions(ticker="AAPL")
+    assert all(t.is_holding is False for t in varsayilan.transactions)
+    genis = await srv.get_insider_transactions(ticker="AAPL", include_holdings=True)
+    tutma = [t for t in genis.transactions if t.is_holding]
+    assert len(tutma) == 1
+    assert tutma[0].shares is None and tutma[0].shares_owned_after == 57378
+    assert tutma[0].nature_of_ownership == "By 401(k) plan"
+    # Pozisyon satiri kod toplamlarina GIRMEMELI: alinip satilan bir sey yok.
+    assert sum(k.transactions for k in genis.code_totals) == 3
+
+
+@pytest.mark.anyio
+async def test_form4_kod_toplamlari_netlestirilmiyor(srv):
+    """Odul + vergi kesintisi + satis TEK bir "net alim" sayisina indirgenmiyor:
+    uc farkli olay, toplami hicbir seyi olcmez (KK-31 mutabakat ilkesi)."""
+    r = await srv.get_insider_transactions(ticker="AAPL")
+    tablo = {k.code: k for k in r.code_totals}
+    assert tablo["A"].shares == 511000 and tablo["A"].transactions == 1
+    assert tablo["F"].shares == 240000
+    assert tablo["S"].shares == 100000
+    assert all(k.meaning for k in r.code_totals), "kod anlamlari toplamlarda da olmali"
+
+
+@pytest.mark.anyio
+async def test_form4_stil_onekli_yol_ham_xml_e_cevriliyor(srv):
+    """Olculdu: `primaryDocument` stil sayfasi yolunu gosteriyor
+    (`xslF345X03/wf-form4_123.xml`); makine okunur XML oneksiz halidir."""
+    ISTEK_KAYDI.clear()
+    await srv.get_insider_transactions(ticker="AAPL")
+    istekler = [u for u in ISTEK_KAYDI if "form4" in u]
+    assert istekler and all("xsl" not in u for u in istekler), istekler
+
+
+@pytest.mark.anyio
+async def test_form4_dosyalama_sayisi_bildiriliyor(srv):
+    """Kac dosyalama okundugu ve kac tane oldugu ayri ayri: model "iceriden
+    islem yok" ile "bakilan dosyalamalarda yok"u ayirt edebilmeli."""
+    r = await srv.get_insider_transactions(ticker="AAPL", filings=1)
+    assert r.filings_read == 1 and r.filings_available == 2
+    assert r.has_more is True
+    assert "does not show trading by anyone else" in r.coverage_note
+
+
+# ------------------------------------------------------ 13F (kurumsal pozisyon)
+@pytest.mark.anyio
+async def test_13f_ayni_ihraccinin_satirlari_birlestiriliyor(srv):
+    """Bir yonetici her alt yonetici icin ayri satir yaziyor. Bunlar mukerrer
+    DEGIL, ayni pozisyonun parcalari - toplanmali ve kac satirdan geldigi
+    soylenmeli."""
+    h = await srv.get_institutional_holdings(ticker="AAPL")
+    apple = [p for p in h.positions if p.issuer == "APPLE INC"][0]
+    assert apple.rows_combined == 2
+    assert apple.shares_or_principal == 669429166 + 7708000
+    assert apple.value_usd == 86841985318 + 1000000000
+    assert h.rows_in_table == 3 and h.unique_positions == 2
+
+
+@pytest.mark.anyio
+async def test_13f_2023_oncesi_deger_bin_dolar_olarak_isaretleniyor(srv, monkeypatch):
+    """OLCULDU (Berkshire, ayni 669.429.166 Apple hissesi): Kas 2022
+    dosyalamasinda deger 92.515.111, Sub 2023 dosyalamasinda 86.841.985.318 -
+    BIN KAT. SEC 2023'te birimi bin dolardan tam dolara cevirdi. Normalize
+    etmeyen bir arac, iki ceyregi karsilastiran modele "pozisyon bin katina
+    cikti" dedirtir."""
+    yeni = await srv.get_institutional_holdings(ticker="AAPL")
+    assert yeni.value_basis == "whole_dollars"
+
+    import copy
+    eski_sub = copy.deepcopy(SUBS)
+    i = eski_sub["filings"]["recent"]["form"].index("13F-HR")
+    eski_sub["filings"]["recent"]["filingDate"][i] = "2022-11-14"
+
+    async def sahte(cik):
+        return eski_sub
+
+    monkeypatch.setattr(srv._client, "submissions", sahte)
+    srv._client._index_cache.clear()
+    eski = await srv.get_institutional_holdings(ticker="AAPL")
+    assert eski.value_basis == "thousands"
+    assert eski.total_value_usd == yeni.total_value_usd * 1000
+
+
+@pytest.mark.anyio
+async def test_13f_kapak_sayfasi_ve_tablo_ayri_ayri_bildiriliyor(srv):
+    """Kapak sayfasindaki toplam ile tablonun toplami tutmayabilir. Ikisini de
+    dondurmek, farki gorunur kilar (KK-31: sessizce birini secme)."""
+    h = await srv.get_institutional_holdings(ticker="AAPL")
+    assert h.reported_entry_count == 3
+    assert h.reported_value_total == 88419197133
+    assert h.total_value_usd == 86841985318 + 1000000000 + 577211815
+    assert h.manager_name == "Apple Asset Management"
+    assert h.period_of_report == "03-31-2026"
+
+
+@pytest.mark.anyio
+async def test_13f_bilgi_tablosu_dizinden_bulunuyor(srv):
+    """Bilgi tablosunun adi rastgele ("56757.xml", "18337.xml" olculdu);
+    tahmin edilemez, dizinden bulunmasi gerekiyor."""
+    ISTEK_KAYDI.clear()
+    await srv.get_institutional_holdings(ticker="AAPL")
+    assert any(u.endswith("/77219.xml") for u in ISTEK_KAYDI), ISTEK_KAYDI
+    assert any(u.endswith("/index.json") for u in ISTEK_KAYDI)
+
+
+@pytest.mark.anyio
+async def test_13f_kapsam_notu_sinirlari_soyluyor(srv):
+    h = await srv.get_institutional_holdings(ticker="AAPL")
+    for ifade in ("short positions", "45 days"):
+        assert ifade in h.coverage_note
+
+
+@pytest.mark.anyio
+async def test_13f_ihracci_araması_ve_siralama(srv):
+    h = await srv.get_institutional_holdings(ticker="AAPL", search="ally")
+    assert h.total_matching == 1 and h.positions[0].issuer == "ALLY FINL INC"
+    tum = await srv.get_institutional_holdings(ticker="AAPL")
+    degerler = [p.value_usd for p in tum.positions]
+    assert degerler == sorted(degerler, reverse=True), "en buyuk pozisyon basta olmali"

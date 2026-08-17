@@ -1,9 +1,20 @@
 [project]
 name = "sec-edgar-mcp"
 version = "0.1.0"
-description = "SEC EDGAR finansal veri MCP sunucusu (MCP 2026-07-28 spesifikasyonu)"
+description = "Read-only MCP server for SEC EDGAR: XBRL financials, filing text, segments, insider and institutional ownership"
 readme = "README.md"
 requires-python = ">=3.11"
+license = { file = "LICENSE" }
+keywords = ["mcp", "sec", "edgar", "xbrl", "finance", "filings", "13f", "form4"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
 dependencies = [
     "mcp[cli]==2.0.0",
     "httpx>=0.27,<1.0",
@@ -13,6 +24,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "anyio>=4", "ruff>=0.6", "mypy>=1.11",
        "python-dotenv>=1.0,<2.0", "pyyaml>=6.0,<7.0"]
+
+[project.urls]
+Homepage = "https://github.com/belermirzaa7-ops/sec-edgar-mcp"
+Repository = "https://github.com/belermirzaa7-ops/sec-edgar-mcp"
+Issues = "https://github.com/belermirzaa7-ops/sec-edgar-mcp/issues"
 
 [project.scripts]
 sec-edgar-mcp = "edgar_mcp.server:main"

@@ -1,3 +1,5 @@
+<!-- mcp-name: io.github.belermirzaa7-ops/sec-edgar-mcp -->
+
 # SEC EDGAR MCP Server
 
 *[Türkçe README](README.tr.md)*
@@ -9,7 +11,9 @@ specific SEC filing, a specific US-GAAP tag and a specific filing date.
 
 Built against the **2026-07-28 MCP specification** using the Python SDK `v2.0.0`.
 
-[![CI](https://github.com/OWNER/sec-edgar-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/sec-edgar-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml)
+
+**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured: 24% correct without this server, 82% with it](evaluation/benchmark.md) · [30 failures that shipped here, each with the test that guards it](PATTERNS.md)
 
 ---
 
@@ -37,6 +41,8 @@ answers. The interesting part of this project is handling them.
 | `sec_edgar_compare_companies` | One concept across every company that reported it for a period, ranked |
 | `sec_edgar_list_fact_dimensions` | Which breakdowns a filing contains — segments, geographies, product lines |
 | `sec_edgar_get_dimensional_facts` | The numbers behind a consolidated total, with the total shown next to them |
+| `sec_edgar_get_insider_transactions` | Form 4 — what directors and officers did with the shares, grouped by transaction code rather than netted |
+| `sec_edgar_get_institutional_holdings` | 13F — an investment manager's quarter-end positions, with the 2023 unit change handled |
 
 Every tool returns a Pydantic model, so MCP `outputSchema` is generated
 automatically and clients consume the results type-safely. List-returning tools
@@ -157,6 +163,45 @@ says so in data rather than in a footnote:
 
 Rank is always computed against the whole frame, so asking about three companies
 does not make one of them "first".
+
+### Who owns the company, and what the insiders did
+
+Two filings answer questions the financial statements never touch, and both are
+XML rather than XBRL.
+
+`sec_edgar_get_insider_transactions` reads Form 4 - what directors, officers
+and ten percent owners did with the company's shares, due within two business
+days of the trade. The tool refuses to compute a single "net insider buying"
+figure, and that refusal is the point: code A is a grant from the company at a
+stated price of zero, code F is shares withheld to pay tax on a vesting grant,
+and only P and S are decisions to buy or sell in the market. Adding them
+produces a number that measures nothing, so share counts come back grouped by
+code with each code's meaning next to it. Derivative lines - the restricted
+units that later become those shares - are excluded by default, because a
+single vesting event appears on both sides and counting both counts the shares
+twice.
+
+`sec_edgar_get_institutional_holdings` reads 13F - the US-listed equity
+positions an investment manager held at a quarter end. Managers rarely have a
+ticker, so they are addressed by CIK. A manager files one row per sub-manager,
+so a single holding is spread over several rows (Berkshire's Apple position ran
+to twelve in one filing); rows for the same security are combined and
+`rows_combined` says how many.
+
+**One measured trap deserves its own paragraph.** SEC changed 13F value
+reporting from thousands of dollars to whole dollars for filings from January
+2023. Berkshire reported the identical 669,429,166 Apple shares in two
+consecutive quarters:
+
+| Filed | Shares | Value as filed | Implied price |
+|---|---|---|---|
+| 14 Nov 2022 | 669,429,166 | 92,515,111 | $0.14 if read as dollars |
+| 14 Feb 2023 | 669,429,166 | 86,841,985,318 | $129.72 |
+
+Apple closed 2022-12-30 at about $129.93. Read literally, a $92 million
+position became an $87 billion one without a share changing hands. Both filings
+are returned in whole dollars here, with `value_basis` naming the convention
+the filing itself used.
 
 ### Segment data, and why the REST API does not have it
 
@@ -460,7 +505,7 @@ the report rather than left for the reader to find.
 
 ### Evaluation set
 
-[`evaluation/questions.xml`](evaluation/questions.xml) holds twenty questions that
+[`evaluation/questions.xml`](evaluation/questions.xml) holds twenty-two questions that
 can only be answered by calling the tools: cross-company fiscal year labels,
 tag merges across an accounting standard change, ratios that need two series,
 and the pagination fields. Every answer was produced by running the tools
@@ -468,7 +513,7 @@ against live SEC data and reading the result — none is written from memory —
 and each question records the exact calls used, so the measurement can be
 repeated instead of trusted.
 
-A test keeps the file structurally honest: twenty pairs, every pair carrying a
+A test keeps the file structurally honest: twenty-two pairs, every pair carrying a
 question, an answer and a verification block, every tool it names actually
 existing on the server, and no question anchored to "the latest" period.
 

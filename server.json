@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.belermirzaa7-ops/sec-edgar-mcp",
+  "title": "SEC EDGAR",
+  "description": "Read-only MCP server for SEC EDGAR: XBRL financials, filing text and tables, segment breakdowns, full-text search, insider and institutional ownership",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/belermirzaa7-ops/sec-edgar-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/belermirzaa7-ops/sec-edgar-mcp:0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "SEC_USER_AGENT",
+          "description": "Identifies you to SEC as their fair-access policy requires; must contain an email address. The server refuses to start without it.",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "SEC_RATE_LIMIT_PER_SEC",
+          "description": "Requests per second sent to SEC. Defaults to 8, below SEC's published ceiling of 10. Raising it risks a block.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "number"
+        }
+      ]
+    }
+  ]
+}

@@ -17,6 +17,8 @@ import sys
 KOK = pathlib.Path(__file__).resolve().parents[1]
 YEDEK_DIZIN = KOK / ".enjeksiyon_yedek"
 KILIT = KOK / ".enjeksiyon_kilit"
+# Hangi enjeksiyonun UYGULANMIS oldugu; sert oldurmeden sonra tek ipucu bu.
+UYGULANAN = YEDEK_DIZIN / "_uygulanan.txt"
 DOSYALAR = [
     "src/edgar_mcp/server.py",
     "src/edgar_mcp/client.py",
@@ -24,10 +26,14 @@ DOSYALAR = [
     "arac/ortam.py",
     "src/edgar_mcp/belge.py",
     "src/edgar_mcp/xbrl.py",
+    "src/edgar_mcp/sahiplik.py",
     "Dockerfile",
 ]
 
 ORTAM = {**os.environ, "SEC_RATE_LIMIT_PER_SEC": "1000"}
+# Tek bir test kosusunun ust siniri (saniye). Asilirsa o enjeksiyon "olculemedi"
+# sayilir; sessizce "koruma yok" sayilmaz.
+SURE_SINIRI = int(os.environ.get("ENJEKSIYON_TEST_SURESI", "900"))
 
 
 def hashle(f):
@@ -49,6 +55,34 @@ def geri_al(sessiz=True):
             (KOK / f).write_bytes(y.read_bytes())
             if not sessiz:
                 print(f"  geri yuklendi: {f}")
+    UYGULANAN.unlink(missing_ok=True)
+
+
+def artiklar() -> tuple[bool, bool, list[str], str]:
+    """Onceki bir calismadan artik kalmis mi: (yedek, kilit, farkli dosyalar, not).
+
+    Neden (16 Agu 2026 olayi - KK-41): harness istisnaya, SIGINT'e ve SIGTERM'e
+    dayanikliydi ama SERT OLDURMEYE degil. Surec 32/163'te oldu; `finally`,
+    `atexit` ve sinyal isleyicilerinin hicbiri calismadi ve `belge.py` enjekte
+    edilmis halde kaldi. Kendi geri yuklemesi bir sonraki harness calismasinda
+    devreye giriyordu - ama testleri kosturan, paketleyen ya da commit eden
+    hicbir adim harness'i calistirmiyor. Yani artik, harness'tan BASKA hicbir
+    yerden gorulmuyordu.
+
+    Bu fonksiyon o boslugu kapatiyor: durum tespiti, onarimdan AYRI. CI ve
+    paketleme oncesi `--kontrol` bunu cagirir ve kirli durumda kirmiziya doner;
+    onarim yalnizca normal calismanin basinda yapilir.
+    """
+    yedek = YEDEK_DIZIN.exists()
+    kilit = KILIT.exists()
+    farkli = []
+    if yedek:
+        for f in DOSYALAR:
+            y = YEDEK_DIZIN / pathlib.Path(f).name
+            if y.exists() and y.read_bytes() != (KOK / f).read_bytes():
+                farkli.append(f)
+    not_ = UYGULANAN.read_text(encoding="utf-8") if UYGULANAN.exists() else ""
+    return yedek, kilit, farkli, not_
 
 
 def kilitle() -> bool:
@@ -82,12 +116,23 @@ def temizle():
         YEDEK_DIZIN.rmdir()
 
 
-def testler():
-    r = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "--tb=no", "-p", "no:cacheprovider"],
-        cwd=KOK, capture_output=True, env=ORTAM,
-        encoding="utf-8", errors="replace",
-    )
+def testler() -> list[str] | None:
+    """Kirmizi test adlari; zaman asiminda `None` (bos liste DEGIL).
+
+    Bos liste "hicbir test kirmiziya donmedi" demek, yani "koruma yok". Zaman
+    asimi ise olcumun HIC yapilamadigi demek. Ikisini ayni degerle bildirmek,
+    calisan bir korumayi KORUMASIZ diye raporlardi - `sozdizimi_gecerli` ile
+    ayni ayrim (KK-10), ve KK-23'un "bos basari, gercek bos cevaptan ayirt
+    edilemez" kuralinin harness'taki karsiligi.
+    """
+    try:
+        r = subprocess.run(
+            [sys.executable, "-m", "pytest", "-q", "--tb=no", "-p", "no:cacheprovider"],
+            cwd=KOK, capture_output=True, env=ORTAM,
+            encoding="utf-8", errors="replace", timeout=SURE_SINIRI,
+        )
+    except subprocess.TimeoutExpired:
+        return None
     return [
         satir.split("::")[1].split()[0]
         for satir in (r.stdout or "").splitlines()
@@ -900,6 +945,72 @@ ENJEKSIYONLAR = [
   "                if False:\n                    raise ValueError(\n                        f\"SEC has no filer with CIK {cik}.",
   "test_bilinmeyen_cik_eyleme_donusturulebilir_hata"),
 
+ ("N: Form 4 kod anlamlarini dusur",
+  "src/edgar_mcp/server.py",
+  "                code_meaning=ISLEM_KODLARI.get(i.code or \"\"),",
+  "                code_meaning=None,",
+  "test_form4_islemleri_kod_anlamiyla_donuyor"),
+
+ ("N: turev satirlarini varsayilan olarak da don",
+  "src/edgar_mcp/server.py",
+  "            if i.is_derivative and not include_derivative:\n                continue",
+  "            if False:\n                continue",
+  "test_form4_turev_satirlari_varsayilan_olarak_disarida"),
+
+ ("N: pozisyon bildirimini islem say",
+  "src/edgar_mcp/server.py",
+  "            if i.is_holding and not include_holdings:\n                continue",
+  "            if False:\n                continue",
+  "test_form4_pozisyon_bildirimi_islem_sanilmiyor"),
+
+ ("N: pozisyon satirini kod toplamina kat",
+  "src/edgar_mcp/server.py",
+  "        if t.shares is None:\n            continue",
+  "        if False:\n            continue",
+  "test_form4_pozisyon_bildirimi_islem_sanilmiyor"),
+
+ ("N: stil onekini soyma (styled kopyayi indir)",
+  "src/edgar_mcp/server.py",
+  "    return _STIL_ONEKI.sub(\"\", birincil or \"\")",
+  "    return birincil or \"\"",
+  "test_form4_stil_onekli_yol_ham_xml_e_cevriliyor"),
+
+ ("N: Form 4 sarmalayicisini atlayip eleman metnini oku",
+  "src/edgar_mcp/sahiplik.py",
+  "    v = c.find(\"value\")\n    metin = (v.text if v is not None else c.text) or \"\"",
+  "    metin = c.text or \"\"",
+  "test_form4_islemleri_kod_anlamiyla_donuyor"),
+
+ ("O: 13F satirlarini birlestirme (ayni ihracci ayri satirlarda kalsin)",
+  "src/edgar_mcp/server.py",
+  "        mevcut = birlesik.get(anahtar)",
+  "        mevcut = None",
+  "test_13f_ayni_ihraccinin_satirlari_birlestiriliyor"),
+
+ ("O: 13F birim sinirini yoksay (2023 oncesini de tam dolar say)",
+  "src/edgar_mcp/server.py",
+  "    bin_mi = kayit[\"filing_date\"] < BIRIM_SINIRI",
+  "    bin_mi = False",
+  "test_13f_2023_oncesi_deger_bin_dolar_olarak_isaretleniyor"),
+
+ ("O: 13F kapak toplamini dusur",
+  "src/edgar_mcp/server.py",
+  "        reported_value_total=(kapak.table_value_total * carpan\n                              if kapak.table_value_total is not None else None),",
+  "        reported_value_total=None,",
+  "test_13f_kapak_sayfasi_ve_tablo_ayri_ayri_bildiriliyor"),
+
+ ("O: 13F bilgi tablosunu adiyla tahmin et",
+  "src/edgar_mcp/server.py",
+  "    veri = await _c().filing_index(dizin)\n    adaylar = [str(x.get(\"name\", \"\"))",
+  "    veri = {}\n    adaylar = [str(x.get(\"name\", \"\"))",
+  "test_13f_bilgi_tablosu_dizinden_bulunuyor"),
+
+ ("O: 13F ad alanini yoksay (oneksiz eleman ara)",
+  "src/edgar_mcp/sahiplik.py",
+  "        c = e.find(f\"{{{BILGI_TABLOSU_NS}}}{ad}\")\n        if c is None:\n            c = e.find(ad)",
+  "        c = e.find(ad)",
+  "test_13f_ayni_ihraccinin_satirlari_birlestiriliyor"),
+
  ("K: tablolari her cagride don (parametreyi yoksay)",
   "src/edgar_mcp/server.py",
   "               if offset <= t.baslangic < offset + len(parca)] if tables else []",
@@ -1019,6 +1130,12 @@ ENJEKSIYONLAR = [
   "                               if etiket_haritasi.bul(u)},",
   "                               },",
   "test_eksen_ve_uye_adlari_insan_okunur_geliyor"),
+
+ ("L: OCI sahiplik etiketini baska bir ada cevir",
+  "Dockerfile",
+  'LABEL io.modelcontextprotocol.server.name="io.github.belermirzaa7-ops/sec-edgar-mcp"',
+  'LABEL io.modelcontextprotocol.server.name="io.github.baskasi/sec-edgar-mcp"',
+  "test_kayit_defteri_kimligi_uc_dosyada_da_ayni"),
 ]
 
 
@@ -1060,10 +1177,68 @@ def secilenler(argv: list[str]) -> list[tuple]:
     `finally` ile geri almayi kullanmali - tek fark, hangi enjeksiyonlarin
     calistigi. Aday once listeye eklenir, sonra tek basina denenir.
     """
-    if "--aday" not in argv:
-        return ENJEKSIYONLAR
-    desen = argv[argv.index("--aday") + 1].lower()
-    return [e for e in ENJEKSIYONLAR if desen in e[0].lower()]
+    secili = ENJEKSIYONLAR
+    if "--aday" in argv:
+        desen = argv[argv.index("--aday") + 1].lower()
+        secili = [e for e in secili if desen in e[0].lower()]
+    if "--parca" in argv:
+        secili = bol(secili, argv[argv.index("--parca") + 1])
+    return secili
+
+
+def bol(liste: list[tuple], ifade: str) -> list[tuple]:
+    """`--parca k/n`: listeyi n bitisik parcaya bol, k'inciyi dondur.
+
+    Neden (16 Agu 2026 - KK-41): her enjeksiyon tum test setini kosturuyor ve
+    set 163 enjeksiyon tasiyor. Sure makinenin yuku ile cok degisiyor - bos bir
+    konteynerde tek kosu 14 sn olculdu (~40 dk toplam), ama ayni gun cokerek
+    biten kosuda enjeksiyon basina ~80 sn dusmustu (3 saatin uzerine cikan bir
+    projeksiyon). Bu degiskenligin kendisi parcalamanin gerekcesi: surec ne
+    kadar uzun yasarsa oldurulme olasiligi o kadar yuksek. Parcali kosuda her
+    surec kisa yasiyor ve bir parca coktugunde yalnizca o parca tekrarlanir.
+
+    Bolme BITISIK, atlamali degil: `--parca 2/4` listenin ikinci dortlugudur.
+    Cokmeden sonra hangi araligin tekrar kosacagi boylece tek bakista belli.
+
+    UYARI: tek bir parcanin yesil donmesi setin tamamini dogrulamaz. Cagiran,
+    n parcanin n'ini de kosturmak ve hepsinin exit 0 dondugunu gormek zorunda.
+    """
+    try:
+        k_s, n_s = ifade.split("/")
+        k, n = int(k_s), int(n_s)
+    except ValueError:
+        raise ValueError("--parca bicimi: k/n (orn. 2/4)") from None
+    if n < 1 or not 1 <= k <= n:
+        raise ValueError(f"--parca {ifade}: 1 <= k <= n olmali")
+    adim = -(-len(liste) // n)  # tavan bolme: son parca kisa kalir, hicbiri dusmez
+    return liste[(k - 1) * adim: k * adim]
+
+
+def kontrol() -> int:
+    """Onceki bir calismadan artik kaldi mi. Kirli ise exit 2.
+
+    Onarim YAPMAZ (bkz. `artiklar`): CI'nin ve paketleme adiminin gormesi
+    gereken sey durumun kendisi. Sessizce onaran bir kontrol, "cokmeden sonra
+    paketlendi" olayini gorunmez kilardi - kapatmaya calistigimiz bosluk tam
+    olarak buydu.
+    """
+    yedek, kilit, farkli, not_ = artiklar()
+    if not (yedek or kilit):
+        print("  TEMIZ: enjeksiyon artigi yok.")
+        return 0
+    print("  KIRLI: onceki bir enjeksiyon calismasi tamamlanmamis.")
+    if kilit:
+        print(f"    kilit dosyasi duruyor: {KILIT}")
+    if yedek:
+        print(f"    yedek dizini duruyor:  {YEDEK_DIZIN}")
+    if not_:
+        print(f"    en son uygulanan enjeksiyon: {not_.strip()}")
+    for f in farkli:
+        print(f"    ENJEKTE HALDE KALMIS: {f}")
+    if yedek and not farkli:
+        print("    (kaynak dosyalar yedekle ayni - enjeksiyon uygulanmadan cokmus)")
+    print("  Onarim: `python arac/enjeksiyon.py` calistir; basta geri yukler.")
+    return 2
 
 
 def main() -> int:
@@ -1073,25 +1248,37 @@ def main() -> int:
 
     try:
         secili = secilenler(sys.argv[1:])
-    except IndexError:
-        print("  KULLANIM: enjeksiyon.py [--aday <ad parcasi>]")
+    except (IndexError, ValueError) as e:
+        print("  KULLANIM: enjeksiyon.py [--aday <ad parcasi>] [--parca k/n] [--kontrol]")
+        if isinstance(e, ValueError):
+            print(f"  {e}")
         return 1
     if not secili:
-        print("  DURDU: --aday hicbir enjeksiyonla eslesmedi.")
+        print("  DURDU: secim bos - hicbir enjeksiyon eslesmedi.")
         return 1
 
     # Onceki cokmeden artik kalmis olabilir: once onu geri yukle.
     if YEDEK_DIZIN.exists():
         print("Onceki calismadan artik yedek bulundu, geri yukleniyor...")
+        _, _, _, not_ = artiklar()
+        if not_:
+            print(f"  en son uygulanan enjeksiyon: {not_.strip()}")
         geri_al(sessiz=False)
 
     print("=" * 78 + "\nHATA ENJEKSIYONU\n" + "=" * 78)
     baslangic = {f: hashle(f) for f in DOSYALAR}
 
     kirmizi = testler()
+    if kirmizi is None:
+        print(f"  DURDU: temiz durumda test kosusu {SURE_SINIRI} sn'yi asti.")
+        return 1
     if kirmizi:
         print("  DURDU: temiz durumda kirmizi test var ->", kirmizi)
         return 1
+    parca = ""
+    if "--parca" in sys.argv:
+        parca = sys.argv[sys.argv.index("--parca") + 1]
+        print(f"  PARCALI KOSU: {parca} - bu kosu setin TAMAMINI dogrulamaz.")
     print(f"  Temiz durum yesil. {len(secili)} enjeksiyon calistirilacak.\n")
 
     yedekle()
@@ -1115,9 +1302,17 @@ def main() -> int:
                 # Bu bir koruma eksigi DEGIL, harness hatasidir.
                 sonuc.append((ad, "ENJEKSIYON SOZDIZIMI BOZDU", False))
                 continue
+            # Once "kim uygulandi" diske yazilir, sonra dosya bozulur. Ters
+            # sirada yazilsa, tam aradaki sert oldurme izsiz kalirdi.
+            UYGULANAN.write_text(f"[{i}/{len(secili)}] {ad} -> {dosya}", encoding="utf-8")
             (KOK / dosya).write_text(bozuk)
             k = testler()
             (KOK / dosya).write_text(metin)
+            UYGULANAN.unlink(missing_ok=True)
+            if k is None:
+                # Olculemedi: "koruma yok" ile ayni satira yazilmamali.
+                sonuc.append((ad, f"TEST ZAMAN ASIMI ({SURE_SINIRI} sn)", False))
+                continue
             sonuc.append((ad, ", ".join(k) or "hicbiri", yakalandi(beklenen, k)))
     finally:
         geri_al()
@@ -1135,14 +1330,22 @@ def main() -> int:
         tamam &= ayni
         print(f"  {f}: {'degismedi' if ayni else 'DEGISMIS!'}  ({hashle(f)[:16]})")
     k = testler()
-    print(f"  Testler: {'tumu yesil' if not k else 'KIRMIZI: ' + str(k)}")
+    if k is None:
+        print(f"  Testler: OLCULEMEDI (zaman asimi, {SURE_SINIRI} sn)")
+    else:
+        print(f"  Testler: {'tumu yesil' if not k else 'KIRMIZI: ' + str(k)}")
 
     kilidi_birak()
     basarili = sum(1 for *_, ok in sonuc if ok)
     print(f"\nSONUC: {basarili}/{len(sonuc)} koruma dogrulandi.")
+    if parca:
+        print(f"UYARI: bu yalnizca {parca} parcasidir; tum parcalar kosulmadan set")
+        print("       dogrulanmis sayilmaz.")
     temizle()
-    return 0 if (basarili == len(sonuc) and tamam and not k) else 1
+    return 0 if (basarili == len(sonuc) and tamam and k == []) else 1
 
 
 if __name__ == "__main__":
+    if "--kontrol" in sys.argv[1:]:
+        sys.exit(kontrol())
     sys.exit(main())

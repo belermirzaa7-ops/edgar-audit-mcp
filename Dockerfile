@@ -3,6 +3,11 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 
+# MCP registry ownership check for an OCI package: the annotation must equal the
+# `name` field of server.json. Measured against the registry's own package-type
+# documentation (16 Aug 2026), not recalled.
+LABEL io.modelcontextprotocol.server.name="io.github.belermirzaa7-ops/sec-edgar-mcp"
+
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir .

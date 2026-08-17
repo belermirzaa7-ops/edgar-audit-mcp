@@ -9,6 +9,10 @@ belirli bir US-GAAP etiketine ve belirli bir sunulma tarihine kadar izlenebilir.
 
 **2026-07-28 MCP spesifikasyonuna** göre, Python SDK `v2.0.0` ile yazıldı.
 
+**Buradan başlayın:** [başka araçların sessizce yanlış yaptığı şeyler](docs/case-study.md) ·
+[ölçüldü: bu sunucu olmadan %24 doğru, onunla %82](evaluation/benchmark.md) ·
+[bu depoda gerçekten yaşanmış 30 hata, her biri bir testle korunuyor](PATTERNS.md)
+
 ---
 
 ## Neden var
@@ -35,6 +39,8 @@ tuzak barındırıyor. Bu projenin asıl kısmı o tuzakları ele alması.
 | `sec_edgar_compare_companies` | Bir kavramın, o dönemde raporlayan tüm şirketlerdeki değeri; sıralı |
 | `sec_edgar_list_fact_dimensions` | Dosyalamanın içerdiği kırılımlar — segment, coğrafya, ürün hattı |
 | `sec_edgar_get_dimensional_facts` | Konsolide toplamın arkasındaki rakamlar, toplamıyla yan yana |
+| `sec_edgar_get_insider_transactions` | Form 4 — yöneticilerin hisse işlemleri, netleştirilmeden kod bazında |
+| `sec_edgar_get_institutional_holdings` | 13F — bir yatırım yöneticisinin çeyrek sonu pozisyonları, 2023 birim değişimi ele alınmış |
 
 Her araç Pydantic modeli döndürür; MCP `outputSchema` otomatik üretilir ve
 istemci sonuçları tip güvenli tüketir. Liste döndüren araçlar
@@ -153,6 +159,44 @@ dipnotta değil veride söylüyor:
 
 Sıra her zaman tüm çerçeveye göre hesaplanır; üç şirket sorulunca biri sırf o
 üçün içinde "birinci" olmaz.
+
+### Şirketin sahibi kim, içerideki ne yaptı
+
+İki dosyalama, mali tabloların hiç değinmediği soruları cevaplıyor; ikisi de
+XBRL değil, düz XML.
+
+`sec_edgar_get_insider_transactions` Form 4'ü okuyor — yöneticilerin,
+görevlilerin ve %10 üstü ortakların şirket hissesinde yaptığı işlemler, işlemden
+sonraki iki iş günü içinde bildiriliyor. Araç tek bir "net içeriden alım" sayısı
+üretmeyi **reddediyor** ve asıl nokta bu: kod A şirketin verdiği bir ödül (fiyatı
+sıfır), kod F vesting sırasında vergi için kesilen hisse, ve yalnızca P ile S
+piyasada alım-satım kararı. Bunları toplamak hiçbir şeyi ölçmeyen bir sayı
+üretir; bu yüzden hisse adetleri **kod bazında** ve her kodun anlamıyla birlikte
+dönüyor. Türev satırları (sonradan o hisselere dönüşen kısıtlı birimler)
+varsayılan olarak dışarıda: tek bir vesting olayı iki tarafta birden görünüyor
+ve ikisini de saymak aynı hisseyi iki kez sayıyor.
+
+`sec_edgar_get_institutional_holdings` 13F'i okuyor — bir yatırım yöneticisinin
+çeyrek sonundaki ABD borsası pozisyonları. Yöneticilerin çoğunun ticker'ı yok,
+bu yüzden CIK ile adresleniyorlar. Yönetici her alt yönetici için ayrı satır
+yazıyor, yani tek bir pozisyon birkaç satıra yayılıyor (Berkshire'ın Apple
+pozisyonu bir dosyalamada on iki satırdı); aynı menkul kıymetin satırları
+birleştiriliyor ve `rows_combined` kaç satırdan geldiğini söylüyor.
+
+**Ölçülmüş bir tuzak kendi paragrafını hak ediyor.** SEC, Ocak 2023'ten
+itibaren yapılan dosyalamalarda 13F değer birimini bin dolardan tam dolara
+çevirdi. Berkshire, aynı 669.429.166 Apple hissesini iki ardışık çeyrekte
+şöyle bildirdi:
+
+| Dosyalama | Hisse | Bildirilen değer | İma edilen fiyat |
+|---|---|---|---|
+| 14 Kas 2022 | 669.429.166 | 92.515.111 | 0,14 $ (dolar okunursa) |
+| 14 Şub 2023 | 669.429.166 | 86.841.985.318 | 129,72 $ |
+
+Apple 30 Ara 2022'de ~129,93 dolardan kapandı. Harfi harfine okunursa, tek bir
+hisse el değiştirmeden 92 milyon dolarlık pozisyon 87 milyar dolara çıkmış
+görünüyor. Araç ikisini de tam dolara çeviriyor ve `value_basis` dosyalamanın
+kendi kullandığı konvansiyonu söylüyor.
 
 ### Segment verisi, ve REST API'sinde neden yok
 
@@ -462,13 +506,13 @@ raporun içinde yazılı.
 ### Değerlendirme seti
 
 [`evaluation/questions.xml`](evaluation/questions.xml), yalnızca araçlar
-çağrılarak cevaplanabilecek yirmi soru tutuyor: şirketler arası mali yıl
+çağrılarak cevaplanabilecek yirmi iki soru tutuyor: şirketler arası mali yıl
 adlandırması, muhasebe standardı değişiminde etiket birleştirme, iki seri
 gerektiren oranlar ve sayfalama alanları. Her cevap araçlar canlı SEC verisine
 karşı çalıştırılarak üretildi — hiçbiri ezberden yazılmadı — ve her soru hangi
 çağrılarla ölçüldüğünü kaydediyor, böylece ölçüm tekrarlanabilir.
 
-Bir test dosyayı yapısal olarak dürüst tutuyor: yirmi çift, her çiftte soru, cevap
+Bir test dosyayı yapısal olarak dürüst tutuyor: yirmi iki çift, her çiftte soru, cevap
 ve ölçüm bloğu, adı geçen her aracın sunucuda gerçekten var olması ve hiçbir
 sorunun "en son dönem" gibi bayatlayacak bir ifadeye bağlanmaması.
 
@@ -493,7 +537,7 @@ src/edgar_mcp/client.py   SEC HTTP istemcisi, hız sınırlayıcı, önbellek
 tests/                    mock'lu birim testleri
 tests/dil.py              dışa bakan yüzey için dil kontrolü
 tests/test_http_tasima.py belgelenen HTTP ve stdio taşımalarını çalıştırır
-evaluation/questions.xml  ölçülmüş yirmi soru ve hangi çağrılarla ölçüldükleri
+evaluation/questions.xml  ölçülmüş yirmi iki soru ve hangi çağrılarla ölçüldükleri
 arac/enjeksiyon.py        hata enjeksiyonu harness'ı
 arac/sir_tarama.py        sır tarayıcı
 arac/tani.py              tek bir SEC yanıtını ham haliyle ölçen tanı aracı

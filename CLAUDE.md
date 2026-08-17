@@ -1178,3 +1178,185 @@ farkli notlandirma.
 Bu sayinin degeri teknik degil ticari: sekiz rakip sunucunun hicbirinde boyle
 bir olcum yok (KK-38 oncesi yapilan tarama). Ama abartilmamali - olculen sey
 "bu sunucu rakiplerinden iyi" degil, "bu sunucu modelin cevabini degistiriyor".
+
+### KK-40: Sahiplik verisi - Form 4 ve 13F, ve bin katlik sessiz hata
+
+16 Agu 2026 gecesi. Rakip taramasi (KK-39 oncesi) tek bir urun boslugunu net
+gosterdi: **sahiplik verisi sekiz rakibin neredeyse hepsinde var, bizde yoktu.**
+Iki belge, iki arac, ve ikisi de XBRL DEGIL - bu yuzden ayri bir modul
+(`sahiplik.py`).
+
+**Form 4 - `sec_edgar_get_insider_transactions`.** Sirketin yoneticileri,
+gorevlileri ve %10 ustu ortaklari kendi hisselerinde islem yapinca iki is gunu
+icinde bildirmek zorunda. Olculen yapi (NVDA, iki ayri dosyalama):
+
+- Kok `ownershipDocument`, **ad alani yok**; degerler `<value>` sarmalayicisi
+  ICINDE. Eleman metnini dogrudan okuyan kod bos alir - bir enjeksiyon tam
+  bunu deniyor.
+- Fiyat alani ayrica `<footnoteId>` tasiyabiliyor.
+- `nonDerivativeHolding` islem DEGIL, mevcut pozisyon bildirimi.
+- Turev tablosu (RSU/opsiyon) ayri: bir RSU vesting'i hem `M` turev satiri hem
+  `A` hisse satiri olarak gorunuyor, ikisini birden saymak ayni hisseyi iki kez
+  saymak demek. Varsayilan olarak turev satirlari DISARIDA.
+
+**En onemli tasarim karari: tek bir "net iceriden alim" sayisi URETILMIYOR.**
+Bu verinin en yaygin yanlis okunmasi, hisse ODULUNU (kod A) ya da vergi icin
+KESILEN hisseyi (kod F) piyasadan alim/satim sanmak. Odulun fiyati sifirdir,
+kesinti bir karar degil mekanik bir sonuctur; ikisini piyasa islemiyle
+toplamak anlamsiz bir sayi uretir. Yanit bu yuzden kod BAZINDA toplam veriyor
+ve her kodun anlamini yaninda tasiyor (§18). Ayni ilke KK-31'deki mutabakat
+karariyla ayni: arac toplamiyor, ayirip gosteriyor.
+
+Bir ayrinti daha olculdu: `primaryDocument` alani **stil sayfasi yolunu**
+gosteriyor (`xslF345X06/wk-form4_....xml`); makine okunur XML oneksiz halidir.
+Onek atilamazsa dizin listesine dusuluyor - isimlendirme kalibina korlemesine
+guvenmek KK-35'te ayni gun ceza kesilen hatanin ta kendisi.
+
+**13F - `sec_edgar_get_institutional_holdings`.** 100 milyon dolar ustu
+yoneticiler ceyrek sonundan itibaren 45 gun icinde ABD borsalarindaki uzun
+pozisyonlarini bildiriyor. Olculen yapi (Berkshire Hathaway):
+
+- Bilgi tablosu **ad alanli** (`.../thirteenf/informationtable`) ve dosya adi
+  **rastgele** ("56757.xml", "18337.xml", "20651.xml") - tahmin edilemez,
+  dizinden bulunuyor.
+- Ayni ihracci **birden fazla satirda** geciyor (Berkshire'in Q3 2022
+  dosyalamasinda Apple 12 satir). Bunlar mukerrer DEGIL, her alt yonetici icin
+  ayri satir. Toplaniyor ve `rows_combined` kac satirdan geldigini soyluyor.
+- Yoneticilerin ticker'i yok; CIK ile adresleme (KK-38) tam da bu yuzden
+  onkosuldu.
+
+**Bin katlik sessiz hata - olculdu.** SEC 2023'te 13F deger birimini binden tam
+dolara cevirdi. Ayni pozisyon, iki ardisik ceyrek:
+
+| Dosyalama | Apple hissesi | Bildirilen deger | Hisse basi |
+|---|---|---|---|
+| 14 Kas 2022 | 669.429.166 | 92.515.111 | 0,14 $ (tam dolar okunursa) |
+| 14 Sub 2023 | 669.429.166 | 86.841.985.318 | 129,72 $ |
+
+Apple 30 Ara 2022'de 129,93 dolardan kapandi, yani ikincisi tam dolar,
+birincisi bin dolar. Normalize etmeyen bir arac, iki ceyregi karsilastiran
+modele "pozisyon bin katina cikti" dedirtir ve bunu hicbir hata mesaji
+durdurmaz. Arac artik ikisini de tam dolara cevirip `value_basis` ile hangi
+konvansiyonun kullanildigini soyluyor. Sinir SEC'in kural degisikliginin
+yururluk tarihi; iki olcum sinirin iki yanindan alindi.
+
+**Kapak sayfasi ile tablo ayri ayri donuyor** (`reported_value_total` /
+`total_value_usd`, `reported_entry_count` / `rows_in_table`): ikisi tutmayabilir
+ve tutmadiginda bu dosyalayanin tutarsizligidir, aracin degil. Sessizce birini
+secmek KK-31'in yasakladigi sey.
+
+**Kapsam notu her iki aracta da yanitin icinde:** Form 4 yalnizca bildirim
+yukumlusu kisileri gosterir ve ne yapildigini soyler, NEDEN yapildigini asla;
+13F yalnizca uzun ABD hisse pozisyonlarini, ceyrek sonu itibariyla ve en erken
+45 gun sonra gosterir - kisa pozisyon, nakit, tahvil, yurt disi holding ve
+ceyrek sonrasi hareket yok.
+
+On dort yeni enjeksiyon dogruluyor. Biri ilk turda "KORUMASIZ" dondu ve yine
+ayni dersi verdi (P-30): kod toplamlarinda `is_holding` kontrolu, `shares is
+None` kontrolunun yaninda OLU koruma idi - pozisyon satirinin zaten `shares`
+alani yok. Birini bozmak otekini devrede biraktigi icin hicbir test kirmiziya
+donmuyordu. Olu kontrol kaldirildi.
+
+### KK-41: Harness sert oldurmeye dayanikli DEGILDI - KK-6'nin duzeltmesi
+
+16 Agu 2026. v38 icin baslatilan tam enjeksiyon kosusu 32/163'te oldu: surec
+yok, log'un son satiri 43 dakika oncesinden. Ne traceback, ne exit kodu, ne
+mesaj. Calisma dizininde `belge.py` enjekte halde kaldi ve testler YESIL
+gorunuyordu - o enjeksiyonun kirmiziya dondurdugu tek test, o an kosan test
+degildi. Elle tespit edildi (`.enjeksiyon_yedek/` ile diff), tek satir geri
+yuklendi, 250 test dogrulandi.
+
+**KK-6 fazla sey iddia ediyordu.** "Cokmeye dayanikli" derken kastedilen sey
+istisna, `SIGINT` ve `SIGTERM`'di; ucu de surecin CALISMAYA DEVAM ETMESINI
+gerektiriyor. `SIGKILL`, OOM reaper ya da konteynerin geri alinmasi hicbirini
+calistirmaz. Iddia yanlis degildi, KAPSAMI yaziya dokulmemisti; simdi dokuldu.
+
+**Asil bosluk geri yuklemede degil, GORUNURLUKTE idi.** Harness artiklari
+kendi bir sonraki kosusunun BASINDA geri yukluyordu - ama testleri kosturan,
+paketleyen ya da commit eden hicbir adim harness'i calistirmiyor. 32/163'te
+olen bir kosunun ardindan repoya dokunan bir sonraki sey, enjekte edilmis bir
+kaynak dosyayi hicbir uyari gormeden paketleyebilirdi.
+
+**Uc degisiklik:**
+
+1. **`--kontrol`** - artik var mi diye bakar, varsa exit 2. **Onarim YAPMAZ.**
+   Sessizce onaran bir kontrol, gorulmesi gereken olayi gizlerdi; tespit ile
+   onarim ayri. CI kosunun ARDINDAN calistiriyor, boylece harness'in kendi
+   temizlik iddiasi da varsayim olmaktan cikip olculen bir sey oluyor.
+2. **Uygulanan enjeksiyonun adi diske yazilir** - dosya bozulmadan ONCE, geri
+   yuklendikten sonra silinir. Artik kalan bir enjeksiyon artik kendini
+   soyluyor; yedeklerle diff alarak yeniden kurmak gerekmiyor.
+3. **`--parca k/n`** - 163 enjeksiyonun her biri tum test setini kosturuyor.
+   Sure makine yukune gore cok oynuyor: bos konteynerde tek kosu **14 sn**
+   olculdu (sweep ~40 dk), cokerek biten kosuda ise enjeksiyon basina ~80 sn
+   dusuyordu (3 saati asan projeksiyon). Bu degiskenlik parcalamanin
+   gerekcesinin kendisi. Dort bitisik parca sureci kisaltiyor ve
+   kaybedilen parcayi ucuz kiliyor. CI matrisi artik `os x parca` (8 is).
+   Bolmenin TAM ve ORTUSMESIZ oldugu testle sabit: enjeksiyon dusuren bir
+   bolme, harness'in iddia ettiginden az sey dogrular - cozulen sorundan
+   buyuk bir sorun.
+
+Ayrica test kosusuna sure siniri (`ENJEKSIYON_TEST_SURESI`, varsayilan 900 sn)
+eklendi ve zaman asimi AYRI bir sonuc olarak raporlaniyor. `testler()` artik
+zaman asiminda bos liste degil `None` donuyor: bos liste "hicbir test kirmiziya
+donmedi" (koruma yok) demek, `None` ise "olculemedi" demek. Ikisini ayni degerle
+bildirmek calisan bir korumayi KORUMASIZ diye raporlardi - KK-10'daki
+`ENJEKSIYON SOZDIZIMI BOZDU` ayriminin aynisi, ve KK-23'un "bos basari gercek
+bos cevaptan ayirt edilemez" kuralinin harness'taki karsiligi.
+
+P-31 olarak kayda gecti. Iki yeni test dogruluyor; bunlar enjeksiyonla degil
+dogrudan sinaniyor cunku harness'in kendisi enjeksiyon hedefi degil.
+
+### KK-42: Yayin kimligi - isim cakismasi ve sahiplik isaretleri
+
+16 Agu 2026. Dagitim adimi (PUBLISHING.md) yazilmisti ama hicbir adimi
+CALISTIRILMAMISTI. Ilk adim ilk gercegi verdi: **PyPI'da `sec-edgar-mcp` adi
+alinmis.**
+
+```
+$ pip index versions sec-edgar-mcp
+sec-edgar-mcp (1.0.8)
+```
+
+Sahibi `stefanoamorelli/sec-edgar-mcp` - ayni nisin en gorunur projesi
+(AGPL-3.0, 310 yildiz). Yani cakisma terk edilmis bir yer tutucuyla degil,
+pazar liderinin ta kendisiyle. Bu bir olcum sonucu; PUBLISHING.md'nin "isim
+alinmis olabilir" notu dogru cikti ama tahmin degil artik.
+
+**Dort sey birbirinden BAGIMSIZ, karistirilmamali:** PyPI dagitim adi (sert
+blok), konsol script adi (yumusak: iki paket ayni komutu kurarsa son kuran
+kazanir, sessizce), kayit defteri sunucu adi (`io.github.<hesap>/...` -
+hesapla ad alanina alindigi icin CAKISMIYOR) ve GitHub depo adi (teknik
+cakisma yok, kesfedilebilirlik sorunu var).
+
+**Karar verilmedi, bilerek.** Dagitim adi degismek ZORUNDA ama hangisi olacagi
+konumlandirma, depo adi ise marka sorusu. Ikisi de bu gece en ucuz haliyle
+duruyor ve ilk musteriye link gittikten sonra pahalilasiyor - bu yuzden
+secenekler olculmus haliyle PUBLISHING.md'ye yazildi, secim birakildi.
+
+**Kayit defteri sahiplik dogrulamasi - olculdu, hatirlanmadi.** Kayit defteri
+paketin gercekten yayinlayana ait oldugunu paket TURUNE gore farkli yollarla
+denetliyor:
+- PyPI: paket README'sinde `mcp-name: <sunucu adi>` dizgisi (HTML yorumu kabul).
+  README zaten PyPI aciklamasi oldugu icin dosyanin ilk satirina kondu.
+- OCI: imajda `LABEL io.modelcontextprotocol.server.name="<sunucu adi>"`.
+
+Ucu de (`server.json` → `name`, README isareti, Dockerfile etiketi) birbirine
+esit olmak zorunda. Bir yeniden adlandirma ucunden ikisini guncelleyip
+ucuncusunu unutursa hata YAYIN aninda cikiyor - geri bildirim dongusunun en
+pahali yeri. `test_kayit_defteri_kimligi_uc_dosyada_da_ayni` ucunu birden
+sabitliyor, ve Dockerfile enjeksiyon hedefi oldugu icin bu koruma enjeksiyonla
+da dogrulaniyor (164. enjeksiyon).
+
+**`server.json` OCI paketiyle yazildi, PyPI ile degil.** Kayit defteri yalnizca
+meta veri tutuyor; girdideki paketin gercekten var olmasi gerekiyor. OCI adi
+GitHub hesabiyla ad alanina alindigi icin bugun yayinlanabilir; `pypi` girdisi
+ise dagitim adi secilip yuklendikten SONRA eklenecek. Baskasinin paketini
+gosteren bir `pypi` girdisi, girdisiz olmaktan kotudur.
+
+**Olculemeyen, acikca yaziliyor:** `server.json` semaya karsi MAKINEYLE
+dogrulanamadi - bu ortamin proxy'si `static.modelcontextprotocol.io`'yu
+reddediyor (`Tunnel connection failed: 403 Forbidden`). Dosya belgelenen zorunlu
+alanlara ve yayinlanan ornege gore elle kuruldu. Normal bir agdan tek komutluk
+`check-jsonschema` cagrisi PUBLISHING.md'de duruyor; ayrica `mcp-publisher
+publish` sunucu tarafinda da dogruluyor.
