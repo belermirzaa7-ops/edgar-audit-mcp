@@ -6,6 +6,7 @@ DIKKAT: v2'de giris noktasi FastMCP degil MCPServer'dir.
 """
 from __future__ import annotations
 
+import os
 import re
 from datetime import date
 from typing import Annotated, Literal
@@ -53,6 +54,22 @@ mcp = MCPServer(
 # "RevenueFromContractWithCustomerExcludingAssessedTax" ile bildirir. Modelin
 # dogru etiketi tahmin etmesini beklemek basarisiz arac cagrilari uretir.
 # Cozum: anlamli takma adlar + aday etiketlerin sirali denenmesi.
+AS_OF_ORTAM = "SEC_AS_OF"
+
+AS_OF_ACIKLAMASI = (
+    "Point-in-time cutoff, as YYYY-MM-DD: ignore anything SEC received after "
+    "this date, so the answer is the one that was available then. Use it to "
+    "avoid look-ahead - reading a later filing's restated figure as if it had "
+    "been known earlier. The response repeats the cutoff that was applied."
+)
+
+
+AS_OF_ALANI = (
+    "The cutoff that was applied: nothing SEC received after this date is in "
+    "this response. None means no cutoff was in effect, so the answer reflects "
+    "everything filed to date."
+)
+
 CONCEPT_ALIASES: dict[str, list[str]] = {
     "revenue": [
         "RevenueFromContractWithCustomerExcludingAssessedTax",
@@ -301,6 +318,7 @@ class FilingPage(BaseModel):
         "reads at most four of them. Anything above zero means the history "
         "here is still incomplete",
     )
+    as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
     filings: list[Filing]
 
 
@@ -410,6 +428,7 @@ class ConceptSeries(BaseModel):
         description="True if older periods exist beyond this response; the most "
         "recent are returned first-to-last, so raise limit to reach further back"
     )
+    as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
     points: list[FactPoint]
 
 
@@ -471,6 +490,7 @@ class RevisionReport(BaseModel):
     has_more: bool = Field(
         description="True if more periods matched than were returned; raise limit"
     )
+    as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
     revisions: list[FactRevision] = Field(
         description="Most recent period last"
     )
@@ -531,6 +551,7 @@ class FilingText(BaseModel):
     accession_number: str
     form: str
     filing_date: str
+    as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
     document_name: str = Field(description="File that was read")
     document_url: str = Field(description="The document this text was read from")
     primary_document_known: bool = Field(
@@ -619,6 +640,7 @@ class ConceptCatalog(BaseModel):
     total_matching: int = Field(description="Total number of tags matching the filter")
     returned: int = Field(description="Number of tags returned in this response")
     has_more: bool = Field(description="True if more tags matched than were returned; narrow with search")
+    as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
     concepts: list[ConceptInfo]
 
 
@@ -709,7 +731,7 @@ def _akis_kayitlari(r: dict, cik: str, form_type: str | None) -> list[Filing]:
 
 async def _tum_akislar(
     cik: str, sub: dict, form_type: str | None, eski_dahil: bool,
-    ctx: Context | None = None,
+    ctx: Context | None = None, as_of: str | None = None,
 ) -> tuple[list[Filing], int]:
     """Recent akisi (+ istenirse eski akislar) -> tarihe gore yeni-once liste.
 
@@ -718,7 +740,11 @@ async def _tum_akislar(
     listede dogru sirayi vermez. `filingDate` ISO oldugu icin metin siralamasi
     tarih siralamasidir.
     """
-    kayitlar = _akis_kayitlari(sub.get("filings", {}).get("recent", {}), cik, form_type)
+    def suz(liste: list[Filing]) -> list[Filing]:
+        return [f for f in liste if not _kesimden_sonra(f.filing_date, as_of)]
+
+    kayitlar = suz(_akis_kayitlari(sub.get("filings", {}).get("recent", {}),
+                                   cik, form_type))
     dosyalar = list(sub.get("filings", {}).get("files") or [])
     if not eski_dahil:
         return kayitlar, 0
@@ -729,7 +755,8 @@ async def _tum_akislar(
         if not ad:
             continue
         await _ilerleme(ctx, n, len(okunacak) + 1, f"Reading older feed {ad}")
-        kayitlar += _akis_kayitlari(await _c().submissions_extra(ad), cik, form_type)
+        kayitlar += suz(_akis_kayitlari(await _c().submissions_extra(ad),
+                                        cik, form_type))
     kayitlar.sort(key=lambda f: f.filing_date, reverse=True)
     return kayitlar, max(0, len(dosyalar) - len(okunacak))
 
@@ -774,13 +801,19 @@ async def list_recent_filings(
               "only the last few years; set this when the question reaches "
               "further back. It costs one extra download per older feed."),
     ] = False,
+    as_of: Annotated[
+        str | None,
+        Field(default=None, description=AS_OF_ACIKLAMASI),
+    ] = None,
     ctx: Context | None = None,
 ) -> FilingPage:
     c = _c()
+    kesim = _as_of_coz(as_of)
     cik, sembol = await _kimlik_coz(ticker)
     sub = await c.submissions(cik)
 
-    dosyalamalar, atlanan = await _tum_akislar(cik, sub, form_type, include_older, ctx)
+    dosyalamalar, atlanan = await _tum_akislar(cik, sub, form_type,
+                                               include_older, ctx, kesim)
 
     # §16: limit tek basina yetmez. Model, gordugu listenin tamami mi yoksa
     # kirpilmis mi oldugunu bilmeden "sirketin N dosyalamasi var" diye
@@ -800,6 +833,7 @@ async def list_recent_filings(
         older_filings_read=include_older and daha_eski,
         older_feeds_skipped=atlanan,
         has_more=len(dosyalamalar) > limit or eksik_kaldi,
+        as_of_applied=kesim,
         filings=dosyalamalar[:limit],
     )
 
@@ -856,6 +890,39 @@ def _aralik_tamamla(bas: str | None, son: str | None) -> tuple[str | None, str |
     if not bas and not son:
         return None, None
     return (bas or EDGAR_BASLANGICI), (son or date.today().isoformat())
+
+
+def _as_of_coz(cagri: str | None) -> str | None:
+    """Etkin kesim tarihi: cagriyla gelen ile ortamin ERKEN olani.
+
+    Neden iki kaynak (17 Agu 2026): tek cagrilik kesim, ayni oturumda birden
+    fazla tarihe bakan bir istemcinin (backtest) ihtiyaci; ortam degiskeni
+    (`SEC_AS_OF`) ise oturumun tamami icin verilen bir SOZ - "bu surecte hicbir
+    arac su tarihten sonrasini gormeyecek". Ikisi carpistiginda erken olan
+    kazanir: gec olani secmek, verilen sozu cagri basina bozmak olurdu.
+
+    Etkin deger her yanitta `as_of_applied` olarak geri gidiyor. Uygulanip
+    uygulanmadigini SOYLEMEYEN bir kesim, hic uygulanmamis olmakla ayni
+    gorunur - KK-23'un bos yanit kurali burada da geciyor.
+    """
+    a = _tarih_dogrula(cagri, "as_of")
+    b = _tarih_dogrula((os.environ.get(AS_OF_ORTAM) or "").strip() or None,
+                       AS_OF_ORTAM)
+    if a and b:
+        return min(a, b)
+    return a or b
+
+
+def _kesimden_sonra(tarih: str | None, as_of: str | None) -> bool:
+    """Bu kayit kesim tarihinden sonra mi - TARIHI BILINMEYEN de sonra sayilir.
+
+    Bilinmeyen tarihi iceri almak, "su tarihte bilinen" sozunu bilinmeyen bir
+    kayitla doldurmak olurdu; disarida birakmak sozu koruyor ve kac kaydin
+    boyle elendigi yanitta ayrica sayiliyor.
+    """
+    if as_of is None:
+        return False
+    return not tarih or tarih > as_of
 
 
 def _tarih_dogrula(deger: str | None, alan: str) -> str | None:
@@ -949,6 +1016,20 @@ async def search_filings(
             f"start_date {bas} falls after end_date {son}, so no filing can "
             "match. Swap them."
         )
+    # Kesim burada AYRI bir parametre degil, `end_date`in tavani. Ikinci bir
+    # tarih parametresi eklemek ayni seyi iki adla anlatirdi; onemli olan
+    # gonderilen araligin yanitta gorunmesi, ki `date_range_applied` zaten
+    # bunu yapiyor.
+    kesim = _as_of_coz(None)
+    if kesim:
+        son = min(son, kesim) if son else kesim
+        bas = bas or EDGAR_BASLANGICI
+        if bas > son:
+            raise ValueError(
+                f"start_date {bas} falls after the {AS_OF_ORTAM} cutoff "
+                f"{kesim}, so no filing can match. Move start_date back or "
+                "clear the cutoff."
+            )
     bas, son = _aralik_tamamla(bas, son)
 
     ciks = (await _kimlik_coz(ticker))[0] if ticker else None
@@ -1118,12 +1199,19 @@ def _donem_uyuyor(
 
 
 def _noktalar(veri: dict, tag: str, period: str, kayma: int,
-              ay_gun: tuple[int, int] | None = None) -> list[FactPoint]:
+              ay_gun: tuple[int, int] | None = None,
+              as_of: str | None = None) -> list[FactPoint]:
     out: list[FactPoint] = []
     for unit, rows in _kullanilabilir_birimler(veri):
         for row in rows:
             end = row.get("end")
             if not end:
+                continue
+            # Kesim SUNULMA tarihine gore, donem sonuna gore DEGIL: 2024
+            # yilini anlatan bir rakam 2026'da revize edilmis olabilir ve o
+            # revizyon 2025'te bilinmiyordu. Donem sonuna bakan bir filtre
+            # tam da bu revizyonu iceri alirdi.
+            if _kesimden_sonra(row.get("filed"), as_of):
                 continue
             start = row.get("start")
             days = _gun_farki(start, end) if start else None
@@ -1267,19 +1355,27 @@ async def get_concept_series(
             description="Maximum number of periods to return, most recent last",
         ),
     ] = 12,
+    as_of: Annotated[
+        str | None,
+        Field(default=None, description=AS_OF_ACIKLAMASI),
+    ] = None,
 ) -> ConceptSeries:
+    kesim = _as_of_coz(as_of)
     cik, adaylar, veriler, kaynak_uc = await _kavram_verisi(ticker, concept)
 
     # H-1 (KK-7): mali yil adi tum kayitlardan turetilir, tahmin edilmez.
+    # Capa satirlari da kesimden geciyor: kesimden sonraki bir 10-K'yi capa
+    # saymak, o tarihte bilinmeyen bir dosyalamadan mali yil adi turetmek olur.
     tum_satirlar = [
         r for _, v in veriler for _, rows in _kullanilabilir_birimler(v) for r in rows
+        if not _kesimden_sonra(r.get("filed"), kesim)
     ]
     kayma, turetildi = _fy_kaymasi(tum_satirlar)
     ay_gun = _mali_yil_sonu(tum_satirlar)
 
     noktalar: list[FactPoint] = []
     for tag, v in veriler:
-        noktalar.extend(_noktalar(v, _bol(tag)[1], period, kayma, ay_gun))
+        noktalar.extend(_noktalar(v, _bol(tag)[1], period, kayma, ay_gun, kesim))
 
     # Ayni donem hem birden fazla dosyalamada hem birden fazla etikette gecer.
     # En son SUNULAN kayit kazanir; esitlikte takma ad sirasi belirler.
@@ -1310,6 +1406,7 @@ async def get_concept_series(
         total_periods=len(tumu),
         returned=len(ordered),
         has_more=len(tumu) > len(ordered),
+        as_of_applied=kesim,
         points=ordered,
     )
 
@@ -1408,8 +1505,15 @@ def _ara(metin: str, ifade: str) -> tuple[int, list[SearchHit]]:
     return toplam, vurgular
 
 
-def _akista_ara(r: dict, accession: str | None, form_type: str) -> dict | None:
-    """Tek akis icinde erisim numarasi ya da form turu araması."""
+def _akista_ara(r: dict, accession: str | None, form_type: str,
+                as_of: str | None = None) -> dict | None:
+    """Tek akis icinde erisim numarasi ya da form turu araması.
+
+    Erisim numarasi ACIKCA verilmisse kesim UYGULANMAZ burada: kayit bulunur ve
+    kararı cagiran verir. Sebep, "bulunamadi" ile "kesimden sonra dosyalanmis"
+    ayni hata mesajina dusmesin - ikincisinde model ne yaptigini bilir ve
+    tarihi degistirebilir (§18).
+    """
     accs = r.get("accessionNumber") or []
     formlar = r.get("form") or []
     tarihler = r.get("filingDate") or []
@@ -1422,7 +1526,8 @@ def _akista_ara(r: dict, accession: str | None, form_type: str) -> dict | None:
         if accession:
             if str(acc) != accession:
                 continue
-        elif not _form_uyuyor(al(formlar, i), form_type):
+        elif (not _form_uyuyor(al(formlar, i), form_type)
+              or _kesimden_sonra(al(tarihler, i), as_of)):
             continue
         return {
             "accession_number": str(acc),
@@ -1435,7 +1540,8 @@ def _akista_ara(r: dict, accession: str | None, form_type: str) -> dict | None:
     return None
 
 
-async def _dosyalama_bul(cik: str, accession: str | None, form_type: str) -> dict:
+async def _dosyalama_bul(cik: str, accession: str | None, form_type: str,
+                         as_of: str | None = None) -> dict:
     """Erisim numarasindan (ya da form turunden) dosyalama kaydini bulur.
 
     Recent akisi yetmezse eski akislar da taraniyor. Sebep tutarlilik: hem
@@ -1444,18 +1550,20 @@ async def _dosyalama_bul(cik: str, accession: str | None, form_type: str) -> dic
     reddetmek, aracin kendi ciktisini kendi reddetmesi olurdu.
     """
     sub = await _c().submissions(cik)
-    kayit = _akista_ara(sub.get("filings", {}).get("recent", {}), accession, form_type)
+    kayit = _akista_ara(sub.get("filings", {}).get("recent", {}), accession,
+                        form_type, as_of)
     if kayit:
-        return kayit
+        return _kesim_denetle(kayit, accession, as_of)
 
     dosyalar = list(sub.get("filings", {}).get("files") or [])[:EK_AKIS_SINIRI]
     for dosya in dosyalar:
         ad = str(dosya.get("name") or "").strip()
         if not ad:
             continue
-        kayit = _akista_ara(await _c().submissions_extra(ad), accession, form_type)
+        kayit = _akista_ara(await _c().submissions_extra(ad), accession,
+                            form_type, as_of)
         if kayit:
-            return kayit
+            return _kesim_denetle(kayit, accession, as_of)
 
     if accession:
         raise ValueError(
@@ -1464,11 +1572,36 @@ async def _dosyalama_bul(cik: str, accession: str | None, form_type: str) -> dic
             "company if it was copied from elsewhere. Call "
             "sec_edgar_list_filings to see the accession numbers available."
         )
+    if as_of:
+        raise ValueError(
+            f"No {form_type} filing was on file for this company on or before "
+            f"{as_of}. The company may have filed one later, or under a "
+            "different form type. Call sec_edgar_list_filings with the same "
+            "as_of to see what existed by then."
+        )
     raise ValueError(
         f"No {form_type} filing found for this company. Call "
         "sec_edgar_list_filings without form_type to see which forms it has "
         "filed."
     )
+
+
+def _kesim_denetle(kayit: dict, accession: str | None,
+                   as_of: str | None) -> dict:
+    """Acikca istenen dosyalama kesimden sonraysa SESSIZCE dondurulmez.
+
+    Kesim bir soz; sozu bozan tek bir satiri gecirmek, sozu hic vermemekten
+    kotudur cunku cagiran artik yanlis bir guvence tasiyor.
+    """
+    if accession and _kesimden_sonra(kayit.get("filing_date"), as_of):
+        raise ValueError(
+            f"Filing {accession} was filed on "
+            f"{kayit.get('filing_date') or 'an unknown date'}, after the "
+            f"as_of cutoff {as_of}, so it was not available then. Drop as_of "
+            "to read it anyway, or call sec_edgar_list_filings with this "
+            "as_of to see what was on file by that date."
+        )
+    return kayit
 
 
 @mcp.tool(
@@ -1551,11 +1684,16 @@ async def read_filing_text(
               "reconciliation, a production and delivery table - where reading "
               "cells joined by ' | ' means aligning columns by eye"),
     ] = False,
+    as_of: Annotated[
+        str | None,
+        Field(default=None, description=AS_OF_ACIKLAMASI),
+    ] = None,
     ctx: Context | None = None,
 ) -> FilingText:
+    kesim = _as_of_coz(as_of)
     await _ilerleme(ctx, 0, 3, "Locating the filing")
     cik, _ = await _kimlik_coz(ticker)
-    kayit = await _dosyalama_bul(cik, accession_number, form_type)
+    kayit = await _dosyalama_bul(cik, accession_number, form_type, kesim)
 
     dizin = (
         f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
@@ -1627,6 +1765,7 @@ async def read_filing_text(
         accession_number=kayit["accession_number"],
         form=kayit["form"],
         filing_date=kayit["filing_date"],
+        as_of_applied=kesim,
         document_name=ad,
         document_url=url,
         primary_document_known=bool(birincil),
@@ -1705,11 +1844,17 @@ async def get_fact_revisions(
         Field(default=12, ge=1, le=60,
               description="Maximum number of periods to return, most recent last"),
     ] = 12,
+    as_of: Annotated[
+        str | None,
+        Field(default=None, description=AS_OF_ACIKLAMASI),
+    ] = None,
 ) -> RevisionReport:
+    kesim = _as_of_coz(as_of)
     cik, adaylar, veriler, kaynak_uc = await _kavram_verisi(ticker, concept)
     ay_gun = _mali_yil_sonu([r for _, v in veriler
                              for _, satirlar in _kullanilabilir_birimler(v)
-                             for r in satirlar])
+                             for r in satirlar
+                             if not _kesimden_sonra(r.get("filed"), kesim)])
 
     # Seri aracindan farki: burada dedup YAPILMAZ. Ayni donemin farkli
     # dosyalamalardaki tum degerleri korunur - revizyonun kendisi cikti.
@@ -1719,6 +1864,11 @@ async def get_fact_revisions(
             for row in satirlar:
                 end = row.get("end")
                 if not end:
+                    continue
+                # Bir revizyon ancak SUNULDUGU tarihte bilinir; kesimden
+                # sonraki satirlari almak, o tarihte olmayan bir duzeltmeyi
+                # gecmise tasirdi.
+                if _kesimden_sonra(row.get("filed"), kesim):
                     continue
                 start = row.get("start")
                 days = _gun_farki(start, end) if start else None
@@ -1793,6 +1943,7 @@ async def get_fact_revisions(
         periods_revised=revize,
         returned=len(kirpik),
         has_more=len(revizyonlar) > len(kirpik),
+        as_of_applied=kesim,
         revisions=kirpik,
     )
 
@@ -1836,7 +1987,12 @@ async def list_available_concepts(
             description="Maximum number of tags to return; check has_more in the response",
         ),
     ] = 25,
+    as_of: Annotated[
+        str | None,
+        Field(default=None, description=AS_OF_ACIKLAMASI),
+    ] = None,
 ) -> ConceptCatalog:
+    kesim = _as_of_coz(as_of)
     cik, _ = await _kimlik_coz(ticker)
     facts = await _c().company_facts(cik)
     tumu = facts.get("facts", {}) or {}
@@ -1855,8 +2011,20 @@ async def list_available_concepts(
         etiket = govde.get("label")
         if q and q not in tag.lower() and q not in (etiket or "").lower():
             continue
-        birimler = list(govde.get("units", {}).keys())
-        sayi = sum(len(v) for v in govde.get("units", {}).values())
+        # Kesim varsa etiket, o tarihte SUNULMUS en az bir veri noktasi
+        # tasidigi surece "mevcut" sayilir. Sayim da kesimden geciyor: 2026'da
+        # eklenen bir etiketi 2025 kataloguna koymak, o tarihte olmayan bir
+        # kavrami varmis gibi gostermek olurdu.
+        birimler = []
+        sayi = 0
+        for birim, satirlar in (govde.get("units", {}) or {}).items():
+            n = sum(1 for r in satirlar
+                    if not _kesimden_sonra(r.get("filed"), kesim))
+            if n:
+                birimler.append(birim)
+                sayi += n
+        if kesim and not sayi:
+            continue
         eslesen.append(
             ConceptInfo(tag=tag, label=etiket, units=birimler, data_points=sayi)
         )
@@ -1870,6 +2038,7 @@ async def list_available_concepts(
         total_matching=len(eslesen),
         returned=min(limit, len(eslesen)),
         has_more=len(eslesen) > limit,
+        as_of_applied=kesim,
         concepts=eslesen[:limit],
     )
 
@@ -2070,6 +2239,22 @@ async def compare_companies(
     ] = 25,
     ctx: Context | None = None,
 ) -> CompanyComparison:
+    # Bu arac kesimi UYGULAYAMIYOR ve bunu sessizce gecmiyor. SEC'in cerceve
+    # ucu satir basina `accn` veriyor ama SUNULMA TARIHI vermiyor; tarihi
+    # ogrenmek cercevedeki her sirket icin ayri bir istek demek (olculdu:
+    # 2.543 sirket). Kesim bir oturum sozuyse, tutamayacagi bir yerde tutmus
+    # gibi yapmak sozu bozmanin en kotu bicimi olurdu - cagiran yanlis bir
+    # guvenceyle devam eder. Cagri reddediliyor ve tutan alternatif
+    # soyleniyor (§18).
+    kesim = _as_of_coz(None)
+    if kesim:
+        raise ValueError(
+            f"A point-in-time cutoff is in effect ({kesim}) and this tool "
+            "cannot honour it: SEC's frame endpoint reports no filing date "
+            "per row, so a restated figure filed later cannot be told apart "
+            "from the original. Read the companies one at a time with "
+            "sec_edgar_get_concept_series and its as_of, which does honour it."
+        )
     await _ilerleme(ctx, 0, 2, "Reading the frame from SEC")
     cerceve = _cerceve_normalle(period)
     anahtar = concept.strip().lower()
@@ -2262,11 +2447,12 @@ async def _etiketler(dizin: str) -> tuple[Etiketler, str | None]:
 async def _dosyalama_ve_instance(
     ticker: str, accession: str | None, form_type: str,
     ctx: Context | None = None, etiket_iste: bool = False,
+    as_of: str | None = None,
 ) -> tuple[dict, Instance, str, Etiketler, str | None]:
     adim_sayisi = 4 if etiket_iste else 3
     await _ilerleme(ctx, 0, adim_sayisi, "Locating the filing")
     cik, _ = await _kimlik_coz(ticker)
-    kayit = await _dosyalama_bul(cik, accession, form_type)
+    kayit = await _dosyalama_bul(cik, accession, form_type, as_of)
     dizin = (
         f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
         f"{kayit['accession_number'].replace('-', '')}"
@@ -2324,6 +2510,7 @@ class DimensionCatalog(BaseModel):
     accession_number: str
     form: str
     filing_date: str
+    as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
     instance_url: str = Field(
         description="The XBRL instance these dimensions were read from. SEC "
         "extracts it from the filer's inline document; the values and contexts "
@@ -2428,6 +2615,7 @@ class DimensionalFacts(BaseModel):
     accession_number: str
     form: str
     filing_date: str
+    as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
     instance_url: str
     concept: str
     resolved_tag: str
@@ -2518,10 +2706,15 @@ async def list_fact_dimensions(
               "extra download - about 1 MB on a large annual report - so turn "
               "it off when the tag names alone are enough"),
     ] = True,
+    as_of: Annotated[
+        str | None,
+        Field(default=None, description=AS_OF_ACIKLAMASI),
+    ] = None,
     ctx: Context | None = None,
 ) -> DimensionCatalog:
+    kesim = _as_of_coz(as_of)
     kayit, inst, url, etiket_haritasi, etiket_dosyasi = await _dosyalama_ve_instance(
-        ticker, accession_number, form_type, ctx, include_labels)
+        ticker, accession_number, form_type, ctx, include_labels, kesim)
     adaylar = _etiket_cozumle(concept) if concept else None
 
     eksenler: dict[str, dict] = {}
@@ -2542,6 +2735,7 @@ async def list_fact_dimensions(
         accession_number=kayit["accession_number"],
         form=kayit["form"],
         filing_date=kayit["filing_date"],
+        as_of_applied=kesim,
         instance_url=url,
         total_facts=len(inst.olgular),
         dimensional_facts=len(boyutlu),
@@ -2625,10 +2819,15 @@ async def get_dimensional_facts(
               "extra download - about 1 MB on a large annual report - so turn "
               "it off when the tag names alone are enough"),
     ] = True,
+    as_of: Annotated[
+        str | None,
+        Field(default=None, description=AS_OF_ACIKLAMASI),
+    ] = None,
     ctx: Context | None = None,
 ) -> DimensionalFacts:
+    kesim = _as_of_coz(as_of)
     kayit, inst, url, etiket_haritasi, etiket_dosyasi = await _dosyalama_ve_instance(
-        ticker, accession_number, form_type, ctx, include_labels)
+        ticker, accession_number, form_type, ctx, include_labels, kesim)
     adaylar = _etiket_cozumle(concept)
 
     def _son(q: str | None) -> str:
@@ -2712,6 +2911,7 @@ async def get_dimensional_facts(
         accession_number=kayit["accession_number"],
         form=kayit["form"],
         filing_date=kayit["filing_date"],
+        as_of_applied=kesim,
         instance_url=url,
         concept=concept,
         resolved_tag=cozulen_etiket,
@@ -2863,6 +3063,7 @@ class InsiderReport(BaseModel):
     issuer_cik: str
     issuer_name: str | None = None
     ticker: str | None = None
+    as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
     filings_read: int = Field(description="Form 4 filings actually downloaded")
     filings_available: int = Field(
         description="Form 4 filings in the feeds that were searched"
@@ -2914,6 +3115,7 @@ class InstitutionalHoldings(BaseModel):
     manager_cik: str
     accession_number: str
     filing_date: str
+    as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
     report_type: str | None = Field(
         default=None, description="13F HOLDINGS REPORT, or an amendment"
     )
@@ -3036,11 +3238,18 @@ async def get_insider_transactions(
         Field(default=False, description="Also return lines that report an "
               "existing position rather than a transaction"),
     ] = False,
+    as_of: Annotated[
+        str | None,
+        Field(default=None, description=AS_OF_ACIKLAMASI),
+    ] = None,
     ctx: Context | None = None,
 ) -> InsiderReport:
+    kesim = _as_of_coz(as_of)
     cik, sembol = await _kimlik_coz(ticker)
     sub = await _c().submissions(cik)
-    kayitlar = _akis_kayitlari(sub.get("filings", {}).get("recent", {}), cik, "4")
+    kayitlar = [f for f in _akis_kayitlari(
+        sub.get("filings", {}).get("recent", {}), cik, "4")
+        if not _kesimden_sonra(f.filing_date, kesim)]
 
     okunacak = kayitlar[:filings]
     islemler: list[InsiderTransaction] = []
@@ -3105,6 +3314,7 @@ async def get_insider_transactions(
         issuer_cik=cik,
         issuer_name=ihrac_adi or sub.get("name"),
         ticker=sembol,
+        as_of_applied=kesim,
         filings_read=len(okunacak),
         filings_available=len(kayitlar),
         total_matching=len(islemler),
@@ -3161,10 +3371,15 @@ async def get_institutional_holdings(
         Field(default=25, ge=1, le=200,
               description="Maximum positions to return, largest value first"),
     ] = 25,
+    as_of: Annotated[
+        str | None,
+        Field(default=None, description=AS_OF_ACIKLAMASI),
+    ] = None,
     ctx: Context | None = None,
 ) -> InstitutionalHoldings:
+    kesim = _as_of_coz(as_of)
     cik, _ = await _kimlik_coz(ticker)
-    kayit = await _dosyalama_bul(cik, accession_number, "13F-HR")
+    kayit = await _dosyalama_bul(cik, accession_number, "13F-HR", kesim)
     dizin = (f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
              f"{kayit['accession_number'].replace('-', '')}")
 
@@ -3218,6 +3433,7 @@ async def get_institutional_holdings(
         manager_cik=cik,
         accession_number=kayit["accession_number"],
         filing_date=kayit["filing_date"],
+        as_of_applied=kesim,
         report_type=kapak.report_type,
         period_of_report=kapak.period_of_report,
         value_basis="thousands" if bin_mi else "whole_dollars",

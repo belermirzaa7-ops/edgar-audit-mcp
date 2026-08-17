@@ -202,9 +202,9 @@ which are counted as failures in the 82%.
 
 ## How it is kept true
 
-- **250 tests**, no network access — SEC responses are mocked from real captured
+- **265 tests**, no network access — SEC responses are mocked from real captured
   payloads.
-- **170 fault injections.** Every guard above is deliberately broken by an
+- **175 fault injections.** Every guard above is deliberately broken by an
   automated harness, and the test that should catch it must turn red. A guard
   that nothing catches is reported as `KORUMASIZ` — unprotected — and the run
   fails. This has caught guards that looked protected and were not, including
@@ -212,7 +212,7 @@ which are counted as failures in the 82%.
 - **A 22-question evaluation set**, every answer produced by running the tools
   against live SEC data with the exact calls recorded, so any answer can be
   re-measured rather than trusted.
-- **[`PATTERNS.md`](../PATTERNS.md)** — 30 failures that actually shipped in
+- **[`PATTERNS.md`](../PATTERNS.md)** — 32 failures that actually shipped in
   this repository, each with symptom, root cause, how it is detected now, and
   the test that guards it. A separate test suite keeps that document from
   drifting: every test it names must exist.

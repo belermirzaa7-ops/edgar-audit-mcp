@@ -1360,3 +1360,96 @@ reddediyor (`Tunnel connection failed: 403 Forbidden`). Dosya belgelenen zorunlu
 alanlara ve yayinlanan ornege gore elle kuruldu. Normal bir agdan tek komutluk
 `check-jsonschema` cagrisi PUBLISHING.md'de duruyor; ayrica `mcp-publisher
 publish` sunucu tarafinda da dogruluyor.
+
+### KK-43: Kesim tarihi (as_of) - "en guncel"in gizli varsayimi
+
+17 Agu 2026. Degerlendirme kosusunun bes soruluk donem uyusmazligi (zaaf 3) bir
+olcum kusuru gibi gorunuyordu; degildi. **Aracin kendisinde bir varsayim
+vardi:** "en son dosyalama" ifadesi her zaman SU AN itibariyle en sonu
+kastediyordu. Gecmise donuk her soruda bu sessizce yanlis. Finanstaki adi
+look-ahead bias.
+
+**Iki secenek vardi, ikisi de ayni sayiyi uretirdi:** (a) sinavi cozen ajana
+"su tarihten sonrasini yok say" talimati verip cevaplarda kullanilan
+dosyalamalari denetlemek, (b) araca gercek bir kesim parametresi eklemek.
+Ikincisi secildi. Gerekce: talimat denetlenebilir ama ENGELLEMIYOR; ve
+point-in-time sorgu, sinavdan bagimsiz olarak gercek bir urun ozelligi (backtest
+yapan herkesin ihtiyaci, ve taranan sekiz rakibin hicbirinde yok).
+
+**Kesim SUNULMA tarihine gore, doneme gore DEGIL.** En onemli tasarim karari
+bu: revize edilmis bir rakamin donem sonu orijinaliyle AYNIDIR. Doneme bakan
+bir filtre butun revizyonlari iceri alir ve calisiyormus gibi gorunur. Sahte
+veriyle olculuyor: Apple FY2023 geliri 2023 10-K'sinda 383.285, 2024
+10-K'sinda 383.290; `as_of=2024-01-01` birincisini donduruyor.
+
+**Kapsam:** guncellige gore secim yapan her arac (`list_filings`,
+`read_filing_text`, `get_concept_series`, `get_fact_revisions`,
+`list_available_concepts`, iki boyut araci, Form 4, 13F) `as_of` aliyor ve her
+yanit `as_of_applied` ile uygulanan kesimi geri veriyor - uygulanip
+uygulanmadigini soylemeyen bir kesim, hic uygulanmamis olmakla ayni gorunurdu
+(KK-23). Tam metin aramasinda ayri parametre YOK: kesim `end_date`in tavani
+oluyor ve gonderilen aralik zaten `date_range_applied`de yaziyor; ayni seyi iki
+adla anlatmak yuzeyi bulanik yapardi.
+
+**Dort incelik, dordu de testli:**
+1. **Tarihi bilinmeyen kayit kesimden SONRA sayilir.** Iceri almak, "o tarihte
+   biliniyordu" sozunu tarihi bilinmeyen bir kayitla doldurmak olurdu.
+2. **Acikca istenen dosyalama da reddediliyor.** Tek satirlik bir istisna,
+   cagiranin elinde yanlis bir guvence birakir. Hata iki tarihi de veriyor.
+3. **Cagri ve ortam carpisirsa ERKEN olan kazanir.** `SEC_AS_OF` oturum capinda
+   bir soz; gec olani secmek sozu cagri basina bozardi.
+4. **`compare_companies` kesimi UYGULAYAMIYOR ve bunu soyluyor.** SEC'in cerceve
+   ucu satir basina sunulma tarihi vermiyor; tarihi ogrenmek cercevedeki her
+   sirket icin ayri istek demek (olculdu: 2.543 sirket). Kesim varken cagri
+   reddediliyor ve tutan alternatif adres gosteriliyor (§18). Tutamayacagi bir
+   sozu tutuyormus gibi yapan bir arac, sozu hic vermeyen bir aractan kotudur.
+
+**Kesim tarihi kaynakla secildi, tahminle degil.** Veri seti Zenodo'da
+**16 Mayis 2025**'te yayinlanmis (kayit 15428639, v1, ayni gun olusturulmus ve
+degistirilmis). Sorularda gecen en gec tam tarih 10 Mart 2025; vals.ai'nin
+liderlik tablosu adresi 30 Mayis 2025 tarihli bir kosuya isaret ediyor; makale
+Agustos 2025'te arXiv'e girmis. Dordu de tutarli, celiski yok.
+
+**Henuz OLCULMEDI:** kesimli kosu yapilmadi. Kod kesimi mumkun kiliyor; %92
+rakami hala bir PROJEKSIYON ve kosu, sunucunun guncel surumu Mirza'nin
+makinesine kurulduktan sonra yapilacak. Ve kosu bes soruyla sinirli
+kalmayacak - **elli sorunun hepsi** yeniden kosulacak, cunku yalnizca yanlis
+cikan besini yeniden kosmak secmeli olcum olur: kesim, dogru cikmis bir cevabi
+da bozabilir ve bunu gormek gerekiyor.
+
+On bir yeni enjeksiyon dogruluyor.
+
+### KK-44: Zaaf 4 - ayni sinavin yayinlanmis skoru bulundu
+
+17 Agu 2026. Zaaf 4 "baska setlerin skorlariyla kiyaslanamiyor" diyordu ve
+cozumu icin Fin-RATE'i kendi puanlamasiyla kosmak planlanmisti - bir gunluk is.
+Setin kendi makalesi (arXiv 2508.00828) okununca gereksiz oldugu goruldu:
+**ayni sinavin yayinlanmis baseline'i var.** En iyi model o3 **%46,8 ± 2,2**,
+ve **hicbir model %50'yi gecmemis**. Ustelik o ajanlarin araclari arasinda hem
+`GoogleSearch` hem `EdgarSearch` var - yani baseline, aracsiz bir model degil,
+SEC dosyalamalarina VE web aramasina erisen bir model.
+
+Makalenin metrigi **sinif-dengeli dogruluk** (her tur esit sayiliyor, her soru
+degil). Ayni yontemle bizim yayinlanmis not dosyamizdan hesaplandi:
+sunucuyla **%80,6**, aracsiz **%29,6** (ham sayilar %82 ve %24).
+
+**Birebir kiyas DEGIL ve rapor bunu dort maddeyle soyluyor:** farkli sorular
+(537'ye karsi acik 50), farkli notlandirma (onlarinki rubrik tabanli, ayrica
+bir "celiski rubrigi" var), farkli araclar (onlarda genel web aramasi vardi,
+bizde yalnizca on SEC araci), ve farkli model kusagi (onlarinki 2025 modelleri,
+bizimki 2026). Sonuncusu en onemlisi: aradaki farkin bir kismi sunucunun degil,
+modelin.
+
+**Ne kaniti oluyor:** bu sinavda yayinlanmis en iyi sonuc, EDGAR ve web
+erisimiyle bile %50'nin altinda - yani sorularin zorlugu tartismali degil.
+**Ne kaniti olmuyor:** bu sunucunun o3'u gectigi. Sunucunun katkisini izole
+eden karsilastirma kosunun KENDI ICINDEKI karsilastirmadir (ayni model, ayni
+sorular, ayni notlandirici: %24'e karsi %82) ve o karsilastirma bir liderlik
+tablosu hakkinda hicbir sey soylemez.
+
+Ayrica bir P-14 temizligi yapildi: vaka calismasi "250 tests" ve "170 fault
+injections", iki README de "30 failures" diyordu; gercek sayilar 265, 175 ve 32.
+Hicbiri yanlis bir sey ogretmiyor ama hepsi ayni sinif - dokumanda duran, kodun
+dogrulamadigi iddia. `test_dokumanlardaki_sayilar_gercekle_ayni` ucunu de
+kaynagindan sayiyor (harness listesi, `### P-` basliklari, ve pytest'in kendi
+topladigi test sayisi). Sayilar buyudukce test kirmiziya donecek; dogrusu bu.

@@ -851,6 +851,10 @@ def handler(request: httpx.Request) -> httpx.Response:
 @pytest.fixture
 def srv(monkeypatch):
     monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@ornek.com")
+    # Kesim ortam degiskeni butun araclari etkiliyor: kabukta unutulmus bir
+    # `SEC_AS_OF`, test paketinin tamamini baska bir dunyada kosturur ve
+    # basarisizlik kodda aranir. Testler kendi ortamini kendi kurar.
+    monkeypatch.delenv("SEC_AS_OF", raising=False)
     from edgar_mcp import server as s
     from edgar_mcp.client import EdgarClient
     c = EdgarClient()
@@ -3433,3 +3437,151 @@ async def test_13f_ihracci_araması_ve_siralama(srv):
     tum = await srv.get_institutional_holdings(ticker="AAPL")
     degerler = [p.value_usd for p in tum.positions]
     assert degerler == sorted(degerler, reverse=True), "en buyuk pozisyon basta olmali"
+
+
+# ------------------------------------------------- kesim tarihi (point-in-time)
+# Zaaf 3 (17 Agu 2026): degerlendirme seti 2025'te yazildi, kosu 2026'da
+# yapildi ve bes soruda "son uc yil" gibi ifadeler baska dosyalamalara denk
+# geldi. Bunun genel adi look-ahead: bir tarihte BILINMEYEN veriyi o tarihte
+# biliniyormus gibi kullanmak. Kesim tarihi bu sinifi kapatiyor.
+
+
+@pytest.mark.anyio
+async def test_as_of_o_tarihte_bilinen_degeri_donduruyor(srv):
+    """Asil sinav bu: FY2023 geliri once 383.285 diye sunuldu (2023-11-03),
+    2024 10-K'sinda 383.290 olarak revize edildi. 2024 basinda duran birinin
+    gordugu sayi ILKIDIR. Donem sonuna bakan bir filtre revizyonu iceri alir,
+    cunku donem ikisinde de ayni - ayirici olan SUNULMA tarihidir."""
+    kesimli = await srv.get_concept_series(ticker="AAPL", concept="revenue",
+                                           as_of="2024-01-01")
+    kesimsiz = await srv.get_concept_series(ticker="AAPL", concept="revenue")
+
+    def deger(seri, bitis):
+        return next(p.value for p in seri.points if p.period_end == bitis)
+
+    assert deger(kesimli, "2023-09-30") == 383_285_000_000
+    assert deger(kesimsiz, "2023-09-30") == 383_290_000_000, "revizyon kayboldu"
+    assert kesimli.as_of_applied == "2024-01-01"
+    assert kesimsiz.as_of_applied is None
+    assert all(p.filed <= "2024-01-01" for p in kesimli.points)
+
+
+@pytest.mark.anyio
+async def test_as_of_dosyalama_listesini_o_tarihe_gore_kesiyor(srv):
+    s = await srv.list_recent_filings(ticker="AAPL", limit=50,
+                                      as_of="2025-06-30")
+    assert s.filings, "kesim her seyi sildi"
+    assert all(f.filing_date <= "2025-06-30" for f in s.filings)
+    # §16/KK-17: toplam FILTREDEN SONRAKI sayidir; filtresiz toplami bildirmek
+    # modele "gormedigin dosyalamalar var" der ve kesimin anlamini bozar.
+    assert s.total_matching == len(s.filings)
+    assert s.as_of_applied == "2025-06-30"
+
+    tumu = await srv.list_recent_filings(ticker="AAPL", limit=50)
+    assert tumu.total_matching > s.total_matching, "kesim hicbir sey elemedi"
+
+
+@pytest.mark.anyio
+async def test_as_of_acikca_istenen_gec_dosyalamayi_sessizce_vermiyor(srv):
+    """Erisim numarasi ACIKCA verildiginde bile kesim geciyor. Tek satirlik bir
+    istisna, cagiranin elinde yanlis bir guvence birakirdi."""
+    with pytest.raises(ValueError) as e:
+        await srv.read_filing_text(ticker="AAPL",
+                                   accession_number="0000320193-25-000073",
+                                   as_of="2025-06-30")
+    mesaj = str(e.value)
+    assert "2025-10-31" in mesaj and "2025-06-30" in mesaj, mesaj
+    assert "sec_edgar_list_filings" in mesaj, "ne yapacagini soylemiyor (§18)"
+
+
+@pytest.mark.anyio
+async def test_as_of_ortam_degiskeni_cagri_vermeden_de_uygulaniyor(srv, monkeypatch):
+    """`SEC_AS_OF` oturum capinda bir soz: her arac, parametre verilmese de
+    ona uyar. Degerlendirme kosusu bunun uzerine kuruluyor."""
+    monkeypatch.setenv("SEC_AS_OF", "2025-06-30")
+    s = await srv.list_recent_filings(ticker="AAPL", limit=50)
+    assert s.as_of_applied == "2025-06-30"
+    assert all(f.filing_date <= "2025-06-30" for f in s.filings)
+
+
+@pytest.mark.anyio
+async def test_as_of_cagri_ile_ortamdan_erken_olani_kazaniyor(srv, monkeypatch):
+    """Ikisi carpistiginda gec olani secmek, oturum capinda verilen sozu cagri
+    basina bozmak olurdu."""
+    monkeypatch.setenv("SEC_AS_OF", "2025-06-30")
+    gec = await srv.list_recent_filings(ticker="AAPL", limit=50,
+                                        as_of="2026-01-01")
+    assert gec.as_of_applied == "2025-06-30", "cagri, ortamin sozunu asti"
+    erken = await srv.list_recent_filings(ticker="AAPL", limit=50,
+                                          as_of="2025-01-01")
+    assert erken.as_of_applied == "2025-01-01", "daha dar kesim uygulanmadi"
+
+
+@pytest.mark.anyio
+async def test_as_of_uygulayamayan_arac_sessizce_gecmiyor(srv, monkeypatch):
+    """`compare_companies` SEC'in cerceve ucunu kullaniyor ve o uc satir basina
+    SUNULMA TARIHI vermiyor. Tutamayacagi bir sozu tutmus gibi yapmak yerine
+    cagriyi reddediyor ve tutan alternatifi soyluyor."""
+    monkeypatch.setenv("SEC_AS_OF", "2025-06-30")
+    with pytest.raises(ValueError) as e:
+        await srv.compare_companies(concept="revenue", period="2025Q1")
+    mesaj = str(e.value)
+    assert "2025-06-30" in mesaj
+    assert "sec_edgar_get_concept_series" in mesaj, "alternatif soylenmiyor (§18)"
+
+
+@pytest.mark.anyio
+async def test_as_of_sahiplik_araclarini_da_kesiyor(srv):
+    """Form 4 akisinda iki dosyalama var (2025-02-03 ve 2026-02-20); 13F ise
+    yalnizca 2026-05-15'te. Kesim ikisini de gormeli."""
+    r = await srv.get_insider_transactions(ticker="AAPL", as_of="2025-12-31")
+    assert r.filings_available == 1, "kesimden sonraki Form 4 sayima girdi"
+    assert r.as_of_applied == "2025-12-31"
+
+    with pytest.raises(ValueError) as e:
+        await srv.get_institutional_holdings(ticker="AAPL", as_of="2025-12-31")
+    assert "2025-12-31" in str(e.value)
+
+
+@pytest.mark.anyio
+async def test_as_of_revizyon_gecmisini_de_kesiyor(srv):
+    """Revizyon aracinin cevabi kesimle DEGISMELI: 2024 basinda o revizyon
+    henuz sunulmamisti, dolayisiyla gorunmemeli."""
+    kesimli = await srv.get_fact_revisions(ticker="AAPL", concept="revenue",
+                                           as_of="2024-01-01")
+    kesimsiz = await srv.get_fact_revisions(ticker="AAPL", concept="revenue")
+    assert kesimsiz.periods_revised >= 1, "fixture revizyon tasimiyor"
+    assert kesimli.periods_revised == 0, "kesimden sonraki revizyon sizdi"
+    assert kesimli.as_of_applied == "2024-01-01"
+
+
+@pytest.mark.anyio
+async def test_as_of_aramanin_ust_sinirini_da_kisiyor(srv, monkeypatch):
+    """Tam metin aramasinin kendi tarih araligi var; kesim ayri bir parametre
+    olarak degil, `end_date`in TAVANI olarak giriyor. Gonderilen aralik
+    yanitta gorunuyor - sessiz bir daraltma olmuyor."""
+    monkeypatch.setenv("SEC_AS_OF", "2025-06-30")
+    r = await srv.search_filings(query="revenue", end_date="2026-01-01")
+    assert r.date_range_applied is not None
+    assert r.date_range_applied.endswith("2025-06-30"), r.date_range_applied
+
+
+def test_as_of_bilinmeyen_tarih_iceri_alinmiyor():
+    """Sunulma tarihi bos bir kayit, "su tarihte biliniyordu" sozunu
+    dolduramaz. Iceri almak sozu sessizce bozardi."""
+    from edgar_mcp.server import _kesimden_sonra
+    assert _kesimden_sonra("", "2025-06-30") is True
+    assert _kesimden_sonra(None, "2025-06-30") is True
+    # Kesim yokken hicbir sey elenmez - bilinmeyen tarih dahil.
+    assert _kesimden_sonra("", None) is False
+    assert _kesimden_sonra("2025-06-30", "2025-06-30") is False, "kesim gunu dahil"
+    assert _kesimden_sonra("2025-07-01", "2025-06-30") is True
+
+
+@pytest.mark.anyio
+async def test_as_of_bicimsiz_tarihi_reddediyor(srv):
+    """SEC gecersiz tarihi sessizce yok sayiyor; burada da sessiz gecerse
+    model filtreledigini sanir (P-29)."""
+    with pytest.raises(ValueError) as e:
+        await srv.list_recent_filings(ticker="AAPL", as_of="2025")
+    assert "YYYY-MM-DD" in str(e.value)

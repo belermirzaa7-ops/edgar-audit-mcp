@@ -149,3 +149,56 @@ def test_kayit_defteri_kimligi_uc_dosyada_da_ayni():
     assert f'LABEL io.modelcontextprotocol.server.name="{ad}"' in docker, (
         "Dockerfile etiketi server.json'daki adla ayni degil "
         "(OCI sahiplik dogrulamasi bu etiketi okuyor)")
+
+
+def _iddia_edilen_sayilar(metin: str, kalip: str) -> list[int]:
+    return [int(m) for m in re.findall(kalip, metin)]
+
+
+def test_dokumanlardaki_sayilar_gercekle_ayni():
+    """Satis malzemesindeki sayilar KODDAN dogrulanir, elle guncellenmez.
+
+    17 Agu 2026'da uc iddia birden bayatti: vaka calismasi "250 tests" ve
+    "170 fault injections" diyordu (gercek 264 ve 175), iki README de
+    "30 failures" diyordu (gercek 31). Hicbiri yanlis bir sey OGRETMIYOR ama
+    hepsi ayni sinifin ornegi (P-14): dokumanda duran, kodun dogrulamadigi bir
+    iddia. Musteriye giden bir sayfada bayat sayi, olcum kulturu iddiasini
+    dogrudan zayiflatir.
+
+    Sayilar buyudugu icin bu test zamanla kirmiziya doner - dogrusu budur:
+    bir insan gelip dokumani gunceller.
+    """
+    import subprocess
+    import sys
+
+    # 1) Hata enjeksiyonu sayisi
+    sys.path.insert(0, str(KOK))
+    from arac.enjeksiyon import ENJEKSIYONLAR
+
+    vaka = (KOK / "docs" / "case-study.md").read_text(encoding="utf-8")
+    enj = _iddia_edilen_sayilar(vaka, r"\*\*(\d+) fault injections")
+    assert enj == [len(ENJEKSIYONLAR)], (
+        f"vaka calismasi {enj} enjeksiyon diyor, harness'ta {len(ENJEKSIYONLAR)} var")
+
+    # 2) PATTERNS girdisi sayisi
+    p_sayisi = len(re.findall(r"^### P-", (KOK / "PATTERNS.md").read_text(
+        encoding="utf-8"), re.MULTILINE))
+    for ad in ("README.md", "README.tr.md", "docs/case-study.md"):
+        metin = (KOK / ad).read_text(encoding="utf-8")
+        iddia = _iddia_edilen_sayilar(metin, r"(\d+)\s+(?:failures|hata)\b")
+        assert iddia and set(iddia) == {p_sayisi}, (
+            f"{ad} {iddia} diyor, PATTERNS.md'de {p_sayisi} girdi var")
+
+    # 3) Test sayisi - pytest'in kendi saydigi sayi, `def test_` sayisi degil:
+    # parametreli testler calisma aninda birden fazla teste aciliyor.
+    r = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q",
+         "-p", "no:cacheprovider"],
+        cwd=KOK, capture_output=True, encoding="utf-8", errors="replace",
+    )
+    m = re.search(r"(\d+) tests? collected", r.stdout or "")
+    assert m, f"pytest toplama ciktisi okunamadi: {(r.stdout or '')[-300:]}"
+    toplanan = int(m.group(1))
+    test_iddia = _iddia_edilen_sayilar(vaka, r"\*\*(\d+) tests\*\*")
+    assert test_iddia == [toplanan], (
+        f"vaka calismasi {test_iddia} test diyor, pytest {toplanan} topluyor")

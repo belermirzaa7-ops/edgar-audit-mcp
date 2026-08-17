@@ -95,10 +95,51 @@ direction both times, with the magnitude wrong both times (20-30bps against 70,
   confident wrong answers and eighteen refusals. A model told to always produce
   an answer would trade those refusals for wrong figures — which is the failure
   this server exists to prevent, but it is not what was measured here.
-- **This is not comparable to published leaderboard numbers** on other datasets.
-  Fin-RATE reports a GPT-5-with-web-search baseline near 43%, but on a different
-  question set with different grading; putting the two side by side would be
-  arithmetic dressed as a comparison.
+- **The published baseline for this benchmark is not a like-for-like
+  comparison** — see the section below, which sets out what it does and does
+  not establish.
+
+## The benchmark's own published baseline
+
+The authors published results for 23 models on this benchmark ([arXiv
+2508.00828](https://arxiv.org/abs/2508.00828)). The best of them, **o3, scored
+46.8% ± 2.2**, and **no model reached 50%**. Those agents were not working
+blind: the paper lists their toolset as `GoogleSearch`, `EdgarSearch` ("a tool
+to access the EDGAR database, containing public SEC filings"), `ParseHTML` and
+`RetrieveInformation`. So the published baseline is a model with both web search
+*and* SEC filing access.
+
+Their metric is **class-balanced accuracy** — each task category counts equally,
+rather than each question. Computed the same way from the per-question grades
+published here:
+
+| | raw accuracy | class-balanced |
+|---|---|---|
+| With this server | 82.0% | **80.6%** |
+| Without tools | 24.0% | 29.6% |
+| Published best (o3, full set) | — | 46.8% ± 2.2 |
+
+**Four reasons this is not a like-for-like comparison**, all of them real:
+
+1. **Different questions.** Their figure covers all 537; this run covers the 50
+   public ones. The public split is a sample of the same set, not the set.
+2. **Different grader.** They use rubric-based grading with a dedicated
+   contradiction rubric. This run used a single blind judge with four grades.
+   Two graders on the same answers do not have to agree.
+3. **Different tools.** Their agents had general web search; this run had ten
+   SEC tools and nothing else. That cuts both ways — web search reaches
+   material this server cannot, and this server reaches filing structure a
+   search box does not.
+4. **Different model generation.** Their evaluation ran on 2025 models (o3,
+   Claude 3.7 Sonnet). This run used a 2026 model, so part of any gap is the
+   model improving, not the server.
+
+**What it does establish:** the published state of the art on this benchmark,
+with EDGAR and web access, sat below 50%, and the difficulty of the questions is
+therefore not in doubt. **What it does not establish:** that this server beats
+o3. The comparison that isolates what this server contributes is the one inside
+this run — same model, same questions, same grader, 24% against 82% — and that
+comparison says nothing about how it would place on a leaderboard.
 
 ## Reproducing it
 

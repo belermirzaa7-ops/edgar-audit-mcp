@@ -11,7 +11,7 @@ belirli bir US-GAAP etiketine ve belirli bir sunulma tarihine kadar izlenebilir.
 
 **Buradan başlayın:** [başka araçların sessizce yanlış yaptığı şeyler](docs/case-study.md) ·
 [ölçüldü: bu sunucu olmadan %24 doğru, onunla %82](evaluation/benchmark.md) ·
-[bu depoda gerçekten yaşanmış 30 hata, her biri bir testle korunuyor](PATTERNS.md)
+[bu depoda gerçekten yaşanmış 32 hata, her biri bir testle korunuyor](PATTERNS.md)
 
 ---
 
@@ -331,6 +331,42 @@ kalıyor.
 
 Etiketler bir ek indirme demek — Tesla'nın FY2025 yıllık raporunda 2,68 MB'lık
 instance'a karşılık 1,21 MB — bu yüzden `include_labels` ile kapatılabiliyor.
+
+### Dosyalamaları geçmiş bir tarihte durdukları hâliyle okumak
+
+Her "en güncel" ifadesi gizli bir *şu an itibarıyla* taşır. En son 10-K'yı
+sorduğunuzda cevap, bir sonraki dosyalandığı anda değişir; FY2023 gelirini
+sorduğunuzda dönen rakam en yeni dosyalamanınkidir — Ocak 2024'te birinin
+okuyabileceği rakam o olmak zorunda değil. Geçmişe dönük bir soruda (bir
+analizi yeniden üretmek, bir kuralı o gün bilinebilenle sınamak, bir yıl önce
+yazılmış bir soruyu cevaplamak) bu varsayım sessizce yanlıştır. Finansta adı
+look-ahead bias.
+
+Güncelliğe göre seçim yapan her araç artık `as_of` (bir tarih) alıyor ve her
+yanıt uygulanan kesimi `as_of_applied` alanında geri veriyor. Ortamdaki
+`SEC_AS_OF` değişkeni kesimi tüm sürece uyguluyor; çağrı ile ortam
+çakıştığında **erken** olan kazanıyor — tek bir çağrının oturum çapındaki
+kesimi aşmasına izin vermek, kesimi anlamsız kılardı.
+
+Kesim **sunulma tarihine** göre, döneme göre değil. Revize edilmiş bir rakamın
+dönem sonu orijinaliyle aynıdır; ikisini yalnızca sunulma tarihi ayırır,
+dolayısıyla döneme bakan bir filtre çalışıyormuş gibi görünürken bütün
+revizyonları içeri alır. Apple'ın FY2023 geliriyle ölçüldü: 2023 yıllık
+raporunda `383.285.000.000`, 2024 raporu revize ettikten sonra
+`383.290.000.000`. `as_of=2024-01-01` ile araç birincisini döndürüyor.
+
+Güvenceyi ciddiye almanın üç sonucu:
+
+- Sunulma tarihi bilinmeyen kayıt kesimden **sonra** sayılıyor. İçeri almak, "o
+  tarihte ne biliniyordu" sorusunu tarihi bilinmeyen bir kayıtla cevaplamak
+  olurdu.
+- Erişim numarasıyla açıkça istenen bir dosyalama, kesimden sonraysa yine
+  reddediliyor. Hata iki tarihi de veriyor; kararı çağıran veriyor.
+- `sec_edgar_compare_companies` bunu uygulayamıyor ve bunu söylüyor. SEC'in
+  çerçeve ucu satır başına sunulma tarihi vermiyor, yani revizyon orijinalden
+  ayırt edilemiyor; kesim varken araç çağrıyı reddedip uygulayabilen aracı
+  (`sec_edgar_get_concept_series`) adres gösteriyor. Sözü tutamayan bir araç
+  tutuyormuş gibi yapmamalı.
 
 ## Ele alınan üç tuzak
 

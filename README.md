@@ -13,7 +13,7 @@ Built against the **2026-07-28 MCP specification** using the Python SDK `v2.0.0`
 
 [![CI](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml)
 
-**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured: 24% correct without this server, 82% with it](evaluation/benchmark.md) · [30 failures that shipped here, each with the test that guards it](PATTERNS.md)
+**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured: 24% correct without this server, 82% with it](evaluation/benchmark.md) · [32 failures that shipped here, each with the test that guards it](PATTERNS.md)
 
 ---
 
@@ -338,6 +338,42 @@ or is null when the filing has no linkbase at all.
 
 Labels cost one extra download — 1.21 MB against a 2.68 MB instance on Tesla's
 FY2025 annual report — so `include_labels` turns them off.
+
+### Reading the filings as they stood on a past date
+
+Every "most recent" carries a hidden *as of now*. Ask for the latest 10-K and
+the answer changes when the next one is filed; ask for FY2023 revenue and the
+figure is whatever the newest filing says, which is not necessarily what anyone
+could have read in January 2024. For a historical question — reproducing an
+analysis, testing a rule against what was knowable at the time, answering a
+question written a year ago — that assumption is silently wrong. Finance calls
+it look-ahead bias.
+
+Every tool that selects by recency takes `as_of`, a date, and every response
+repeats the cutoff in `as_of_applied`. Setting `SEC_AS_OF` in the environment
+applies it to a whole process; where a call and the environment disagree the
+earlier date wins, because letting one call reach past a session-wide cutoff
+would make the cutoff meaningless.
+
+The cut is on the **filing date**, not the period. A restated figure has the
+same period end as the original — only the filing date separates them, so a
+filter on the period would let every restatement through while appearing to
+work. Measured on Apple's FY2023 revenue: `383,285,000,000` as reported in the
+2023 annual report, `383,290,000,000` after the 2024 one restated it. With
+`as_of=2024-01-01` the tool returns the first.
+
+Three details follow from taking the guarantee seriously:
+
+- A record whose filing date is unknown counts as *after* the cutoff. Keeping it
+  would answer "what was known then" with a record whose date is not known.
+- A filing named explicitly by accession number is still refused when it
+  postdates the cutoff. The error gives both dates, so the caller can decide
+  rather than guess.
+- `sec_edgar_compare_companies` cannot honour it and says so. SEC's frame
+  endpoint reports no filing date per row, so a restatement is
+  indistinguishable from an original; under a cutoff the tool refuses the call
+  and names `sec_edgar_get_concept_series`, which does honour it. A tool that
+  cannot keep the promise should not pretend to.
 
 ## Three traps this server handles
 

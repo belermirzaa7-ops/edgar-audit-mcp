@@ -44,6 +44,7 @@ can verify rather than remember.
 | [P-29](#p-29) | Does a filter compare strings the caller wrote by hand, and does a miss look like an empty answer? | `test_form_filtresi_buyuk_kucuk_harf_duyarsiz` |
 | [P-30](#p-30) | Does a missing optional dependency turn a loader into a silent no-op? | `test_env_yukleyici_bagimlilik_olmadan_da_yukluyor`, `test_env_yukleyici_bom_lu_dosyayi_okuyor` |
 | [P-31](#p-31) | Does my cleanup depend on my process getting a chance to run it? | `test_enjeksiyon_kontrol_modu_yarim_kalan_kosuyu_goruyor`, `test_enjeksiyon_parcali_kosu_hicbir_enjeksiyonu_dusurmuyor` |
+| [P-32](#p-32) | Is "the latest filing" the latest as of *when* — and does my filter cut on the period or on the filing date? | `test_as_of_o_tarihte_bilinen_degeri_donduruyor`, `test_as_of_bilinmeyen_tarih_iceri_alinmiyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -894,6 +895,63 @@ were diffed against `.enjeksiyon_yedek/`, `belge.py` was found to differ by one
 line, and it was restored by hand. That recovery worked only because the
 backups were still on disk and someone thought to look. Nothing in the
 repository would have raised the question.
+
+---
+
+<a id="p-32"></a>
+### P-32 · "The latest filing" has a hidden argument: as of when
+
+**Symptom.** A question written in 2025 asking about "the last three years" or
+"the most recent 10-K" gets a different answer when it is run in 2026. Nothing
+errors. The tool finds a real filing, quotes it accurately, and cites its
+accession number — it is simply a filing that did not exist when the question
+was written. The answer is well-sourced and off by a year.
+
+A second, quieter version of the same thing: a figure for a period that has
+already closed can still change, because the company restates it in a later
+filing. Read today, FY2023 revenue is whatever the most recent filing says it
+is. Read as it stood in January 2024, it is the original number. Both are
+correct; they answer different questions, and nothing in the data marks which
+one was asked.
+
+**Root cause.** Every "most recent" in a filing tool carries an implicit *as of
+now*. Once that assumption is written down it is obviously wrong for any
+historical question — evaluating a benchmark authored a year ago, reproducing
+an analysis, testing a strategy against what was knowable at the time. In
+finance the general name for the failure is **look-ahead bias**: using
+information that was not available at the moment being described.
+
+The trap inside the fix is choosing the wrong date to cut on. A restated FY2023
+figure has the same period end as the original — the two are separated only by
+when they were **filed**. A filter that cuts on the period end therefore lets
+every restatement through while looking like it is doing the right thing.
+
+**Detection.** An `as_of` cutoff, and it cuts on the filing date:
+
+- Every tool that selects by recency takes it, and every response repeats the
+  cutoff that was applied. A cutoff that quietly did nothing would be
+  indistinguishable from no cutoff at all — the same rule as P-19.
+- A record whose filing date is unknown counts as *after* the cutoff. Letting it
+  through would fill a promise about what was known on a date with a record
+  whose date is not known.
+- A filing named explicitly by accession number is still refused if it postdates
+  the cutoff, with an error that says both dates. One exception would leave the
+  caller holding a guarantee that is not true.
+- `SEC_AS_OF` sets the cutoff for a whole process. Where a call and the
+  environment disagree, the **earlier** wins: taking the later one would let a
+  single call break a promise made for the session.
+- One tool cannot honour it. SEC's frame endpoint reports no filing date per
+  row, so `sec_edgar_compare_companies` refuses the call under a cutoff and
+  names the tool that does honour it, rather than returning rows it cannot
+  vouch for.
+
+**Incident.** 16 Aug 2026, in this repository's own benchmark run. Five of fifty
+answers were graded not-correct for exactly this reason: the dataset was
+published on 16 May 2025 (Zenodo record 15428639), the run happened fifteen
+months later, and phrases like "the last three years" had moved on. The tool arm
+had found the right document by the wrong clock. Counting those five as correct
+would have put the run at 92% rather than 82%; the lower number was published
+and the cause was fixed in the tools rather than in the grading.
 
 ---
 
