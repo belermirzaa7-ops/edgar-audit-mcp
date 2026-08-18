@@ -182,29 +182,38 @@ twice — once with no tools at all, once with only this server's tools:
 
 | | correct | partial | wrong | could not answer |
 |---|---|---|---|---|
-| **With the server** | **41 (82%)** | 8 | 0 | 1 |
-| Without tools | 12 (24%) | 20 | 0 | 18 |
+| **With the server** | **45 (90%)** | 4 | 0 | 1 |
+| Without tools | 13 (26%) | 17 | 3 | 17 |
 
 The sharpest split is on questions asking whether a company beat the guidance it
-gave a quarter earlier: **7/7 with the server, 0/7 without**. Those need two
+gave a quarter earlier: **6/7 with the server, 0/7 without**. Those need two
 8-K exhibits filed months apart. Without filing access the model could only
 recall the direction — it said "beat" for both TJX and Micron and was right both
 times, while missing the magnitude by 3-4x (20-30bps against an actual 70bps;
 40bps against an actual 140bps).
 
+The run is **point-in-time**: the dataset was published on 16 May 2025, so the
+tools were told to ignore anything SEC received after that date. Otherwise a
+question written in 2025 asking about "the most recent annual report" gets
+answered from a 2026 filing — correctly sourced, wrong year. Every accession
+number the tool arm read was then checked against SEC: none postdates the
+cutoff. An earlier run without the cutoff scored 82%, and both runs are
+published.
+
 Neither answering side ever saw the expected answers, and a separate grader saw
 the two answers in randomised order without being told which system produced
-which. The full method, the raw answers from both sides, the grades and the
+which. The full method, the raw answers from both runs, the grades and the
 limits of the number are in
-[`evaluation/benchmark.md`](../evaluation/benchmark.md) — including the five
-questions where the answer was correctly sourced from the wrong fiscal period,
-which are counted as failures in the 82%.
+[`evaluation/benchmark.md`](../evaluation/benchmark.md) — including the three
+period mismatches that survive, and a direct measurement of how much the grader
+itself moves the number: two graders agreed on 86% of the same fifty answers, so
+read every figure as carrying about ±2 points.
 
 ## How it is kept true
 
-- **265 tests**, no network access — SEC responses are mocked from real captured
+- **268 tests**, no network access — SEC responses are mocked from real captured
   payloads.
-- **175 fault injections.** Every guard above is deliberately broken by an
+- **178 fault injections.** Every guard above is deliberately broken by an
   automated harness, and the test that should catch it must turn red. A guard
   that nothing catches is reported as `KORUMASIZ` — unprotected — and the run
   fails. This has caught guards that looked protected and were not, including
@@ -212,7 +221,7 @@ which are counted as failures in the 82%.
 - **A 22-question evaluation set**, every answer produced by running the tools
   against live SEC data with the exact calls recorded, so any answer can be
   re-measured rather than trusted.
-- **[`PATTERNS.md`](../PATTERNS.md)** — 32 failures that actually shipped in
+- **[`PATTERNS.md`](../PATTERNS.md)** — 33 failures that actually shipped in
   this repository, each with symptom, root cause, how it is detected now, and
   the test that guards it. A separate test suite keeps that document from
   drifting: every test it names must exist.

@@ -1,0 +1,702 @@
+[
+ {
+  "id": 0,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Her iki yanit da Aralik 2023 birlesme anlasmasini ve Ocak 2025'te baskanlik kararnamesiyle engellenmesini dogru aktariyor; beklenen cevaptaki '7,3 milyar dolarlik teklif reddedildi' ifadesi kendi icinde hatali gorunuyor, yanitlar 55 dolar/hisse anlasmasini dogru veriyor."
+ },
+ {
+  "id": 1,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 2019-2024 ARM degerlerini beklenenle birebir veriyor; Y1 sadece yaklasik araliklar ('10,8-11,0' ve '11,5-12,0') sunup yil bazinda rakam vermiyor, yon dogru ama nicel icerik eksik."
+ },
+ {
+  "id": 2,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "yanlis",
+   "farkli_donem": false,
+   "uydurma_sayi": true
+  },
+  "gerekce": "Y1 dusuk uctan 80bps / yuksek uctan 70bps beat'i tam veriyor; Y2 yonlendirmeyi %11,3-11,4 sanip ~20-30bps beat diyerek maddi olarak yanlis rakam beyan ediyor."
+ },
+ {
+  "id": 3,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Iki yanit da dort ceyregin alt/ust bantlarini ve orta noktaya oranlari (%10,5 / %9,0 / %8,0 / %8,5) beklenenle ayni veriyor."
+ },
+ {
+  "id": 4,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 sekiz adayin tamamini dogru sayiyor; Y2 isimleri bilmedigini soyleyip DEF 14A'ya yonlendiriyor."
+ },
+ {
+  "id": 5,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Her iki yanit da AMZN > GOOG > META siralamasini ve AMZN'in en cok harcayacagi sonucunu veriyor; Y2'nin Meta icin 64-72 milyar dolar bandi guncellenmis 10-Q rehberligi oldugundan uydurma sayilmadi."
+ },
+ {
+  "id": 6,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Elinor (Ellie) Mertz her iki yanitta da dogru sekilde Airbnb CFO'su olarak veriliyor."
+ },
+ {
+  "id": 7,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 basligi 3,25 milyar dolar olarak veriyor (muhasebe degerine dair cekince koysa da rakam dogru); Y2 3,25 milyar + 50 milyon duzeltme ile ayni sonuca variyor."
+ },
+ {
+  "id": 8,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "yanlis",
+   "farkli_donem": false,
+   "uydurma_sayi": true
+  },
+  "gerekce": "Y1 140bps beat'i (rehberlik %25,5 orta nokta, gerceklesen %26,9) dogru hesapliyor; Y2 rehberligi %26,5 sanip ~40bps beat diyerek maddi olarak yanlis rakam veriyor."
+ },
+ {
+  "id": 9,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Beklenen cevap kendi icinde tutarsiz: 2022-2024 (2 yillik) buyumeyi 3 yillik ussle bolup %14,56 buluyor; soru 3 yillik CAGR sordugundan 2021-2024 uzerinden %22,9 veren her iki yanit da yontemsel olarak dogru kabul edildi."
+ },
+ {
+  "id": 10,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": true,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 dogru sinif yapisini ve C/H rakamlarini veriyor ama 18 Nisan 2025 tarihli 10-Q kapak verisini kullandigi icin A ve B sinifi adetleri beklenen donemden farkli; Y2 sinif bazinda rakam vermiyor."
+ },
+ {
+  "id": 11,
+  "y1": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "kismen",
+   "farkli_donem": true,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Beklenen cevap Q1 2025 rehberligi uzerinden %1,0 MISS hesapliyor; Y2 Q2 2025 rehberligi uzerinden calisip MISS yonunu tutturuyor ama buyukluk (%5-9) maddi olarak farkli, Y1 hic hesap yapmiyor."
+ },
+ {
+  "id": 12,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 2,263,113 dolar toplamini kalem kalem dogru veriyor; Y2 bilmedigini belirtiyor."
+ },
+ {
+  "id": 13,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 2023 %11,3 ve 2024 %12,7 rakamlarini birebir tutturuyor ve 2022'deki sapmayi (Zillow Offers stok tasfiyesi) acikliyor - 2022 icin beklenen %24,8 ile farki beklenen cevabin gelir tabani secimindeki tutarsizliktan kaynakli gorunuyor; Y1 hicbir yillik rakam vermiyor ve trendi 'yukseldi' diye tarif ediyor."
+ },
+ {
+  "id": 14,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 14.060 / 2.148 = 6,5x ile beklenen 6,49 degerini tutturuyor; Y2 sadece 6-7x araligi tahmin edip dogrulanmis rakam vermiyor."
+ },
+ {
+  "id": 15,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 buyukluk (51.750.000 hisse / 2,5875 milyar dolar), 7 Mart 2025 kapanis, 50 dolar fiyat, %6,25 temettu ve 0,3312-0,4140 donusum bandini tam veriyor (yalniz oy hakkini ozetlemiyor); Y1 sadece genel yapiyi hatirliyor, buyukluk-kupon-tarih eksik."
+ },
+ {
+  "id": 16,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Her iki yanit da 2022 %13,3 - 2023 %13,5 - 2024 %13,6 seyrini ve kademeli artis yorumunu veriyor."
+ },
+ {
+  "id": 17,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 gross revenue retention tanimini (onceki donem sonu ARR ile ayni musteri kohortunun cari donem ARR karsilastirmasi, churn dahil, ek satis/net genisleme haric) beklenenle ortusen bicimde veriyor; Y1 metrigin gross oldugunu dogru soyluyor ama tanimi gevsek aktariyor."
+ },
+ {
+  "id": 18,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 85.002 bin dolar ve toplamin %51,3'u sonucunu yillik kirilimla veriyor; Y2 rakam bilmedigini soyleyip kabaca ucte bir tahmini yapiyor."
+ },
+ {
+  "id": 19,
+  "y1": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 FY2024 %10,9 ve FY2023 %6,8 ile ~410bps artisi tam veriyor; Y1 guvenilir rakami olmadigini soyluyor."
+ },
+ {
+  "id": 20,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 'Kuzey Amerika'daki uye isyeri islem hacmi tek bir saticiyla yurutuluyor' ifadesini ve yedek sistem degerlendirmesini birebir aktariyor; Y2 sadece genel sponsor banka/kart agi yogunlasmasindan bahsedip beklenen tek-satici acilamasini kaciriyor."
+ },
+ {
+  "id": 21,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Her iki yanit da 2022 ~160, 2023 ~164, 2024 ~166 dolar seviyelerini yuvarlama farki icinde veriyor."
+ },
+ {
+  "id": 22,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 uretimin mali 2025'in ikinci ceyreginde basladigini soyluyor; bu beklenen '2025'te baslamasi bekleniyor' ifadesiyle mali yil bazinda ortusuyor. Y2 tarih vermiyor."
+ },
+ {
+  "id": 23,
+  "y1": {
+   "not": "yanlis",
+   "farkli_donem": false,
+   "uydurma_sayi": true
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 tahvil tahvil dokum yapip surdurulebilirlik tahvilleri haric 7,5 milyar dolar sonucunu dogru veriyor; Y1 toplam 8,5 milyar dolari haric tutulmus rakam sanarak maddi olarak yanlis sayi veriyor."
+ },
+ {
+  "id": 24,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 veri gizliligi (GDPR/CCPA/BIPA/HIPAA/FTC), vergi-yan hak mevzuati degisiklikleri, para transferi lisanslamasi ve dava riski gibi beklenen temalari kapsiyor; Y2 hafizadan genel bir liste verip FY2024 10-K ile ortusmeyebilecegini belirtiyor."
+ },
+ {
+  "id": 25,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Iki yanit da 102.000/228.000 = ~%45 sonucunu veriyor; Y1 rakami dogrulanmamis olarak isaretlese de icerik dogru."
+ },
+ {
+  "id": 26,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 500 milyon dolarlik Seri A %6,500 tahvilin planlanan 2057 / nihai 2067 vadesini ve 15 Mayis 2037 sonrasi geri cagirma sartlarini dogru veriyor; Y2 spesifik sartlari bilmiyor."
+ },
+ {
+  "id": 27,
+  "y1": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 14,426 milyar dolarlik 12 aylik nakit yukumlulugu ve kirilimini veriyor; Y1 rakami olmadigini soyluyor."
+ },
+ {
+  "id": 28,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 tum operasyonel KPI'lari FY2024 degerleriyle (209,9 ucak, 288.180 kalkis, %82,4 doluluk, 111,21 dolar vb.) beklenene uygun veriyor; Y2 sadece KPI adlarini sayip hicbir deger vermiyor."
+ },
+ {
+  "id": 29,
+  "y1": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 tahvil bazinda donusum oranlariyla ~85,9 milyon hisselik azami sulandirmayi buluyor; Y1 yontemi anlatip rakam vermiyor."
+ },
+ {
+  "id": 30,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 1.281 milyon dolar gelir ve %26,55 brut marj tabanindan 467 milyon dolara ulasiyor; Y2 2026 gelirini hesaplasa da brut kar rakamini vermeyi reddediyor."
+ },
+ {
+  "id": 31,
+  "y1": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 satin alma 12.057.993 bin ve refinansman 5.250.321 bin dolar rakamlarini birebir veriyor; Y1 bilmedigini soyluyor."
+ },
+ {
+  "id": 32,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 %21 vergi etkisiyle ~1.277 milyon dolar ve ~%10,8 sonucunu vererek beklenen 1,261 milyar dolar / %10,7 ile ortusuyor; Y2 sadece vergi oncesi ~1,6 milyar dolar ve %13-14 diyerek net gelir etkisini eksik hesapliyor."
+ },
+ {
+  "id": 33,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Beklenen %20; Y1 'kabaca beste bir ile dortte bir' diyerek dogru bandi isaret ediyor ama taahhut etmiyor, Y2 bilgiyi bulamadigini belirtiyor."
+ },
+ {
+  "id": 34,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Iki yanit da en buyuk duzeltmenin hisse bazli odeme gideri ~1,9 milyar dolar oldugunu veriyor; Y1 ayrica 1.935 milyon dolarlik tam rakami sunuyor."
+ },
+ {
+  "id": 35,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Iki yanit da 12,50 dolar/hisse ve 1,75 milyar dolar ozkaynak degerini veriyor; Y1 0,7926 degisim oranini ayrintili vermiyor ve isletme degerini 2,0-2,4 milyar araligi olarak birakiyor, Y2 orani dogru veriyor ama 2,4 milyar dolarlik isletme degerini bulamadigini soyluyor."
+ },
+ {
+  "id": 36,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 2022-2024 toplaminda ~4,79 milyar dolar bularak beklenen ~4,7 milyar dolarla maddi olarak ortusuyor; Y2 kumulatif rakami bilmiyor."
+ },
+ {
+  "id": 37,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 orta noktaya gore ~25bps beat vererek beklenen 26,1bps ile yuvarlama farki icinde ortusuyor; Y1 15-25bps araligi verip tum rakamlari dogrulanmamis olarak isaretliyor."
+ },
+ {
+  "id": 38,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 ceyreklik (gelir buyumesi, faaliyet marji, EPS) ve yillik (EPS buyumesi, serbest nakit akisi, brut kaldirac) kalemlerini birebir veriyor; Y2 dogru cekirdegi versede CASM-ex, yakit fiyati ve kapasite gibi beklenen listede olmayan kalemler ekliyor."
+ },
+ {
+  "id": 39,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Iki yanit da vergi, diger gelir/gider, faiz geliri, amortisman, hisse bazli odeme, satin alma kaynakli etkiler ve konaklama/stopaj/islem vergileri duzeltmelerini kapsiyor."
+ },
+ {
+  "id": 40,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 Q4 2024 magaza bazli satis degisimini -%0,8 olarak dogru veriyor; Y2 sadece 'kucuk negatif' diyerek rakam vermiyor."
+ },
+ {
+  "id": 41,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 KDP %82,9 > KO %78,6 > PEP %75,5 siralamasini beklenenle ortusen sekilde veriyor (KHC ve SJM eksik, MNST eklenmis); Y1 dogrulanmis siralama uretemiyor ve KDP'yi KO'nun altina koyarak beklenen siralamayla celisiyor."
+ },
+ {
+  "id": 42,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 2023 %27,04 / 2024 %27,02 take rate ve buyumenin tamaminin hacimden geldigi sonucunu tam veriyor; Y2 rakamsal ayristirma yapmasa da %18/%18 esitliginden ayni sonuca variyor."
+ },
+ {
+  "id": 43,
+  "y1": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 Asya Pasifik icin 3,3 geceyi bolgesel kirilimla dogru veriyor; Y1 bu verinin acilandigindan suphe edip tahmin etmeyi reddediyor."
+ },
+ {
+  "id": 44,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Iki yanit da 1.407 milyon dolarlik hisse bazli odeme duzeltmesini veriyor; Y2 'yaklasik 1,4 milyar' diyerek yuvarlama farki icinde kaliyor."
+ },
+ {
+  "id": 45,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 uc satin almayi da (Aryeo 35 milyon/31 Tem, Spruce 19 milyon/11 Eyl, Follow Up Boss 399 milyon + 100 milyon kosullu/8 Ara) tutar ve tarihleriyle verip gelir karisimi baglantisini kuruyor; Y1 yalnizca Follow Up Boss ve Aryeo'ya deginip Spruce'u ve tutarlari kaciriyor."
+ },
+ {
+  "id": 46,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 47,0 milyar dolar orta nokta rehberligine karsi 43,48 milyar dolar gerceklesme ile ~%7,5 MISS sonucunu veriyor (beklenen %7,4); Y2 sorunun varsayimini sorgulayip cevap vermiyor."
+ },
+ {
+  "id": 47,
+  "y1": {
+   "not": "kismen",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 IFP 943,7 / GEP 827,3 / gelir 526,5 / duzeltilmis FAVOK zarari 149,7 milyon dolar ile beklenen kalemleri tutturuyor (SBC ve capex detaylari eksik); Y1 sadece IFP'yi hatirlayip tum rakamlari dogrulanmamis olarak isaretliyor."
+ },
+ {
+  "id": 48,
+  "y1": {
+   "not": "dogru",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y1 iki mali yilda da beat oldugunu (4,30 ve 4,52 dolar) ve 2025 ilk rehberliginin 4,52 dolar tabanindan -%1/+%1 (yani 4,47-4,57 dolar) oldugunu veriyor; Y2 hicbir sayim veya bant vermiyor."
+ },
+ {
+  "id": 49,
+  "y1": {
+   "not": "cevapyok",
+   "farkli_donem": false,
+   "uydurma_sayi": false
+  },
+  "y2": {
+   "not": "kismen",
+   "farkli_donem": true,
+   "uydurma_sayi": false
+  },
+  "gerekce": "Y2 Q2-Q4 2024 icin beklenen gerceklesme ve beat yuzdeleriyle (%2,6/%2,0/%2,2) ortusuyor ama Q1 2024 yerine Q1 2025'i alarak farkli bir dort ceyrek setiyle calisiyor ve ortalamayi %2,6 buluyor; Y1 hesap yapamiyor."
+ }
+]

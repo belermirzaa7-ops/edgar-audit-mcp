@@ -10,8 +10,8 @@ belirli bir US-GAAP etiketine ve belirli bir sunulma tarihine kadar izlenebilir.
 **2026-07-28 MCP spesifikasyonuna** göre, Python SDK `v2.0.0` ile yazıldı.
 
 **Buradan başlayın:** [başka araçların sessizce yanlış yaptığı şeyler](docs/case-study.md) ·
-[ölçüldü: bu sunucu olmadan %24 doğru, onunla %82](evaluation/benchmark.md) ·
-[bu depoda gerçekten yaşanmış 32 hata, her biri bir testle korunuyor](PATTERNS.md)
+[ölçüldü: bu sunucu olmadan %26 doğru, onunla %90](evaluation/benchmark.md) ·
+[bu depoda gerçekten yaşanmış 33 hata, her biri bir testle korunuyor](PATTERNS.md)
 
 ---
 
@@ -351,9 +351,20 @@ kesimi aşmasına izin vermek, kesimi anlamsız kılardı.
 Kesim **sunulma tarihine** göre, döneme göre değil. Revize edilmiş bir rakamın
 dönem sonu orijinaliyle aynıdır; ikisini yalnızca sunulma tarihi ayırır,
 dolayısıyla döneme bakan bir filtre çalışıyormuş gibi görünürken bütün
-revizyonları içeri alır. Apple'ın FY2023 geliriyle ölçüldü: 2023 yıllık
-raporunda `383.285.000.000`, 2024 raporu revize ettikten sonra
-`383.290.000.000`. `as_of=2024-01-01` ile araç birincisini döndürüyor.
+revizyonları içeri alır.
+
+Tesla'nın FY2017 geliriyle, SEC'e karşı canlı ölçüldü — o rakam iki yıl sonra
+revize edilmiş:
+
+| çağrı | FY2017 geliri | dosyalama tarihi |
+|---|---|---|
+| `as_of=2019-01-01` | `11.758.751.000` | 2018-02-23 |
+| kesimsiz | `11.759.000.000` | 2020-02-13 |
+
+Aynı dönem, aynı şirket, aynı kavram. Birincisi 2018'de Tesla'nın hesaplarını
+okuyan bir analistin gördüğü rakam; ikincisi onun yerine geçen rakam. Kesim
+olmadan araç, 2018 sorusuna 2020 dosyalamasıyla cevap veriyor ve bu değişimi
+hiçbir şey işaretlemiyor.
 
 Güvenceyi ciddiye almanın üç sonucu:
 
@@ -526,18 +537,25 @@ yılı, bitiş yılı ve başlangıç yılı geleneklerini kullanan şirketlerle
 değiştirdiğini ölçüyor: aynı model,
 [Vals AI Finance Agent Benchmark](https://huggingface.co/datasets/vals-ai/finance_agent_benchmark)
 setinin açık 50 sorusunu iki kez cevapladı — bir kez hiçbir araç olmadan, bir
-kez yalnızca bu on araçla.
+kez yalnızca bu araçlarla.
 
 | | doğru | kısmen | yanlış | cevap yok |
 |---|---|---|---|---|
-| **Bu sunucuyla** | **41 (%82)** | 8 | 0 | 1 |
-| Araçsız | 12 (%24) | 20 | 0 | 18 |
+| **Bu sunucuyla** | **45 (%90)** | 4 | 0 | 1 |
+| Araçsız | 13 (%26) | 17 | 3 | 17 |
+
+Koşu **2025-05-16**'ya kesimli: setin yayımlandığı tarih. Yani sorular, onlar
+yazılırken var olan dosyalamalara karşı cevaplanıyor. Araç kolunun okuduğu her
+erişim numarası sonradan SEC'e karşı denetlendi: **hiçbiri kesimden sonra
+değil**, kullanılan en geç dosyalama 2025-05-09 tarihli.
 
 Cevaplayan kolların hiçbiri beklenen cevabı görmedi; notlandırmayı, iki cevabı
 rastgele sırayla ve hangisinin hangi koldan geldiğini bilmeden gören ayrı bir
-değerlendirici yaptı. Bütün ham veri — iki kolun cevapları, notlandırma girdisi,
-notlar, kol anahtarı — `evaluation/benchmark/` altında, ve sayının sınırları
-raporun içinde yazılı.
+değerlendirici yaptı. Bütün ham veri — iki koşunun cevapları, notlandırma
+girdileri, notlar, kol anahtarı, uyum denetimi — `evaluation/benchmark/`
+altında. Sayının sınırları raporun içinde yazılı; buna notlandırıcının kendisinin
+sayıyı ne kadar oynattığının ölçümü de dahil (iki değerlendirici aynı elli
+cevabın %86'sında aynı notu verdi).
 
 ### Değerlendirme seti
 

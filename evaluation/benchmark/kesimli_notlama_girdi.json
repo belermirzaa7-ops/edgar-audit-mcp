@@ -1,0 +1,402 @@
+[
+ {
+  "id": 0,
+  "soru": "How has US Steel addressed its planned merger with Nippton Steel and its effect on its business operations?",
+  "beklenen": "The proposed merger between Nippon Steel and U.S. Steel occured late in 2023 when Nippon Steel made an unsolicited offer to acquire U.S. Steel for approximately $7.3 billion. U.S. Steel rejected the offer, citing concerns about the strategic fit and the undervaluation of the company. Ultimately, the merger was blocked by executive order.",
+  "tur": "Market Analysis",
+  "yanit_1": "U. S. Steel (CIK 0001163302) discusses the Nippon Steel deal as a pending, contested merger rather than a closed transaction. Per the FY2024 10-K (accession 0001163302-25-000018, filed 31 Jan 2025) and the Q1 2025 10-Q (accession 0001163302-25-000030, filed 2 May 2025): the Merger Agreement was signed 18 December 2023 with Nippon Steel North America, Inc. (Purchaser), 2023 Merger Subsidiary, Inc. and Nippon Steel Corporation; each U. S. Steel share converts into the right to receive $55.00 in cash, and the company would survive as a wholly owned subsidiary of Purchaser. Stockholders approved on 12 April 2024 with 98.8% of shares voted. HSR waiting period has expired and all non-U.S. regulatory approvals were obtained, leaving CFIUS clearance as the outstanding condition. After CFIUS referred the matter, President Biden issued an order on 3 January 2025 prohibiting the merger and requiring the parties to abandon it within thirty days; on 10 January 2025 CFIUS extended that deadline to 18 June 2025. On 6 January 2025 U. S. Steel, NSC and Purchaser sued in the D.C. Circuit challenging the President's order and the CFIUS process as politically motivated and unconstitutional, and separately sued Cleveland-Cliffs, its CEO Lourenco Goncalves and USW president David McCall in the Western District of Pennsylvania for alleged anticompetitive/racketeering conduct; motions to dismiss were argued 12 March 2025 and remained pending. On 6 April 2025 the President issued a Presidential Memorandum directing CFIUS to conduct a de novo review with a recommendation due 21 May 2025, and the D.C. Circuit granted a 60-day abeyance of the litigation on 11 April 2025. As to business operations, the company states the Merger Agreement requires it to operate in the ordinary course and restricts it, without Purchaser's consent, from taking specified actions outside the ordinary course until closing or termination; its forward-looking-statement disclosures flag risks from transaction-related litigation, inability to satisfy closing conditions, and disruption of management time from ongoing business operations due to the proposed transaction. Meanwhile the underlying business continued to be run and invested in (e.g. Big River Steel 2 produced its first coil in October 2024, lifting Mini Mill capability from 3.3 to 6.3 million tons).",
+  "yanit_2": "US Steel signed a merger agreement with Nippon Steel in December 2023 at $55.00 per share cash (~$14+ billion equity value); deal blocked by executive order Jan 2025, later cleared June 2025 with golden share; risk-factor style answer."
+ },
+ {
+  "id": 1,
+  "soru": "How has Netflix's (NASDAQ: NFLX) Average Revenue Per Paying User Changed from 2019 to 2024?",
+  "beklenen": "2019: 10.82 / 2020: 10.91 / 2021: 11.67 / 2022: 11.76 / 2023: 11.64 / 2024: 11.70. From 2019-2022 ARPU rose ~2.8%/yr; 2022-2024 roughly flat, likely due to lower priced ad plans",
+  "tur": "Trends",
+  "yanit_1": "ARM roughly $10.8-11.0 in 2019 and roughly $11.5-12.0 in 2024; only modest growth; regional divergence; explicitly says numbers are approximations to verify.",
+  "yanit_2": "Netflix's global average monthly revenue per paying membership (ARM, its ARPU measure) was essentially flat over the six years: $10.82 in 2019, $10.91 in 2020, $11.67 in 2021, $11.76 in 2022, $11.64 in 2023 and $11.70 in 2024 - a cumulative rise of only about 8% (roughly 1.4% a year), with all of the gain coming in 2021. The 2019-2021 figures come from the FY2021 10-K (accession 0001065280-22-000036) and the 2022-2024 figures from the FY2024 10-K (accession 0001065280-25-000044). The flat consolidated line hides diverging regional trends: in the FY2024 10-K, UCAN ARM rose from $15.86 (2022) to $16.28 (2023) to $17.20 (2024), EMEA was $10.99 / $10.87 / $10.96, while LATAM fell from $8.48 to $8.66 to $8.24 and APAC fell from $8.50 to $7.64 to $7.29. So consolidated ARM was held down by geographic mix shift toward lower-priced regions and by FX (Netflix reports 2024 constant-currency ARM growth of 4% versus the 1% reported figure), while paid memberships grew from 167.1 million at end-2019 to 301.6 million at end-2024."
+ },
+ {
+  "id": 2,
+  "soru": "Did TJX beat or miss its Q4 FY 2025 pre-tax margin guidance? Express result as BPS difference",
+  "beklenen": "80bps beat from low end and 70bps beat from high end",
+  "tur": "Beat or Miss",
+  "yanit_1": "TJX beat. In its Q3 FY25 release (8-K filed 20 Nov 2024) TJX guided Q4 FY25 pretax profit margin to 10.8%-10.9% (midpoint 10.85%). Actual Q4 FY25 (13-week quarter ended 1 Feb 2025, 8-K filed 26 Feb 2025) pretax profit margin was 11.6%, up 0.4 pp versus the prior year's 14-week Q4 (11.2%). That is a beat of +70 bps versus the high end of guidance, +80 bps versus the low end and +75 bps versus the midpoint; TJX itself stated the quarter came in 0.7 pp above the high end of its plan, driven mainly by lower-than-expected inventory shrink expense and expense leverage on above-plan sales, partly offset by higher incentive compensation.",
+  "yanit_2": "Says TJX beat; guided ~11.3-11.4% pre-tax margin, reported ~11.6%, so ~20-30bps beat; not confident."
+ },
+ {
+  "id": 3,
+  "soru": "How large was the range (in % terms) for AMD's revenue guidance for Q2 2024, Q3 2024, Q4 2024, and Q1 2025? Format answer as: \"Q[X] [YEAR]: $[X.X] billion (low) to $[X.X] billion (high), [X.X]% of midpoint\". Add line break for each period.",
+  "beklenen": "Q1 2025: $6.8B to $7.4B, 8.5% of midpoint; Q4 2024: $7.2B to $7.8B, 8.0%; Q3 2024: $6.4B to $7.0B, 9.0%; Q2 2024: $5.4B to $6.0B, 10.5%",
+  "tur": "Complex Retrieval",
+  "yanit_1": "Q2 2024 $5.4-6.0B 10.5%; Q3 2024 $6.4-7.0B 9.0%; Q4 2024 $7.2-7.8B 8.0%; Q1 2025 $6.8-7.4B 8.5%; midpoint +/- $300M convention.",
+  "yanit_2": "AMD guided revenue as a midpoint plus or minus $300 million in each of these quarters, so the full range is $600 million wide each time.\nQ2 2024: $5.4 billion (low) to $6.0 billion (high), 10.5% of midpoint\nQ3 2024: $6.4 billion (low) to $7.0 billion (high), 9.0% of midpoint\nQ4 2024: $7.2 billion (low) to $7.8 billion (high), 8.0% of midpoint\nQ1 2025: $6.8 billion (low) to $7.4 billion (high), 8.5% of midpoint\nMidpoints as guided: $5.7bn (given 30 Apr 2024, acc. 0000002488-24-000054), $6.7bn (30 Jul 2024, 0000002488-24-000121), $7.5bn (29 Oct 2024, 0000002488-24-000161) and $7.1bn (4 Feb 2025, 0000002488-25-000009). The relative width narrows over the four quarters because the dollar band was held constant while the revenue base grew."
+ },
+ {
+  "id": 4,
+  "soru": "In 2024, who was Nominated to Serve on BBSI's (NASDAQ: BBSI) Board of Directors?",
+  "beklenen": "Thomas Carley, Joseph Clabby, Thomas Cusick, Gary Kramer, Anthony Meeker, Carla Moradi, Alexandra Morehouse, Vincent Price",
+  "tur": "Qualitative Retrieval",
+  "yanit_1": "BBSI's 2024 definitive proxy statement (DEF 14A filed 22 April 2024, for the 3 June 2024 annual meeting) nominated eight directors for election, all of them incumbents already serving on the Board: Thomas J. Carley (director since 2000), Joseph S. Clabby (2022), Thomas B. Cusick (2016), Gary E. Kramer, the company's President and CEO (2020), Anthony Meeker (1993), Carla A. Moradi (2021), Alexandra Morehouse (2022) and Vincent P. Price (2017). The proxy explicitly states that all director nominees were currently serving on the Board, so no newly named outside nominee was put forward in 2024; a full-text search of BBSI's 2024 filings (including 8-K exhibits) returned no press release announcing a new board nominee.",
+  "yanit_2": "Does not know; will not guess names; points to DEF 14A."
+ },
+ {
+  "id": 5,
+  "soru": "Of AMZN, META, or GOOG, who plans to spend the most in capex in 2025?",
+  "beklenen": "AMZN: $105.2B (guided from Q4 2024 run-rate); GOOG: $75.0B; META: $62.5B midpoint. AMZN plans to spend the most.",
+  "tur": "Complex Retrieval",
+  "yanit_1": "AMZN most (~$100-105B), GOOG ~$75B, META ~$60-65B; ranking AMZN > GOOG > META.",
+  "yanit_2": "On the basis of what was on file with the SEC by 16 May 2025, Amazon appears to be the biggest 2025 capex spender, but only Meta gives an explicit full-year dollar plan. Meta's Q1 2025 10-Q (accession 0001326801-25-000054) states: 'We anticipate making capital expenditures of approximately $64 billion to $72 billion in 2025 to support our core business and generative AI efforts'; Meta's Q1 2025 capex including finance-lease principal was $13.69 billion. Alphabet's Q1 2025 10-Q (accession 0001652044-25-000043) reports $17.2 billion of capex in Q1 2025 versus $12.0 billion in Q1 2024 and says only that it expects to increase its technical-infrastructure investment relative to 2024 in support of AI; no dollar guidance appears in the 10-Q or in the FY2024 10-K (accession 0001652044-25-000014). Amazon's Q1 2025 10-Q (accession 0001018724-25-000036) reports cash capital expenditures of $24.3 billion in Q1 2025 versus $13.9 billion in Q1 2024 and says it expects cash capex to increase in 2025, driven primarily by technology infrastructure, again without a dollar figure. Comparing the only like-for-like data in the filings, Amazon's Q1 run rate (~$97 billion annualized) is above Meta's guided $64-72 billion and roughly $10 billion above Alphabet's much larger Q1 spend gap, so Amazon plans to spend the most, with Alphabet second and Meta third. Note that the exact Alphabet and Amazon full-year 2025 targets were given on earnings calls rather than in SEC filings, so they cannot be sourced with these tools."
+ },
+ {
+  "id": 6,
+  "soru": "Who is the current CFO of Airbnb (NASDAQ: ABNB)?",
+  "beklenen": "Elinor Mertz",
+  "tur": "Qualitative Retrieval",
+  "yanit_1": "Elinor Mertz is Airbnb's Chief Financial Officer. She signed Airbnb's FY2024 Form 10-K (accession 0001559720-25-000010, filed 13 February 2025) as Chief Financial Officer and Principal Financial Officer. The same signature page shows Brian Chesky as CEO and David Bernstein as Chief Accounting Officer. This is the most recent annual report on file as of the 16 May 2025 cutoff.",
+  "yanit_2": "Ellie Mertz, appointed 2024, succeeded Dave Stephenson."
+ },
+ {
+  "id": 7,
+  "soru": "What was the total consideration cost TKO paid to acquired Endeavor assets measured at transaction close?",
+  "beklenen": "$3.25 Billion",
+  "tur": "Quantitative Retrieval",
+  "yanit_1": "Headline ~$3.25 billion but says accounting consideration at close differs and cannot verify.",
+  "yanit_2": "TKO acquired the Endeavor assets (the IMG businesses, On Location and PBR) for total consideration of approximately $3.25 billion plus a $50 million purchase price adjustment, i.e. roughly $3.30 billion, with the price based on the volume-weighted average sale price of TKO Class A common stock over the twenty-five trading days ended 23 October 2024. The consideration was paid entirely in equity: Endeavor Group Holdings received approximately 26.54 million TKO OpCo common units and subscribed for an equivalent number of TKO Class B shares. The deal closed on 28 February 2025 and, because EGH controlled both TKO and the acquired businesses, it was accounted for as a merger of entities under common control, so the net assets were recorded at their historical carrying amounts and prior periods were retrospectively recast rather than the $3.3 billion being pushed through as purchase-accounting fair value. Source: TKO 10-Q for Q1 2025 (accession 0000950170-25-067220)."
+ },
+ {
+  "id": 8,
+  "soru": "How many basis points did MU beat or miss its Q3 2024 GAAP gross margin guidance?",
+  "beklenen": "140bps BEAT",
+  "tur": "Beat or Miss",
+  "yanit_1": "Micron beat its fiscal Q3 2024 GAAP gross margin guidance by about 140 basis points versus the midpoint. In the 20 March 2024 earnings release (acc. 0000723125-24-000004) Micron guided FQ3-24 GAAP gross margin to 25.5% plus or minus 1.5% (range 24.0%-27.0%). Actual FQ3-24 GAAP gross margin, reported 26 June 2024 (acc. 0000723125-24-000016), was 26.9% ($1,832 million on $6,811 million of revenue). That is +1.4 percentage points (140 bps) above the 25.5% midpoint, and it landed 10 bps inside the 27.0% high end of the guided range.",
+  "yanit_2": "Says MU beat; guided ~26.5% +/-1.5pp, reported ~26.9%, so ~40bps beat; not confident."
+ },
+ {
+  "id": 9,
+  "soru": "Calculate the 3 year revenue CAGR for Palantir Technologies.",
+  "beklenen": "2024: 2,865,507; 2022: 1,905,871; CAGR: 14.56%",
+  "tur": "Numerical Reasoning",
+  "yanit_1": "Uses 2021 $1.542B and 2024 $2.866B; CAGR ~22.9%.",
+  "yanit_2": "Using Palantir's reported annual revenue (RevenueFromContractWithCustomerExcludingAssessedTax), FY2021 revenue was $1,541.9 million and FY2024 revenue was $2,865.5 million. The three-year CAGR is (2,865.5/1,541.9)^(1/3) - 1 = 22.9% (about 22.9% per year; total growth of 85.8% over the three years). For reference the intervening years were $1,905.9 million (2022) and $2,225.0 million (2023)."
+ },
+ {
+  "id": 10,
+  "soru": "How many common stock shares are outstanding for ABNB? Format \"Class X: X shares\" add line break.",
+  "beklenen": "Class A: 432,876,657; Class B: 188,462,942; Class C: 0; Class H: 9,200,000",
+  "tur": "Quantitative Retrieval",
+  "yanit_1": "Per the cover page of Airbnb's Q1 2025 Form 10-Q (accession 0001559720-25-000017, filed 1 May 2025), as of April 18, 2025:\nClass A: 431,602,213 shares\nClass B: 185,610,542 shares\nClass C: 0 shares\nClass H: 9,200,000 shares\nTotal outstanding across all classes: 626,412,755 shares.",
+  "yanit_2": "Does not know per-class counts; describes four-class structure; total low-to-mid 600 millions."
+ },
+ {
+  "id": 11,
+  "soru": "Assuming normal March seasonality over last three years, will TSM beat or miss Q2 guidance and by how much? Show work.",
+  "beklenen": "Q1 2025 guidance $25.0B-$25.4B (NT$833,120); Feb->Mar growth 2022 17.0%, 2023 10.9%, 2024 7.5%; Feb 2025 NT$260,009; Mar estimate NT$271,810; Q1 estimate 825,107 vs guidance 833,120 => -1.0% MISS",
+  "tur": "Financial Modeling",
+  "yanit_1": "Cannot do the calculation from memory; no figures.",
+  "yanit_2": "Work, using only what was on file by 16 May 2025. Guidance: in the 17 April 2025 6-K (accession 0001046179-25-000035) TSMC guided Q2 2025 revenue to US$28.4-29.2 billion, i.e. a US$28.8 billion midpoint (FX assumption NT$32.5/US$). Base: the same release reports Q1 2025 (the March quarter) revenue of NT$839.25 billion / US$25.53 billion. Normal March-quarter-to-June-quarter seasonality over the last three years, taken from the Q2 press releases: Q2 2022 NT$534.14bn, +8.8% QoQ (USD +3.4%) - accession 0001564590-22-025726; Q2 2023 NT$480.84bn, -5.5% QoQ (USD -6.2%) - accession 0001628280-23-025146; Q2 2024 NT$673.51bn, +13.6% QoQ (USD +10.3%) - accession 0001046179-24-000083. Three-year average sequential growth is +5.6% in NT$ and +2.5% in USD. Applying that to Q1 2025 gives NT$839.25bn x 1.056 = about NT$886bn, or US$27.3bn at the guided NT$32.5 rate; on the USD series, US$25.53bn x 1.025 = about US$26.2bn. Versus the US$28.8bn midpoint that is a MISS of roughly 5% (NT$-based) to 9% (USD-based). Caveat that cuts the other way: the 9 May 2025 monthly revenue 6-K (accession 0001046179-25-000052) shows April 2025 revenue of NT$349.57 billion, +48.1% YoY, which implies April 2024 was about NT$236bn, i.e. 35% of Q2 2024's NT$673.51bn. If April holds that same 35% share of the quarter, Q2 2025 would be about NT$999bn, or US$30.7bn - a BEAT of about 7%. So plain March-quarter seasonality points to a mid-single-digit to high-single-digit percentage miss, but the one month of actual Q2 data already on file points to a beat; the honest conclusion is that the seasonality-only model is not reliable here because AI-driven demand is breaking the historical sequential pattern."
+ },
+ {
+  "id": 12,
+  "soru": "What is the total amount of director compensation (in dollars) that was paid to the directors of 3D Systems in 2023?",
+  "beklenen": "$2,263,113",
+  "tur": "Numerical Reasoning",
+  "yanit_1": "Total 2023 non-employee director compensation at 3D Systems was $2,263,113, consisting of $913,113 of fees earned or paid in cash and $1,350,000 of stock awards (nine directors each received an annual grant of 18,094 shares valued at $150,000, based on the $8.29 closing price on 16 May 2023); there was no other compensation. Individual totals: Malissia R. Clinton $240,000, William E. Curran $255,000, Claudia N. Drayton $218,113, Thomas W. Erickson $228,764, Jim D. Kever $220,000, Charles G. McClure Jr. $400,000, Kevin S. Moore $245,000, Vasant Padmanabhan $216,236 and John J. Tracy $240,000. Source: 3D Systems DEF 14A filed 13 August 2024 (accession 0001193125-24-199863).",
+  "yanit_2": "Does not know; points to DEF 14A director compensation table."
+ },
+ {
+  "id": 13,
+  "soru": "Approximate Zillow's Free Cash Flow as CFO - Capex. What is the trend of FCF margin over the last 3 years?",
+  "beklenen": "2024: 12.7%; 2023: 11.3%; 2022: 24.8%. Declined substantially since 2022, settled into low teens.",
+  "tur": "Trends",
+  "yanit_1": "Directional only; says FCF margin rose to low-to-mid teens by 2024; not confident; no per-year numbers.",
+  "yanit_2": "Using CFO minus purchases of property and equipment from Zillow Group's XBRL data (as reported in the 10-K filings on file at 16 May 2025), FY2022: CFO $4,504m - capex $115m = FCF $4,389m on revenue $1,958m, an FCF margin of roughly 224%. FY2023: CFO $354m - capex $135m = FCF $219m on revenue $1,945m, an FCF margin of about 11.3%. FY2024: CFO $428m - capex $143m = FCF $285m on revenue $2,236m, an FCF margin of about 12.7%. The trend: the 2022 figure is a one-off distortion, since operating cash flow that year was inflated by the liquidation of the Zillow Offers home inventory rather than by ongoing operations. Excluding that, the underlying trend over the last three years is a step down to a normalized low-double-digit FCF margin in 2023 and then modest improvement in 2024 (about +140 bps), with capex creeping up every year ($115m to $135m to $143m) but CFO growing faster in 2024. So: distorted spike, reset, then gradual improvement."
+ },
+ {
+  "id": 14,
+  "soru": "Calculate the inventory turnover for US Steel in FY2024.",
+  "beklenen": "CoS $14,060; Avg inventory $2,168; turnover 6.49",
+  "tur": "Numerical Reasoning",
+  "yanit_1": "United States Steel Corp (CIK 0001163302; the ticker 'X' is not in SEC's ticker file, so the CIK was used) reported FY2024 cost of goods and services sold of $14,060 million, with inventory of $2,168 million at 12/31/2024 and $2,128 million at 12/31/2023. Inventory turnover on average inventory = 14,060 / 2,148 = 6.5x (about 56 days of inventory). On ending inventory the ratio is 14,060 / 2,168 = 6.5x as well.",
+  "yanit_2": "Cannot give verified number; estimates turnover on the order of 6-7x; COGS mid-$14 billions, inventories around $2 billion."
+ },
+ {
+  "id": 15,
+  "soru": "Summarize the key terms of the Series D mandatory convertible preferred stock (size, closing date, price, liquidation preference, dividend rights, conversion terms, voting rights, purpose) that KKR & Co. (NYSE:KKR) offered in March 2025.",
+  "beklenen": "51,750,000 shares ($2,587,500,000 liquidation preference) + 6,750,000 over-allotment; closing 7 Mar 2025; $50.00/share; liquidation preference $50.00; dividend 6.25%/yr quarterly from 1 Jun 2025 to 1 Mar 2028; mandatory conversion 0.3312-0.4140 KKR shares on ~1 Mar 2028 based on 20-day VWAP; optional conversion at bottom of range; generally no voting rights; no optional redemption; proceeds to acquire equity in core PE portfolio companies and general corporate purposes",
+  "tur": "Complex Retrieval",
+  "yanit_1": "Recalls generic structure ($50 liquidation preference, quarterly dividend, 2028 mandatory conversion) but not size, coupon, date or conversion range.",
+  "yanit_2": "KKR & Co. Inc. priced 6.25% Series D Mandatory Convertible Preferred Stock on 4-5 March 2025 (pricing term sheet FWP, accession 0001140361-25-007061; closing 8-K accession 0001140361-25-007608). Size: upsized from an announced 30,000,000 shares to 45,000,000 shares, plus a 6,750,000-share over-allotment option that the underwriters exercised in full, so 51,750,000 shares, or $2,587,500,000 aggregate liquidation preference, were issued. Trade date 5 March 2025; settlement/closing 7 March 2025, the same day KKR filed the Certificate of Designations in Delaware. Price: $50.00 per share public offering price with a $1.125 per share underwriting discount; net proceeds were approximately $2.53 billion. Liquidation preference: $50.00 per share plus accumulated and unpaid dividends, ranking ahead of common stock and behind debt and senior stock. Dividends: 6.25% per annum on the $50.00 liquidation preference, cumulative and payable when, as and if declared, in cash or (subject to limits) in common stock or a combination; quarterly on 1 March, 1 June, 1 September and 1 December through 1 March 2028, first payment 1 June 2025 of approximately $0.7292 per share and $0.78125 per share thereafter; record dates 15 Feb/May/Aug/Nov. While the preferred is outstanding, no common dividends or buybacks may occur unless all accumulated preferred dividends have been paid or set aside, and parity stock dividends must be paid pro rata. Conversion: mandatory conversion expected 1 March 2028 at between 0.3312 (minimum) and 0.4140 (maximum) common shares per preferred share, based on the 20-trading-day VWAP ending near 1 March 2028; initial price approximately $120.7729, threshold appreciation price approximately $150.9662 (about 25% above the initial price), floor price $42.2705. Holders may convert early at any time at the minimum rate of 0.3312 shares; on a fundamental change they may convert at a fundamental change conversion rate (table ranging 0.3280-0.4140) plus a fundamental change dividend make-whole amount discounted at 4.77% and any accumulated dividend amount. Listed on NYSE as 'KKR PR D' (CUSIP 48251W 500). Purpose: KKR said it intends to use net proceeds to acquire additional equity interests in core private equity portfolio companies reported in its Strategic Holdings segment and for other general corporate purposes. Voting rights: the 8-K states that the Certificate of Designations establishes the voting rights of the preferred but the 8-K and pricing term sheet I read do not summarize them; the detail sits in Exhibit 3.1 to accession 0001140361-25-007608, which I did not read within budget."
+ },
+ {
+  "id": 16,
+  "soru": "How has Airbnb's Annual Take Rate (Revenue/Gross Booking Value) Trended from FY 2022 - 2024?",
+  "beklenen": "2022 13.3%; 2023 13.5%; 2024 13.6%; incrementally increased year over year",
+  "tur": "Trends",
+  "yanit_1": "Airbnb's take rate (revenue divided by Gross Booking Value) has been essentially flat with a small upward drift: FY2022 revenue $8,399 million on GBV of $63,212 million = 13.29%; FY2023 revenue $9,917 million on GBV of $73,252 million = 13.54%; FY2024 revenue $11,102 million on GBV of $81,784 million = 13.57%. That is roughly +25 basis points from 2022 to 2023 and only +3 basis points from 2023 to 2024, so the platform is monetising bookings at a stable rate and revenue growth is being driven by volume and price rather than by higher fees. GBV figures are from the key business metrics tables in the FY2023 10-K (accession 0001559720-24-000006) and the FY2024 10-K (accession 0001559720-25-000010); revenue is the XBRL reported figure from the same annual reports.",
+  "yanit_2": "2022 ~13.3%; 2023 ~13.5%; 2024 ~13.6%; incremental expansion."
+ },
+ {
+  "id": 17,
+  "soru": "Does Workday (NASDAQ: WDAY) report a gross or net retention metric in its annual or quarterly reporting? If so, provide the definition",
+  "beklenen": "Gross Revenue Retention Rate: percentage of recurring revenue retained from existing customers, computed as prior period-end ARR of those customers compared with current period-end ARR from the same customers; accounts for churn but not add-ons or net expansion",
+  "tur": "Qualitative Retrieval",
+  "yanit_1": "Says Workday reports gross revenue retention above 95%; definition paraphrased loosely; not confident on wording.",
+  "yanit_2": "Yes, but only a gross metric, not a net one. In its FY2025 Form 10-K (year ended 31 January 2025, accession 0001327811-25-000056) Workday discloses a gross revenue retention rate of approximately 98% as of 31 January 2025. Workday defines it as the percentage of recurring revenue retained from existing customers, calculated by taking total annual recurring revenue (ARR) of its customers as of the corresponding prior period end and comparing that to the ARR of the same cohort at the current period end. The measure takes into account recurring revenue lost to product or customer churn but does not include additional revenue from add-ons or net expansions, which include volume and price adjustments; ARR represents the annualized value of active subscription contracts at period end. Workday does not report a net revenue retention or net expansion rate."
+ },
+ {
+  "id": 18,
+  "soru": "What is the total value of MSCI's operating leases (in $'s, thousands) that are maturing in the next three years? What percentage?",
+  "beklenen": "$85,002 thousand, 51.3% of leases",
+  "tur": "Numerical Reasoning",
+  "yanit_1": "From MSCI's FY2024 10-K (acc. 0001408198-25-000053), the operating lease liability maturity schedule as of 31 December 2024 shows undiscounted payments of $30,220 thousand in 2025, $30,361 thousand in 2026 and $24,421 thousand in 2027. The total maturing in the next three years is therefore $85,002 thousand (about $85.0 million). Total undiscounted operating lease payments are $165,605 thousand, so the next three years represent approximately 51.3% of MSCI's total remaining operating lease obligations.",
+  "yanit_2": "Does not know; guesses next three years likely roughly a third of total; no figures."
+ },
+ {
+  "id": 19,
+  "soru": "What was ORCL's effective tax rate for the fiscal year ended 5/31/2024 and how did it change vs. the prior year?",
+  "beklenen": "2023: 6.8%; 2024: 10.9%; Delta: increased 410bps",
+  "tur": "Numerical Reasoning",
+  "yanit_1": "Does not have a reliable figure; no rate given.",
+  "yanit_2": "Oracle's effective income tax rate for fiscal 2024 (year ended 31 May 2024) was 10.9%, up from 6.8% in fiscal 2023 (year ended 31 May 2023) - an increase of about 4.1 percentage points, i.e. the rate rose roughly 60% versus the unusually low prior-year rate. Both figures are the EffectiveIncomeTaxRateContinuingOperations values reported in the FY2024 Form 10-K filed 20 June 2024. For context, FY2022 was 12.2%."
+ },
+ {
+  "id": 20,
+  "soru": "What is Shift4's vendor concentration risk as of Dec 31, 2024?",
+  "beklenen": "Merchant processing activity in North America is facilitated by ONE vendor; company believes vendor maintains backup systems and alternative arrangements",
+  "tur": "Qualitative Retrieval",
+  "yanit_1": "Shift4 Payments' FY2024 10-K (accession 0001794669-25-000011, fiscal year ended 31 December 2024) discloses vendor concentration in two places. In the Concentration Risk accounting note: 'The Company's merchant processing activity in North America is facilitated by one vendor,' with management stating it believes that vendor maintains appropriate backup systems and alternative arrangements to avoid a significant processing disruption. The same note adds a related dependency: because Shift4 is not a member bank in North America, it processes card transactions through a sponsorship agreement with a member bank, and if Shift4 breached that agreement the sponsor could terminate it, leaving Shift4 180 days to find an alternative bank sponsor. The risk factor 'Because we rely on third-party vendors to provide products and services, we could be adversely impacted if they fail to fulfill their obligations' expands on this: in the U.S., EU and Canada Shift4 is dependent on its relationship with a single third-party processor for merchant authorization, processing, risk and chargeback monitoring, accounting, and clearing and settlement; there is no assurance backup systems would avoid a significant disruption, and if the processor agreement were terminated or could not be renewed on favorable terms it may be difficult to replace those services. Shift4 also relies on third parties for specific software and devices, notes those providers serve competitors too, and states it does not have long-term or exclusive contracts with them. Consequences flagged include loss of revenue, loss of merchants and software partners, data loss, card-network fines, regulatory action, reputational harm, fraud losses, and added operating and development costs. The filing does not quantify the vendor concentration as a percentage of purchases or costs.",
+  "yanit_2": "Cannot cite the disclosure; gives generic sponsor-bank/card-network concentration discussion; does not mention the single North America processing vendor language."
+ },
+ {
+  "id": 21,
+  "soru": "What was ABNB's gross booking per room night (GBV / nights and experiences booked) over FY 2022-2024?",
+  "beklenen": "2022: $160.44; 2023: $163.51; 2024: $166.23",
+  "tur": "Numerical Reasoning",
+  "yanit_1": "2022 ~$160; 2023 ~$164; 2024 ~$166.",
+  "yanit_2": "Dividing Gross Booking Value by Nights and Experiences Booked gives an implied value per night/experience of about $160.6 in FY2022 ($63,212 million / 393.7 million), $163.4 in FY2023 ($73,252 million / 448.2 million) and about $166.4 in FY2024 ($81,784 million / 491.5 million; the 10-K table rounds nights to 492 million, which gives $166.2). That is roughly +1.8% in 2023 and +1.8% in 2024, a cumulative rise of about 3.6% over the two years, consistent with Airbnb's commentary that higher Average Daily Rate contributed to GBV growth alongside volume. Note this is GBV per night, which is inclusive of host earnings, service fees, cleaning fees and taxes, and it is diluted slightly by experiences being counted in the denominator. Source: key business metrics tables in the FY2023 10-K (accession 0001559720-24-000006) and FY2024 10-K (accession 0001559720-25-000010)."
+ },
+ {
+  "id": 22,
+  "soru": "When is production expected to begin in J M Smucker's (NYSE: SJM) new distribution center in McCalla, Alabama?",
+  "beklenen": "Production expected to begin in 2025",
+  "tur": "Qualitative Retrieval",
+  "yanit_1": "Production has already started: J.M. Smucker's 10-Q for the quarter ended 31 October 2024 (accession 0000091419-24-000103) states that production at the McCalla, Alabama facility began during the second quarter of fiscal 2025 (the quarter ended 31 October 2024). The site, announced in November 2021 as a roughly $1.1 billion investment in a new manufacturing facility and distribution center dedicated to Uncrustables sandwiches, began construction in 2022; capital spending on it was still a main driver of investing cash outflows in the first half of fiscal 2025 ($210.7 million of capex).",
+  "yanit_2": "Not confident; no date given."
+ },
+ {
+  "id": 23,
+  "soru": "As of March 10, 2025, what is the face value of Salesforce's debt excluding their sustainability notes?",
+  "beklenen": "$7.5 Billion",
+  "tur": "Numerical Reasoning",
+  "yanit_1": "No verified figure; guesses roughly $8.5 billion after excluding a ~$1.0B sustainability tranche.",
+  "yanit_2": "Salesforce's FY2025 10-K, filed 5 March 2025 and therefore the filing on file as of 10 March 2025 (acc. 0001108524-25-000006), lists outstanding principal as of 31 January 2025 of: 2028 Senior Notes (3.70%) $1,500m; 2028 Senior Sustainability Notes (1.50%) $1,000m; 2031 Senior Notes (1.95%) $1,500m; 2041 Senior Notes (2.70%) $1,250m; 2051 Senior Notes (2.90%) $2,000m; 2061 Senior Notes (3.05%) $1,250m. The 2024 Senior Notes had been repaid (zero outstanding) and there were no borrowings under the $5.0 billion revolving credit facility. Total face value is $8.5 billion; excluding the $1.0 billion 2028 Senior Sustainability Notes, the face value of Salesforce's debt is $7.5 billion."
+ },
+ {
+  "id": 24,
+  "soru": "Summarize the regulatory risks Paylocity's (NASDAQ: PCTY) lists in its FY 2024 10-K.",
+  "beklenen": "Evolving global data privacy regulation affecting HCM/payroll; federal and state laws incl. FTC rules, HIPAA, CCPA/CPRA, BIPA, breach notification; GDPR and foreign laws via global clients; changing tax/benefit/privacy laws may require product changes, raise costs, delay offerings, reduce demand; possible money transmitter licensing; third-party partner breaches/supply-chain attacks; security incidents damaging trust; increasing cybersecurity regulatory scrutiny",
+  "tur": "Qualitative Retrieval",
+  "yanit_1": "Paylocity's FY2024 10-K (fiscal year ended 30 June 2024) groups regulatory exposure under 'Risks Related to Legal and Regulatory Matters' and the 'Governmental Regulation' discussion in Item 1. The main themes are: (1) changes in regulatory laws applicable to its HCM/payroll software - changes in tax, benefit, wage-and-hour and employment law force costly product modifications, may delay or block new products, or may eliminate the need for existing ones; (2) money transmitter / money services business regulation - new state or federal statutes, or changed regulatory interpretations, could require registration or licensing, restrict how client funds are invested (hurting interest income on client funds), and an unlicensed-operation finding could bring civil and criminal fines, penalties and reputational damage; (3) AI and machine learning regulation - emerging U.S., EU and other legislation on generative AI, plus reputational, IP, privacy, employment and civil-rights litigation risk from AI-powered features; (4) data privacy laws - HIPAA (BeneFLEX and its self-insured plan), GDPR (fines up to 4% of worldwide revenue), CCPA/CPRA, Illinois BIPA, FTC rules, state breach-notification and new state privacy laws, with rising enforcement actions and inconsistent, evolving interpretations; (5) adverse tax laws - new or retroactive income, sales and use tax rules applied to internet-delivered services, and potential liability for past uncollected sales/use taxes plus interest and penalties in states where it has not been charging them; and (6) general litigation exposure from client, employment and personal-data claims that may be uninsured or underinsured. The filing notes this list is not exhaustive.",
+  "yanit_2": "Generic Paylocity risk list from memory; explicitly says may not match FY2024 10-K."
+ },
+ {
+  "id": 25,
+  "soru": "As of June 30, 2024, what % of Microsoft's full-time employees are located outside of the United States? (give the numbers)",
+  "beklenen": "45% (102,000/228,000)",
+  "tur": "Numerical Reasoning",
+  "yanit_1": "45% (102,000/228,000) but flags the split as unverified.",
+  "yanit_2": "Microsoft's FY2024 10-K (accession 0000950170-24-087843, fiscal year ended 30 June 2024) states that as of June 30, 2024 it employed approximately 228,000 people on a full-time basis, 126,000 in the U.S. and 102,000 internationally. So the share located outside the United States is 102,000 / 228,000 = approximately 44.7% (about 45%), with the remaining 126,000 / 228,000 = approximately 55.3% in the U.S."
+ },
+ {
+  "id": 26,
+  "soru": "As of FY 2024, what are the terms of the Junior Subordinated Debentures in the Allstate Corporation's (NYSE: ALL) capital structure?",
+  "beklenen": "$500 million Series A 6.500% Fixed-to-Floating Rate Junior Subordinated Debentures; scheduled maturity 15 May 2057, final maturity 15 May 2067; redeemable in whole or part on/after 15 May 2037 at principal plus accrued interest, or earlier in certain circumstances at principal plus accrued interest or a make-whole price",
+  "tur": "Qualitative Retrieval",
+  "yanit_1": "Per Note 14 (Capital Structure) of Allstate's FY2024 10-K (accession 0000899051-25-000015), as of 31 December 2024 Allstate had $500 million outstanding of Series A 6.500% Fixed-to-Floating Rate Junior Subordinated Debentures. Terms: scheduled maturity date 15 May 2057 with a final maturity date of 15 May 2067; redeemable in whole or in part at any time on or after 15 May 2037 at principal plus accrued and unpaid interest, and in certain circumstances before 15 May 2037 at principal plus accrued interest or, if greater, a make-whole price. Interest is payable semi-annually at the fixed 6.500% rate to 15 May 2037, and thereafter quarterly at three-month LIBOR plus 2.120%, with LIBOR replaced by the CME Term SOFR reference rate for a three-month tenor plus a 0.26161% spread adjustment. Allstate may defer interest for one or more consecutive periods not exceeding 10 years, with interest compounding during deferral; the deferral feature obliges Allstate in certain circumstances to issue common stock or other qualifying securities to fund the deferred interest, and 75 million authorised and unissued shares are reserved for that purpose. While interest is deferred, Allstate is prohibited from declaring or paying dividends or distributions on common or preferred stock or from redeeming or repurchasing such stock, subject to limited exceptions (Allstate did not defer interest in 2024). The debentures are also covered by a replacement capital covenant running to 2067 for the benefit of holders of the $800 million Floating Rate Subordinated Debentures due 2053, under which Allstate will not repay, redeem or purchase the Junior Subordinated Debentures unless it has received specified net cash proceeds from sales of common stock or other qualifying securities, with carve-outs including an S&P upgrade to A or above, a tax-event redemption, and repurchases of up to 10% of principal in any one year (25% in any ten years). Rating agencies give the instrument partial equity credit in Allstate's capital structure. The $500 million balance was unchanged from 31 December 2023.",
+  "yanit_2": "Does not know specific terms; generic hybrid capital description."
+ },
+ {
+  "id": 27,
+  "soru": "What are Netflix's (NASDAQ: NFLX) Total Projected Material Cash Requirements for 2025?",
+  "beklenen": "$14,426,266,000",
+  "tur": "Quantitative Retrieval",
+  "yanit_1": "Does not have the figure; describes where it is disclosed.",
+  "yanit_2": "In its FY2024 10-K (accession 0001065280-25-000044) Netflix reports material cash requirements from known contractual and other obligations of $45.852 billion in total as of 31 December 2024, of which $14.426 billion falls due in the next 12 months (i.e. calendar 2025) and $31.425 billion beyond 12 months. The 2025 portion comprises content obligations of $11.425 billion, debt of $2.487 billion and operating lease obligations of $0.515 billion. Netflix notes the table excludes obligations for unknown future titles, which it believes could total roughly $1 billion to $4 billion over the next three years with the vast majority payable after the next twelve months."
+ },
+ {
+  "id": 28,
+  "soru": "List the Operating KPIs Spirit Airlines (NYSE: SAVE) tracked in FY 2024. Provide the KPI and FY 2024 Total.",
+  "beklenen": "Average aircraft 209.9; aircraft at end of period 213; average daily utilization 9.9 hours; departures 288,180; passenger flight segments 44,180,000; RPMs 43,671,009,000; ASMs 53,017,948,000; load factor 0.824; total revenue per PFS $111.21; average yield 11 cents; TRASM 9.3 cents; CASM; adjusted CASM; adjusted CASM ex-fuel 8.0 cents; fuel gallons 551,819,000; average fuel cost per gallon $2.68",
+  "tur": "Qualitative Retrieval",
+  "yanit_1": "Spirit Airlines' FY2024 10-K (acc. 0001498710-25-000008, filed 3 March 2025) presents these operating statistics with FY2024 totals: Average aircraft 209.9; Aircraft at end of period 213; Average daily aircraft utilization 9.9 hours; Departures 288,180; Passenger flight segments 44,180 thousand; Revenue passenger miles (RPMs) 43,671,009 thousand; Available seat miles (ASMs) 53,017,948 thousand; Load factor 82.4%; Total revenue per passenger flight segment $111.21; Average yield 11.25 cents; TRASM 9.27 cents; CASM 11.35 cents; Adjusted CASM 10.76 cents; Adjusted CASM ex-fuel 7.97 cents; Fuel gallons consumed 551,819 thousand; Average fuel cost per gallon $2.68. Note that 21 of the 213 aircraft were classified as assets held for sale at year end.",
+  "yanit_2": "Lists plausible KPI names but says it does not know any FY2024 values and will not guess."
+ },
+ {
+  "id": 29,
+  "soru": "What is the maximum dilutive impact in number of shares of Snapchat's outstanding convertible notes as of 12/31/2024?",
+  "beklenen": "85,945,127 shares if all converts were converted (including out of the money)",
+  "tur": "Financial Modeling",
+  "yanit_1": "Does not know; describes method.",
+  "yanit_2": "From Snap's FY2024 10-K, principal outstanding at 12/31/2024 and the stated initial conversion rates per $1,000 principal give the maximum share issuance: 2025 Notes $36.24 million at 46.1233 shares = 1.7 million shares; 2026 Notes $249.75 million at 43.8481 = 11.0 million; 2027 Notes $1,150.0 million at 11.2042 = 12.9 million; 2028 Notes $1,500.0 million at 17.7494 = 26.6 million; 2030 Notes $750.0 million at 45.0846 = 33.8 million. Total principal $3,686.0 million, implying approximately 85.9 million Class A shares of maximum dilution if every note converted fully into stock at the initial conversion rates (Snap can settle in cash, stock or a mix). This is a floor on the maximum: conversion rates can be increased for make-whole fundamental changes or redemptions. Snap also bought capped call hedges (cap prices $32.12, $32.58, $121.02, $93.90 and $33.48 for the 2025/2026/2027/2028/2030 notes) that offset dilution economically. As of 12/31/2024 the if-converted value did not exceed principal and the sale-price conversion condition was not met."
+ },
+ {
+  "id": 30,
+  "soru": "Assume BROS grows revenue by 30% CAGR and gross margins compress by 500bps from YE 2024. What is BROS gross profit in 2026? Round to nearest million.",
+  "beklenen": "$467 million",
+  "tur": "Financial Modeling",
+  "yanit_1": "Roughly $467 million. Basis (Dutch Bros FY2024 XBRL as reported in its FY2024 10-K filed 13 February 2025): revenue $1,281.0 million and cost of sales (us-gaap:CostOfGoodsAndServicesSold) $940.9 million, giving 2024 gross profit of $340.1 million and a gross margin of 26.55%. Applying a 30% revenue CAGR for two years: $1,281.0m x 1.30^2 = $2,164.9 million of 2026 revenue. Compressing the gross margin by 500 basis points: 26.55% - 5.00% = 21.55%. 2026 gross profit = $2,164.9m x 21.55% = $466.6 million, i.e. approximately $467 million (about $2,165 million revenue less about $1,698 million cost of sales). Note that Dutch Bros does not report a us-gaap GrossProfit tag; this uses its reported cost of sales line, which for its company-operated shops includes beverage/food/packaging, labor and occupancy costs.",
+  "yanit_2": "Cannot give a reliable number; computes 2026 revenue ~$2.17B but refuses gross profit for lack of margin base."
+ },
+ {
+  "id": 31,
+  "soru": "For loanDepot (NYSE: LDI) what is the breakdown of loan originations between purchases and refinancings for the last 9 months as of 11/12/2024?",
+  "beklenen": "Purchase: $12,057,993 thousand; Refinance: $5,250,321 thousand",
+  "tur": "Quantitative Retrieval",
+  "yanit_1": "Does not know; describes where disclosed.",
+  "yanit_2": "From loanDepot's Form 10-Q for the quarter ended 30 September 2024, filed 12 November 2024 (accession 0001831631-24-000285), loan originations by purpose for the nine months ended 30 September 2024 were: purchase $12,057,993 thousand (about $12.06 billion) and refinance $5,250,321 thousand (about $5.25 billion), for total originations of $17,308,314 thousand (about $17.31 billion). That is a mix of roughly 69.7% purchase and 30.3% refinance. For comparison, the same nine-month period in 2023 was purchase $12,403,166 thousand and refinance $4,897,857 thousand on total originations of $17,301,023 thousand (71.7% purchase / 28.3% refinance), so total volume was essentially flat year over year while the mix shifted modestly toward refinance. For the third quarter alone, purchase was $4,378,575 thousand and refinance $2,280,754 thousand on $6,659,329 thousand of total originations."
+ },
+ {
+  "id": 32,
+  "soru": "What would be the impact to net income in dollars and percent if all debt for Boeing in 2024 were refinanced at 3% higher interest rates than current?",
+  "beklenen": "$1.261 Billion negative impact to net income, a 10.7% decrease",
+  "tur": "Adjustments",
+  "yanit_1": "Boeing's total debt at 31 December 2024 was $53,864 million (10-K accession 0000012927-25-000015, Note 16), of which $1,278 million was short-term or current. Refinancing all of it at rates 3 percentage points higher would add roughly $53,864m x 3% = $1,616 million of pre-tax interest per year, which would raise interest incurred from the $2,874 million actually recorded in 2024 to about $4,490 million (+56%). Against 2024 net loss attributable to shareholders of $11,817 million, the after-tax effect depends on the tax assumption: with no tax benefit recognised the loss widens by the full $1,616 million to about $13,433 million, i.e. a 13.7% larger loss; applying a 21% US statutory benefit the effect is about $1,277 million, widening the loss to roughly $13,094 million, i.e. 10.8% worse. Note this is a static calculation on the year-end debt balance and ignores the portion of interest that Boeing capitalises ($149 million in 2024).",
+  "yanit_2": "Approach only; estimates ~$1.6B pre-tax impact, roughly 13-14%; flags inputs unverified."
+ },
+ {
+  "id": 33,
+  "soru": "In fiscal 2024, what percentage of Cloudflare's (NYSE: NET) customers were derived from channel partners?",
+  "beklenen": "20%",
+  "tur": "Quantitative Retrieval",
+  "yanit_1": "Does not know; guesses roughly a fifth to a quarter; cannot confirm metric definition.",
+  "yanit_2": "I could not find this figure with these tools. Cloudflare's FY2024 10-K (acc. 0001477333-25-000043) describes selling indirectly through an ecosystem of channel partners (managed service providers, resellers, distributors and global system integrators) and carries risk-factor language about dependence on channel partners, but I found no disclosed percentage of customers (or of revenue) attributable to channel partners in that filing. The only comparable percentage disclosed is geographic: 49% of 2024 revenue came from international customers. The cutoff did not prevent this - the FY2024 10-K was filed 20 February 2025, well before 16 May 2025."
+ },
+ {
+  "id": 34,
+  "soru": "For the fiscal year ended 12/31/2023, what was Uber's (NYSE: UBER) largest adjustment to EBITDA? Provide the line item and amount in billions.",
+  "beklenen": "Stock-Based Compensation Expense: $1.935B",
+  "tur": "Adjustments",
+  "yanit_1": "In Uber's Adjusted EBITDA reconciliation for the year ended 31 December 2023, the largest single adjustment line was stock-based compensation expense of $1,935 million, i.e. about $1.9 billion added back to net income. The next largest item was other (income) expense, net of $(1,844) million (about $1.8 billion deducted, mainly unrealized gains on equity investments), followed by depreciation and amortization of $823 million and interest expense of $633 million. Net income attributable to Uber of $1,887 million reconciled to Adjusted EBITDA of $4,052 million. Figures read from the FY2024 10-K, which presents the 2023 comparative column.",
+  "yanit_2": "Says stock-based compensation ~$1.9B is largest; not confident on exact amounts."
+ },
+ {
+  "id": 35,
+  "soru": "What price was RDFN acquired at? (include price per share, equity value and enterprise value)",
+  "beklenen": "0.7926 shares of Rocket Companies class A stock per Redfin share; equity value $1.75 billion; total enterprise value $2.4 billion",
+  "tur": "Quantitative Retrieval",
+  "yanit_1": "$12.50 per Redfin share all-stock, ~$1.75B equity value; enterprise value $2.0-2.4B range, not pinned; note per-share price is stock ratio in expected answer.",
+  "yanit_2": "Redfin (NASDAQ: RDFN, CIK 0001382821) agreed on 9-10 March 2025 to be acquired by Rocket Companies (NYSE: RKT) in an all-stock transaction. Per the joint announcement filed as Exhibit 99.1 to Rocket's 8-K (accession 0000950142-25-000696, filed 10 March 2025; also filed by Redfin as accession 0001628280-25-011457 / Form 425 accession 0000950142-25-000697): the price was $12.50 per Redfin share, or $1.75 billion of equity value. Each Redfin share is to be exchanged for a fixed ratio of 0.7926 shares of Rocket Companies Class A common stock, a 63% premium to Redfin's 30-day VWAP ending 7 March 2025. Rocket said it expects more than $200 million of run-rate synergies by 2027 (about $140 million cost, more than $60 million revenue) and accretion to adjusted EPS by end-2026. The filings I read do not disclose an enterprise value for the transaction - the press release quotes only the per-share price and the $1.75 billion equity value - so I could not source an enterprise value figure with these tools."
+ },
+ {
+  "id": 36,
+  "soru": "As of Dec 31, 2024, what was Warner Bros Discovery's (NASDAQ: WBD) Total Restructuring Costs incurred as a result of its 2022 Merger?",
+  "beklenen": "$4.7 Billion",
+  "tur": "Quantitative Retrieval",
+  "yanit_1": "Warner Bros. Discovery does not disclose a single cumulative merger-restructuring total, but Note 6 of its FY2024 10-K (accession 0001437107-25-000031) states that the restructuring programme was launched in connection with the completion of the 8 April 2022 Merger with AT&T's WarnerMedia business and that the merger-related restructuring programme was considered substantially completed as of 31 December 2024. Summing the restructuring and other charges reported for the programme period gives $3,757 million in 2022 plus $585 million in 2023 plus $447 million in 2024, i.e. approximately $4,789 million (about $4.8 billion) of restructuring and other charges from the merger through 31 December 2024. By segment the 2022/2023/2024 charges were Studios $1,050m/$225m/$263m, Networks $1,003m/$201m/$85m, DTC $1,551m/$66m/$3m and Corporate and inter-segment eliminations $153m/$93m/$96m. Two caveats: the 2023 and 2024 amounts also include some non-merger initiatives (the 2023 Warner Bros. Pictures Animation realignment and, in 2024, an organisational and personnel restructuring plan and a Warner Bros. Games restructuring), and a further $411 million of facility consolidation impairment charges in 2024 was recorded in impairment and loss on dispositions rather than in restructuring and other charges. The restructuring liability balance fell from $864 million at end-2022 to $460 million at end-2023 and $289 million at end-2024, with cash paid of $853 million in 2023 and $423 million in 2024.",
+  "yanit_2": "Does not know cumulative figure."
+ },
+ {
+  "id": 37,
+  "soru": "How did Lyft's Q4'24 Adjusted EBITDA margin (adjusted EBITDA / Gross Bookings) compare to management guidance at midpoint in Q3'24?",
+  "beklenen": "Beat by 26.1bps at midpoint",
+  "tur": "Beat or Miss",
+  "yanit_1": "Says Lyft slightly ahead, ~15-25bps better than guided midpoint; all figures flagged unverified.",
+  "yanit_2": "Lyft beat. In the Q3'24 release (8-K filed 6 November 2024, accession 0001759509-24-000121) management guided Q4'24 to Gross Bookings of $4.28-$4.35 billion and Adjusted EBITDA of $100-$105 million, an Adjusted EBITDA margin of approximately 2.3% to 2.4% of Gross Bookings, i.e. a 2.35% midpoint. Actual Q4'24 (8-K filed 11 February 2025, accession 0001759509-25-000009) Adjusted EBITDA was $112.8 million and the Adjusted EBITDA margin was 2.6% of Gross Bookings, versus 1.8% in Q4'23. That is about 25 bps above the guidance midpoint and 20 bps above the high end, with Adjusted EBITDA about $10 million above the top of the guided range."
+ },
+ {
+  "id": 38,
+  "soru": "What financial metrics does Delta Airlines (NYSE: DAL) guide on in its quarterly earnings reports?",
+  "beklenen": "Quarterly: total revenue YoY growth, operating margin, EPS. Full year: EPS YoY growth, free cash flow, gross leverage",
+  "tur": "Qualitative Retrieval",
+  "yanit_1": "In its quarterly earnings releases Delta gives a 'Financial Guidance' table of non-GAAP metrics. For the coming quarter it guides on three items: total revenue year-over-year growth, operating margin, and earnings per share. For example the March quarter 2025 release (acc. 0001683168-25-002353) guided 2Q25 to total revenue down 2% to up 2%, operating margin 11%-14% and EPS $1.70-$2.30. Alongside that, the full-year outlook given in the December-quarter release (acc. 0001683168-25-000182) guides on earnings per share growth (FY2025: greater than 10%), free cash flow (greater than $4 billion) and gross leverage / adjusted debt to EBITDAR (2x or less), which are also framed against 3-5 year targets. Note that in the April 2025 release Delta declined to reaffirm its full-year 2025 guidance given macro uncertainty, keeping only the quarterly revenue/margin/EPS guide.",
+  "yanit_2": "Lists adjusted EPS, revenue growth, operating margin, CASM-ex, fuel price, capacity, plus full-year FCF, capex, leverage."
+ },
+ {
+  "id": 39,
+  "soru": "What adjustments does Airbnb (NASDAQ: ABNB) make to its Net Income to Derive Adjusted EBITDA?",
+  "beklenen": "Provision for (benefit from) income taxes; other income (expense), net; interest income; depreciation and amortization; stock-based compensation; acquisition-related impacts incl. fair value changes of contingent consideration; lodging/withholding/transactional taxes with significant uncertainty",
+  "tur": "Adjustments",
+  "yanit_1": "Lists taxes, D&A, SBC, acquisition-related items, lodging tax reserves, interest income/expense, other income.",
+  "yanit_2": "Per Airbnb's FY2024 10-K, Adjusted EBITDA is net income adjusted for: provision for (benefit from) income taxes; other income (expense), net; interest income; depreciation and amortization; stock-based compensation expense; acquisition-related impacts (gains/losses from changes in the fair value of contingent consideration arrangements); and lodging taxes for which Airbnb may have joint and several liability with hosts, withholding taxes on payments to hosts and related settlements, and transactional taxes where there is significant uncertainty over how the taxes apply to its platform. In 2024 these were: income taxes $683M, other expense net $40M, interest income $(818)M, D&A $65M, stock-based compensation $1,407M, acquisition-related impacts $(7)M and lodging/host withholding/transactional taxes net $23M, taking net income of $2,648M to Adjusted EBITDA of $4,041M (36% margin)."
+ },
+ {
+  "id": 40,
+  "soru": "What was FND same-store sales growth in Q4 2024?",
+  "beklenen": "-0.8%",
+  "tur": "Quantitative Retrieval",
+  "yanit_1": "Floor & Decor's comparable store sales decreased 0.8% in the fourth quarter of fiscal 2024 (the quarter ended 26 December 2024). Source: the Q4/FY2024 earnings release filed as Exhibit 99.1 to its 8-K, accession 0001507079-25-000012, filed 20 February 2025. For context in the same release, Q4 net sales were $1,107.4 million, up 5.7% from $1,048.1 million a year earlier, diluted EPS was $0.44, operating income was $59.2 million (up 28.3%), and 10 new warehouse stores opened, ending at 251 warehouse stores and five design studios. Full-year fiscal 2024 comparable store sales fell 7.1% on net sales of $4,455.8 million, and the company guided fiscal 2025 comps to approximately flat to +3.0%.",
+  "yanit_2": "Not confident; says small negative low single digits or roughly breakeven; no figure stated."
+ },
+ {
+  "id": 41,
+  "soru": "Compare the FY24 dividend payout ratio of Coca-Cola (KO) to that of its competitors and rank from highest to lowest.",
+  "beklenen": "KDP 0.83; KO 0.79; PEP 0.75; KHC 0.70; SJM 0.59",
+  "tur": "Market Analysis",
+  "yanit_1": "Cannot produce verified ranking; guesses KO ~75-80%, PEP similar, KDP lower, and adds MNST (0%) which is not in the expected peer set.",
+  "yanit_2": "Using FY2024 cash dividends paid divided by net income attributable to the parent (both from the companies' FY2024 XBRL data as reported in their FY2024 10-Ks), the ranking from highest to lowest payout ratio is: 1) Keurig Dr Pepper (KDP) 82.9% ($1,194 million of dividends on $1,441 million of net income); 2) Coca-Cola (KO) 78.6% ($8,359 million on $10,631 million); 3) PepsiCo (PEP) 75.5% ($7,229 million on $9,578 million); 4) Monster Beverage (MNST) 0%, as Monster reports no dividend payments at all (no PaymentsOfDividends fact exists for the company). So Coca-Cola sits in the middle of its large-cap beverage peers - well above PepsiCo but below Keurig Dr Pepper, and far above Monster, which returns capital only through buybacks. Two points of caution: KO's 2024 net income was depressed by the fairlife contingent consideration and IRS tax-litigation deposit effects, which flatters its payout ratio, and KDP's 2024 net income also fell sharply year over year (from $2,181 million in 2023), inflating its ratio; on 2023 net income KDP's payout would have been about 52%. On a dividends-per-share over diluted-EPS basis PepsiCo's FY2024 ratio is 76.7% ($5.33 / $6.95), consistent with the cash-flow calculation. These figures come from the companies' FY2024 annual-report XBRL facts rather than from reading a specific document, so no accession numbers are cited."
+ },
+ {
+  "id": 42,
+  "soru": "What portion of Uber's 2024 revenue growth was driven by take-rate expansion versus volume growth?",
+  "beklenen": "Take rate 2023: 27.04%, 2024: 27.02% (virtually flat). Revenue growth 18%, gross bookings growth 18% (mobility 25%, delivery 17%, freight 2%). All growth from volume, not take rate.",
+  "tur": "Financial Modeling",
+  "yanit_1": "Essentially all of Uber's 2024 revenue growth was volume-driven; take rate was flat to very slightly negative. From the FY2024 10-K (accession 0001543151-25-000008): Gross Bookings rose from $137,865 million in 2023 to $162,773 million in 2024 (+$24,908 million, +18%, +21% constant currency) while revenue rose from $37,281 million to $43,978 million (+$6,697 million, +18%). Implied take rate was 27.04% in 2023 versus 27.02% in 2024, roughly 2 bps lower. Decomposing the $6,697 million increase at 2023 take rate: volume (Gross Bookings) growth contributed about $6,736 million, or roughly 101% of the increase, while the change in take rate subtracted about $39 million, roughly -0.6%. Uber's own explanation matches: revenue was 'up 18% year-over-year, primarily attributable to an increase in Gross Bookings of 18%', with Mobility Gross Bookings +25% and Delivery +17% constant currency driven by trip volumes. Note take rate is a derived figure, not a metric Uber reports.",
+  "yanit_2": "Cannot decompose reliably; says both grew ~18% so growth essentially volume-driven; no take rate values."
+ },
+ {
+  "id": 43,
+  "soru": "In 2024, what was the Average Nights per Booking for Airbnb (NASDAQ: ABNB) in the Asia Pacific region?",
+  "beklenen": "Asia Pacific - 3.3 nights per booking",
+  "tur": "Quantitative Retrieval",
+  "yanit_1": "Does not know and doubts it is disclosed; refuses to estimate.",
+  "yanit_2": "Airbnb's average nights per booking in the Asia Pacific region was 3.3 nights in 2024. This is disclosed in the MD&A of Airbnb's FY2024 10-K (acc. 0001559720-25-000010): total company average nights per booking excluding experiences was 3.8 in 2024 (versus 3.9 in 2023), split by region as 4.1 for North America, 3.8 for EMEA, 3.7 for Latin America and 3.3 for Asia Pacific - making Asia Pacific the shortest average stay of the four regions."
+ },
+ {
+  "id": 44,
+  "soru": "In 2024, what was Airbnb's (NASDAQ: ABNB) adjustment for Stock-based Compensation Expense?",
+  "beklenen": "$1,407,000,000 excluded from adjusted EBITDA",
+  "tur": "Adjustments",
+  "yanit_1": "In Airbnb's 2024 Adjusted EBITDA reconciliation, the stock-based compensation expense adjustment was $1,407 million, up from $1,120 million in 2023. It was the largest single add-back in the reconciliation, which took 2024 net income of $2,648 million to Adjusted EBITDA of $4,041 million.",
+  "yanit_2": "Says on the order of $1.4 billion; not confident on exact figure."
+ },
+ {
+  "id": 45,
+  "soru": "As of December 2024, what has been Zillow's (NASDAQ: Z) acquisition strategy over the past 2 years and how does it align with the company's evolving revenue mix?",
+  "beklenen": "Acquired subscription revenue platforms: Follow Up Boss (CRM) for $399M plus up to $100M contingent on 8 Dec; Spruce (title/escrow) $19M on 11 Sep; Aryeo (real estate photography software) $35M on 31 Jul. Mortgages and Residential/Premier Agent revenue declined post-COVID; company adding software subscription businesses to round out home-buying services.",
+  "tur": "Market Analysis",
+  "yanit_1": "Follow Up Boss ~$400 million in late 2023 plus smaller deals; mentions Aryeo; misses Spruce and the exact amounts/dates; flags verification needed.",
+  "yanit_2": "Per Zillow Group's FY2024 10-K (accession 0001617640-25-000016, filed 11 February 2025), the acquisitions of the prior two years were all completed in 2023 and were tuck-in purchases of software and transaction-services capability rather than balance-sheet-heavy home buying: Aryeo, a software company serving real estate photographers, on 31 July 2023 for about $35 million total ($15 million cash net of cash acquired plus 380,259 Class C shares valued at $20 million); substantially all assets and liabilities of Spruce, a tech-enabled title and escrow platform, on 11 September 2023 for about $19 million cash; and Follow Up Boss, a CRM for real estate professionals, on 8 December 2023 for $399 million cash net of cash acquired plus contingent consideration of up to $100 million over three years (total purchase price $484 million, of which $402 million goodwill and $86 million intangibles - developed technology $50 million, customer relationships $34 million, trade names $2 million). Zillow explicitly frames the Follow Up Boss deal as 'consistent with our strategy to invest in a more integrated software experience for our customers.' No material business combinations are disclosed for 2024, so the strategy in the period was to digest the 2023 software/services acquisitions rather than to keep buying. This lines up with the revenue mix disclosed in Note 17: total revenue of $2,236 million in 2024 versus $1,945 million in 2023 and $1,958 million in 2022, split as Residential $1,594 million (71% of revenue, up 10%), Mortgages $145 million (6%, up 51%), Rentals $453 million (20%, up 27%) and Other $44 million (2%). The fastest-growing lines are exactly the ones the acquisitions feed: Follow Up Boss and Aryeo deepen the agent software/listing-media layer that supports Premier Agent and the enhanced-market Residential business, while Spruce brings title and escrow in-house to capture more of the adjacent transaction economics alongside the mortgage originations business. In other words, the acquisitions push Zillow further from a pure advertising-marketplace revenue base toward integrated software plus transaction services, matching the shift in mix toward Rentals and Mortgages, which together went from about 23% of revenue in 2023 to about 27% in 2024."
+ },
+ {
+  "id": 46,
+  "soru": "Did FOUR beat or miss its end to end payment volume guidance at midpoint for Q3 2024 provided in Q1 2024? Express as % BEAT or MISS",
+  "beklenen": "7.4% MISS",
+  "tur": "Beat or Miss",
+  "yanit_1": "MISS by approximately 7.5%. In its Q1 2024 shareholder letter, filed as Exhibit 99.1 to the 8-K of 9 May 2024 (accession 0001794669-24-000014), Shift4 broke its 2024 guidance down by quarter for the first time and guided Q3 2024 end-to-end payment volume to $46.0 billion to $48.0 billion, a midpoint of $47.0 billion. Actual Q3 2024 end-to-end payment volume was $43,483.9 million, i.e. $43.48 billion, per the key performance indicators table in the Form 10-Q for the quarter ended 30 September 2024 (accession 0001794669-24-000033). That is $3.52 billion below the midpoint, or -7.5% ((43.484 - 47.0) / 47.0). It also fell short of the bottom of the guided range by 5.5%. Note that volume still grew 56% year over year (from $27.93 billion in Q3 2023), so the shortfall was against guidance rather than a decline in the business.",
+  "yanit_2": "Does not know; questions the premise; will not fabricate."
+ },
+ {
+  "id": 47,
+  "soru": "How did Lemonade Insurance FY2024 results compare to the prior quarter's full year guidance?",
+  "beklenen": "IFP $944M at high end; GEP $827M above high end; revenue $526.5M above high end; adjusted EBITDA loss $(149.7)M above high end; SBC $64.5M above expected $64M; capex $9.4M below expected $10M; weighted common shares 71M on target",
+  "tur": "Beat or Miss",
+  "yanit_1": "Cannot verify; recalls IFP around $944 million and a beat across metrics; flags all figures unverified.",
+  "yanit_2": "Lemonade met or beat every line of the full-year 2024 guidance it had given one quarter earlier. Guidance in the Q3 2024 shareholder letter (8-K filed 30 October 2024, accession 0001691421-24-000128) was: in force premium $940-944 million, gross earned premium $823-826 million, revenue $522-524 million and an adjusted EBITDA loss of $151-155 million. Reported FY2024 results (8-K filed 25 February 2025, accession 0001691421-25-000021) were: IFP $943.7 million (top of the range, +26% year over year), gross earned premium $827.3 million (about $1.3 million above the high end), total revenue $526.5 million (about $2.5 million above the high end, +22% year over year) and an adjusted EBITDA loss of $149.7 million (about $1.3 million smaller than the smallest guided loss, versus $172.6 million in 2023). GAAP net loss was $202.2 million versus $236.9 million in 2023, and the year was Lemonade's first full year of positive adjusted free cash flow at $48 million."
+ },
+ {
+  "id": 48,
+  "soru": "How many times has General Mills beaten Adjusted Diluted EPS guidance in the past 2 years and what is the guidance for 2025?",
+  "beklenen": "2023 projected $3.94-$4.06, actual $4.30 BEAT; 2024 projected $4.47-$4.56, actual $4.52 beat midpoint; beaten twice; 2025 guidance $4.47-$4.57",
+  "tur": "Beat or Miss",
+  "yanit_1": "General Mills beat its adjusted diluted EPS guidance in each of the last two completed fiscal years, so 2 out of 2. Fiscal 2023: the raised guidance in the Q3 release of 23 March 2023 (acc. 0001193125-23-077267) called for adjusted diluted EPS up 8% to 9% in constant currency; the actual result reported 28 June 2023 (acc. 0001193125-23-176744) was $4.30, up 10% in constant currency - a beat. Fiscal 2024: guidance reaffirmed in the Q3 release of 20 March 2024 (acc. 0001193125-24-072050) was adjusted diluted EPS up 4% to 5% in constant currency; the actual result reported 26 June 2024 (acc. 0001193125-24-168511) was $4.52, up 6% in constant currency - a beat. For fiscal 2025, initial guidance issued in June 2024 was adjusted diluted EPS between down 1% and up 1% in constant currency off the $4.52 fiscal 2024 base; that was cut twice, and as of the Q3 release on 19 March 2025 (acc. 0001193125-25-057150) fiscal 2025 adjusted diluted EPS is expected to be down 8% to down 7% in constant currency (previously down 4% to down 2%), with the guidance excluding any impact from new 2025 tariff actions. Fiscal 2025 actual results were not yet on file as of 16 May 2025.",
+  "yanit_2": "Cannot answer with confidence; no count, no 2025 range."
+ },
+ {
+  "id": 49,
+  "soru": "By how much did AMD beat/miss its non-GAAP gross profit guide in each of the last 4 quarters, and what was the average?",
+  "beklenen": "Q1 2024 $2,861M (1.9% BEAT); Q2 2024 $3,101M (2.6% BEAT); Q3 2024 $3,657M (2.0% BEAT); Q4 2024 $4,140M (2.2% BEAT); average 2.2% BEAT",
+  "tur": "Beat or Miss",
+  "yanit_1": "Cannot compute reliably; recalls gross margin guides ~53-54% and revenue midpoints; no dollar beats or average.",
+  "yanit_2": "AMD guides non-GAAP gross margin as a percentage, so the implied non-GAAP gross profit guide is midpoint revenue guidance times the guided margin. Q2 2024: guide $5.7B x 53.0% = $3,021M vs actual $3,101M, a beat of $80M. Q3 2024: guide $6.7B x 53.5% = $3,585M vs actual $3,657M, a beat of $73M. Q4 2024: guide $7.5B x 54.0% = $4,050M vs actual $4,140M, a beat of $90M. Q1 2025: guide $7.1B x 54.0% = $3,834M vs actual $3,992M, a beat of $158M. AMD beat in all four quarters, with an average beat of about $100 million (roughly 2.6% above the implied guide on average). Guidance figures come from the prior quarter's earnings release (8-Ks of 30 Apr 2024, 30 Jul 2024, 29 Oct 2024 and 4 Feb 2025) and actuals from the release for each quarter."
+ }
+]

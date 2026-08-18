@@ -1,0 +1,72 @@
+[
+  {
+    "id": 2,
+    "cevap": "TJX beat. In its Q3 FY25 release (8-K filed 20 Nov 2024) TJX guided Q4 FY25 pretax profit margin to 10.8%-10.9% (midpoint 10.85%). Actual Q4 FY25 (13-week quarter ended 1 Feb 2025, 8-K filed 26 Feb 2025) pretax profit margin was 11.6%, up 0.4 pp versus the prior year's 14-week Q4 (11.2%). That is a beat of +70 bps versus the high end of guidance, +80 bps versus the low end and +75 bps versus the midpoint; TJX itself stated the quarter came in 0.7 pp above the high end of its plan, driven mainly by lower-than-expected inventory shrink expense and expense leverage on above-plan sales, partly offset by higher incentive compensation.",
+    "arac_cagrisi": 7,
+    "erisim_numaralari": ["0000109198-24-000056", "0000109198-25-000006"],
+    "kesim_engelledi": false
+  },
+  {
+    "id": 7,
+    "cevap": "TKO acquired the Endeavor assets (the IMG businesses, On Location and PBR) for total consideration of approximately $3.25 billion plus a $50 million purchase price adjustment, i.e. roughly $3.30 billion, with the price based on the volume-weighted average sale price of TKO Class A common stock over the twenty-five trading days ended 23 October 2024. The consideration was paid entirely in equity: Endeavor Group Holdings received approximately 26.54 million TKO OpCo common units and subscribed for an equivalent number of TKO Class B shares. The deal closed on 28 February 2025 and, because EGH controlled both TKO and the acquired businesses, it was accounted for as a merger of entities under common control, so the net assets were recorded at their historical carrying amounts and prior periods were retrospectively recast rather than the $3.3 billion being pushed through as purchase-accounting fair value. Source: TKO 10-Q for Q1 2025 (accession 0000950170-25-067220).",
+    "arac_cagrisi": 6,
+    "erisim_numaralari": ["0000950170-25-067220"],
+    "kesim_engelledi": false
+  },
+  {
+    "id": 12,
+    "cevap": "Total 2023 non-employee director compensation at 3D Systems was $2,263,113, consisting of $913,113 of fees earned or paid in cash and $1,350,000 of stock awards (nine directors each received an annual grant of 18,094 shares valued at $150,000, based on the $8.29 closing price on 16 May 2023); there was no other compensation. Individual totals: Malissia R. Clinton $240,000, William E. Curran $255,000, Claudia N. Drayton $218,113, Thomas W. Erickson $228,764, Jim D. Kever $220,000, Charles G. McClure Jr. $400,000, Kevin S. Moore $245,000, Vasant Padmanabhan $216,236 and John J. Tracy $240,000. Source: 3D Systems DEF 14A filed 13 August 2024 (accession 0001193125-24-199863).",
+    "arac_cagrisi": 3,
+    "erisim_numaralari": ["0001193125-24-199863"],
+    "kesim_engelledi": false
+  },
+  {
+    "id": 17,
+    "cevap": "Yes, but only a gross metric, not a net one. In its FY2025 Form 10-K (year ended 31 January 2025, accession 0001327811-25-000056) Workday discloses a gross revenue retention rate of approximately 98% as of 31 January 2025. Workday defines it as the percentage of recurring revenue retained from existing customers, calculated by taking total annual recurring revenue (ARR) of its customers as of the corresponding prior period end and comparing that to the ARR of the same cohort at the current period end. The measure takes into account recurring revenue lost to product or customer churn but does not include additional revenue from add-ons or net expansions, which include volume and price adjustments; ARR represents the annualized value of active subscription contracts at period end. Workday does not report a net revenue retention or net expansion rate.",
+    "arac_cagrisi": 2,
+    "erisim_numaralari": ["0001327811-25-000056"],
+    "kesim_engelledi": false
+  },
+  {
+    "id": 22,
+    "cevap": "Production has already started: J.M. Smucker's 10-Q for the quarter ended 31 October 2024 (accession 0000091419-24-000103) states that production at the McCalla, Alabama facility began during the second quarter of fiscal 2025 (the quarter ended 31 October 2024). The site, announced in November 2021 as a roughly $1.1 billion investment in a new manufacturing facility and distribution center dedicated to Uncrustables sandwiches, began construction in 2022; capital spending on it was still a main driver of investing cash outflows in the first half of fiscal 2025 ($210.7 million of capex).",
+    "arac_cagrisi": 2,
+    "erisim_numaralari": ["0000091419-24-000103"],
+    "kesim_engelledi": false
+  },
+  {
+    "id": 27,
+    "cevap": "In its FY2024 10-K (accession 0001065280-25-000044) Netflix reports material cash requirements from known contractual and other obligations of $45.852 billion in total as of 31 December 2024, of which $14.426 billion falls due in the next 12 months (i.e. calendar 2025) and $31.425 billion beyond 12 months. The 2025 portion comprises content obligations of $11.425 billion, debt of $2.487 billion and operating lease obligations of $0.515 billion. Netflix notes the table excludes obligations for unknown future titles, which it believes could total roughly $1 billion to $4 billion over the next three years with the vast majority payable after the next twelve months.",
+    "arac_cagrisi": 2,
+    "erisim_numaralari": ["0001065280-25-000044"],
+    "kesim_engelledi": false
+  },
+  {
+    "id": 32,
+    "cevap": "Boeing's total debt at 31 December 2024 was $53,864 million (10-K accession 0000012927-25-000015, Note 16), of which $1,278 million was short-term or current. Refinancing all of it at rates 3 percentage points higher would add roughly $53,864m x 3% = $1,616 million of pre-tax interest per year, which would raise interest incurred from the $2,874 million actually recorded in 2024 to about $4,490 million (+56%). Against 2024 net loss attributable to shareholders of $11,817 million, the after-tax effect depends on the tax assumption: with no tax benefit recognised the loss widens by the full $1,616 million to about $13,433 million, i.e. a 13.7% larger loss; applying a 21% US statutory benefit the effect is about $1,277 million, widening the loss to roughly $13,094 million, i.e. 10.8% worse. Note this is a static calculation on the year-end debt balance and ignores the portion of interest that Boeing capitalises ($149 million in 2024).",
+    "arac_cagrisi": 4,
+    "erisim_numaralari": ["0000012927-25-000015"],
+    "kesim_engelledi": false
+  },
+  {
+    "id": 37,
+    "cevap": "Lyft beat. In the Q3'24 release (8-K filed 6 November 2024, accession 0001759509-24-000121) management guided Q4'24 to Gross Bookings of $4.28-$4.35 billion and Adjusted EBITDA of $100-$105 million, an Adjusted EBITDA margin of approximately 2.3% to 2.4% of Gross Bookings, i.e. a 2.35% midpoint. Actual Q4'24 (8-K filed 11 February 2025, accession 0001759509-25-000009) Adjusted EBITDA was $112.8 million and the Adjusted EBITDA margin was 2.6% of Gross Bookings, versus 1.8% in Q4'23. That is about 25 bps above the guidance midpoint and 20 bps above the high end, with Adjusted EBITDA about $10 million above the top of the guided range.",
+    "arac_cagrisi": 6,
+    "erisim_numaralari": ["0001759509-24-000121", "0001759509-25-000009"],
+    "kesim_engelledi": false
+  },
+  {
+    "id": 42,
+    "cevap": "Essentially all of Uber's 2024 revenue growth was volume-driven; take rate was flat to very slightly negative. From the FY2024 10-K (accession 0001543151-25-000008): Gross Bookings rose from $137,865 million in 2023 to $162,773 million in 2024 (+$24,908 million, +18%, +21% constant currency) while revenue rose from $37,281 million to $43,978 million (+$6,697 million, +18%). Implied take rate was 27.04% in 2023 versus 27.02% in 2024, roughly 2 bps lower. Decomposing the $6,697 million increase at 2023 take rate: volume (Gross Bookings) growth contributed about $6,736 million, or roughly 101% of the increase, while the change in take rate subtracted about $39 million, roughly -0.6%. Uber's own explanation matches: revenue was 'up 18% year-over-year, primarily attributable to an increase in Gross Bookings of 18%', with Mobility Gross Bookings +25% and Delivery +17% constant currency driven by trip volumes. Note take rate is a derived figure, not a metric Uber reports.",
+    "arac_cagrisi": 2,
+    "erisim_numaralari": ["0001543151-25-000008"],
+    "kesim_engelledi": false
+  },
+  {
+    "id": 47,
+    "cevap": "Lemonade met or beat every line of the full-year 2024 guidance it had given one quarter earlier. Guidance in the Q3 2024 shareholder letter (8-K filed 30 October 2024, accession 0001691421-24-000128) was: in force premium $940-944 million, gross earned premium $823-826 million, revenue $522-524 million and an adjusted EBITDA loss of $151-155 million. Reported FY2024 results (8-K filed 25 February 2025, accession 0001691421-25-000021) were: IFP $943.7 million (top of the range, +26% year over year), gross earned premium $827.3 million (about $1.3 million above the high end), total revenue $526.5 million (about $2.5 million above the high end, +22% year over year) and an adjusted EBITDA loss of $149.7 million (about $1.3 million smaller than the smallest guided loss, versus $172.6 million in 2023). GAAP net loss was $202.2 million versus $236.9 million in 2023, and the year was Lemonade's first full year of positive adjusted free cash flow at $48 million.",
+    "arac_cagrisi": 9,
+    "erisim_numaralari": ["0001691421-24-000128", "0001691421-25-000021"],
+    "kesim_engelledi": false
+  }
+]

@@ -1,0 +1,72 @@
+[
+ {
+  "id": 3,
+  "cevap": "AMD guided revenue as a midpoint plus or minus $300 million in each of these quarters, so the full range is $600 million wide each time.\nQ2 2024: $5.4 billion (low) to $6.0 billion (high), 10.5% of midpoint\nQ3 2024: $6.4 billion (low) to $7.0 billion (high), 9.0% of midpoint\nQ4 2024: $7.2 billion (low) to $7.8 billion (high), 8.0% of midpoint\nQ1 2025: $6.8 billion (low) to $7.4 billion (high), 8.5% of midpoint\nMidpoints as guided: $5.7bn (given 30 Apr 2024, acc. 0000002488-24-000054), $6.7bn (30 Jul 2024, 0000002488-24-000121), $7.5bn (29 Oct 2024, 0000002488-24-000161) and $7.1bn (4 Feb 2025, 0000002488-25-000009). The relative width narrows over the four quarters because the dollar band was held constant while the revenue base grew.",
+  "arac_cagrisi": 6,
+  "erisim_numaralari": ["0000002488-24-000054", "0000002488-24-000121", "0000002488-24-000161", "0000002488-25-000009"],
+  "kesim_engelledi": false
+ },
+ {
+  "id": 8,
+  "cevap": "Micron beat its fiscal Q3 2024 GAAP gross margin guidance by about 140 basis points versus the midpoint. In the 20 March 2024 earnings release (acc. 0000723125-24-000004) Micron guided FQ3-24 GAAP gross margin to 25.5% plus or minus 1.5% (range 24.0%-27.0%). Actual FQ3-24 GAAP gross margin, reported 26 June 2024 (acc. 0000723125-24-000016), was 26.9% ($1,832 million on $6,811 million of revenue). That is +1.4 percentage points (140 bps) above the 25.5% midpoint, and it landed 10 bps inside the 27.0% high end of the guided range.",
+  "arac_cagrisi": 3,
+  "erisim_numaralari": ["0000723125-24-000004", "0000723125-24-000016"],
+  "kesim_engelledi": false
+ },
+ {
+  "id": 13,
+  "cevap": "Using CFO minus purchases of property and equipment from Zillow Group's XBRL data (as reported in the 10-K filings on file at 16 May 2025), FY2022: CFO $4,504m - capex $115m = FCF $4,389m on revenue $1,958m, an FCF margin of roughly 224%. FY2023: CFO $354m - capex $135m = FCF $219m on revenue $1,945m, an FCF margin of about 11.3%. FY2024: CFO $428m - capex $143m = FCF $285m on revenue $2,236m, an FCF margin of about 12.7%. The trend: the 2022 figure is a one-off distortion, since operating cash flow that year was inflated by the liquidation of the Zillow Offers home inventory rather than by ongoing operations. Excluding that, the underlying trend over the last three years is a step down to a normalized low-double-digit FCF margin in 2023 and then modest improvement in 2024 (about +140 bps), with capex creeping up every year ($115m to $135m to $143m) but CFO growing faster in 2024. So: distorted spike, reset, then gradual improvement.",
+  "arac_cagrisi": 3,
+  "erisim_numaralari": [],
+  "kesim_engelledi": false
+ },
+ {
+  "id": 18,
+  "cevap": "From MSCI's FY2024 10-K (acc. 0001408198-25-000053), the operating lease liability maturity schedule as of 31 December 2024 shows undiscounted payments of $30,220 thousand in 2025, $30,361 thousand in 2026 and $24,421 thousand in 2027. The total maturing in the next three years is therefore $85,002 thousand (about $85.0 million). Total undiscounted operating lease payments are $165,605 thousand, so the next three years represent approximately 51.3% of MSCI's total remaining operating lease obligations.",
+  "arac_cagrisi": 1,
+  "erisim_numaralari": ["0001408198-25-000053"],
+  "kesim_engelledi": false
+ },
+ {
+  "id": 23,
+  "cevap": "Salesforce's FY2025 10-K, filed 5 March 2025 and therefore the filing on file as of 10 March 2025 (acc. 0001108524-25-000006), lists outstanding principal as of 31 January 2025 of: 2028 Senior Notes (3.70%) $1,500m; 2028 Senior Sustainability Notes (1.50%) $1,000m; 2031 Senior Notes (1.95%) $1,500m; 2041 Senior Notes (2.70%) $1,250m; 2051 Senior Notes (2.90%) $2,000m; 2061 Senior Notes (3.05%) $1,250m. The 2024 Senior Notes had been repaid (zero outstanding) and there were no borrowings under the $5.0 billion revolving credit facility. Total face value is $8.5 billion; excluding the $1.0 billion 2028 Senior Sustainability Notes, the face value of Salesforce's debt is $7.5 billion.",
+  "arac_cagrisi": 1,
+  "erisim_numaralari": ["0001108524-25-000006"],
+  "kesim_engelledi": false
+ },
+ {
+  "id": 28,
+  "cevap": "Spirit Airlines' FY2024 10-K (acc. 0001498710-25-000008, filed 3 March 2025) presents these operating statistics with FY2024 totals: Average aircraft 209.9; Aircraft at end of period 213; Average daily aircraft utilization 9.9 hours; Departures 288,180; Passenger flight segments 44,180 thousand; Revenue passenger miles (RPMs) 43,671,009 thousand; Available seat miles (ASMs) 53,017,948 thousand; Load factor 82.4%; Total revenue per passenger flight segment $111.21; Average yield 11.25 cents; TRASM 9.27 cents; CASM 11.35 cents; Adjusted CASM 10.76 cents; Adjusted CASM ex-fuel 7.97 cents; Fuel gallons consumed 551,819 thousand; Average fuel cost per gallon $2.68. Note that 21 of the 213 aircraft were classified as assets held for sale at year end.",
+  "arac_cagrisi": 4,
+  "erisim_numaralari": ["0001498710-25-000008"],
+  "kesim_engelledi": false
+ },
+ {
+  "id": 33,
+  "cevap": "I could not find this figure with these tools. Cloudflare's FY2024 10-K (acc. 0001477333-25-000043) describes selling indirectly through an ecosystem of channel partners (managed service providers, resellers, distributors and global system integrators) and carries risk-factor language about dependence on channel partners, but I found no disclosed percentage of customers (or of revenue) attributable to channel partners in that filing. The only comparable percentage disclosed is geographic: 49% of 2024 revenue came from international customers. The cutoff did not prevent this - the FY2024 10-K was filed 20 February 2025, well before 16 May 2025.",
+  "arac_cagrisi": 6,
+  "erisim_numaralari": ["0001477333-25-000043"],
+  "kesim_engelledi": false
+ },
+ {
+  "id": 38,
+  "cevap": "In its quarterly earnings releases Delta gives a 'Financial Guidance' table of non-GAAP metrics. For the coming quarter it guides on three items: total revenue year-over-year growth, operating margin, and earnings per share. For example the March quarter 2025 release (acc. 0001683168-25-002353) guided 2Q25 to total revenue down 2% to up 2%, operating margin 11%-14% and EPS $1.70-$2.30. Alongside that, the full-year outlook given in the December-quarter release (acc. 0001683168-25-000182) guides on earnings per share growth (FY2025: greater than 10%), free cash flow (greater than $4 billion) and gross leverage / adjusted debt to EBITDAR (2x or less), which are also framed against 3-5 year targets. Note that in the April 2025 release Delta declined to reaffirm its full-year 2025 guidance given macro uncertainty, keeping only the quarterly revenue/margin/EPS guide.",
+  "arac_cagrisi": 5,
+  "erisim_numaralari": ["0001683168-25-002353", "0001683168-25-000182"],
+  "kesim_engelledi": false
+ },
+ {
+  "id": 43,
+  "cevap": "Airbnb's average nights per booking in the Asia Pacific region was 3.3 nights in 2024. This is disclosed in the MD&A of Airbnb's FY2024 10-K (acc. 0001559720-25-000010): total company average nights per booking excluding experiences was 3.8 in 2024 (versus 3.9 in 2023), split by region as 4.1 for North America, 3.8 for EMEA, 3.7 for Latin America and 3.3 for Asia Pacific - making Asia Pacific the shortest average stay of the four regions.",
+  "arac_cagrisi": 2,
+  "erisim_numaralari": ["0001559720-25-000010"],
+  "kesim_engelledi": false
+ },
+ {
+  "id": 48,
+  "cevap": "General Mills beat its adjusted diluted EPS guidance in each of the last two completed fiscal years, so 2 out of 2. Fiscal 2023: the raised guidance in the Q3 release of 23 March 2023 (acc. 0001193125-23-077267) called for adjusted diluted EPS up 8% to 9% in constant currency; the actual result reported 28 June 2023 (acc. 0001193125-23-176744) was $4.30, up 10% in constant currency - a beat. Fiscal 2024: guidance reaffirmed in the Q3 release of 20 March 2024 (acc. 0001193125-24-072050) was adjusted diluted EPS up 4% to 5% in constant currency; the actual result reported 26 June 2024 (acc. 0001193125-24-168511) was $4.52, up 6% in constant currency - a beat. For fiscal 2025, initial guidance issued in June 2024 was adjusted diluted EPS between down 1% and up 1% in constant currency off the $4.52 fiscal 2024 base; that was cut twice, and as of the Q3 release on 19 March 2025 (acc. 0001193125-25-057150) fiscal 2025 adjusted diluted EPS is expected to be down 8% to down 7% in constant currency (previously down 4% to down 2%), with the guidance excluding any impact from new 2025 tariff actions. Fiscal 2025 actual results were not yet on file as of 16 May 2025.",
+  "arac_cagrisi": 10,
+  "erisim_numaralari": ["0001193125-23-077267", "0001193125-23-176744", "0001193125-24-072050", "0001193125-24-168511", "0001193125-25-057150"],
+  "kesim_engelledi": false
+ }
+]

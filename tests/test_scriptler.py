@@ -93,7 +93,7 @@ def test_tani_dolu_yaniti_ozetliyor(monkeypatch, capsys):
     cikti = capsys.readouterr().out
     assert kod == 0, cikti
     assert "HTTP       : 200" in cikti
-    assert "USD: 6 satir" in cikti
+    assert "USD: 7 satir" in cikti
     assert "'end' eksik: 0" in cikti
 
 
@@ -189,7 +189,7 @@ def test_matris_farki_yaratan_degiskeni_gosteriyor(monkeypatch, capsys):
     cikti = capsys.readouterr().out
     assert kod == 1, cikti
     assert "temel=0" in cikti and "tekrar=0" in cikti
-    assert "onbellek-bypass=6" in cikti
+    assert "onbellek-bypass=7" in cikti
     assert "'onbellek-bypass'" in cikti, "farki yaratan kosul adiyla anilmali"
     assert "age           : 51231" in cikti, "onbellek basliklari yazilmali"
 

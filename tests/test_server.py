@@ -53,6 +53,12 @@ CONCEPT = {"label": "Revenues", "units": {"USD": [
     {"start":"2022-09-25","end":"2023-09-30","val":383_290_000_000,"fy":2024,"fp":"FY","form":"10-K","filed":"2024-11-01","accn":"0000320193-24-000123"},
     # ceyreklik veri ayni listede
     {"start":"2023-04-02","end":"2023-07-01","val": 81_797_000_000,"fy":2023,"fp":"Q3","form":"10-Q","filed":"2023-08-04","accn":"0000320193-23-000077"},
+    # AYNI GUN biten yil-basindan-beri satiri. Gercek 10-Q'lar ikisini birden
+    # tasir ve ikisi de dogrudur; sahte veri bunu tasimazsa "ayni bitis =
+    # ayni donem" varsayimi hicbir testte gorunmez (P-4). Canli olculdu
+    # (17 Agu 2026): AAPL'in 2021-03-27'sinde 89.584 uc aylik, 201.023 alti
+    # ayliktir ve IKISI DE ayni dosyalamadan gelir.
+    {"start":"2022-09-25","end":"2023-07-01","val":293_787_000_000,"fy":2023,"fp":"Q3","form":"10-Q","filed":"2023-08-04","accn":"0000320193-23-000077"},
 ]}}
 
 # Apple gerçekte "Revenues" DEGIL bunu kullanir; ilk aday 404 vermeli ki
@@ -3585,3 +3591,55 @@ async def test_as_of_bicimsiz_tarihi_reddediyor(srv):
     with pytest.raises(ValueError) as e:
         await srv.list_recent_filings(ticker="AAPL", as_of="2025")
     assert "YYYY-MM-DD" in str(e.value)
+
+
+# --------------------------------------- ayni gun biten, farkli uzunluktaki donemler
+# 17 Agu 2026, CANLI kullanimda bulundu (test paketi bunu gormuyordu, cunku
+# sahte veri ayni bitisli iki donem tasimiyordu - P-4). Bir 10-Q hem ceyregi
+# hem yil basindan beri toplami raporlar; ikisi ayni gun biter, ikisi de
+# dogrudur, ve ikisi de AYNI dosyalamadan gelir.
+
+
+@pytest.mark.anyio
+async def test_ayni_gun_biten_farkli_uzunluktaki_donemler_birbirini_dusurmuyor(srv):
+    """Olculdu (AAPL, `period="all"`): 2025-03-29 icin donen deger 219.659 -
+    yani alti aylik toplam - ve o ceyregin kendi rakami 95.359 listede HIC
+    yoktu. Bitis tarihi tek basina bir donemin kimligi degildir."""
+    s = await srv.get_concept_series(ticker="AAPL", concept="revenue",
+                                     period="all", limit=60)
+    ayni_bitis = [p for p in s.points if p.period_end == "2023-07-01"]
+    assert len(ayni_bitis) == 2, f"donemlerden biri sessizce dustu: {ayni_bitis}"
+    assert {p.value for p in ayni_bitis} == {81_797_000_000, 293_787_000_000}
+    assert {p.days for p in ayni_bitis} == {90, 279}
+
+
+@pytest.mark.anyio
+async def test_farkli_uzunluktaki_donemler_revizyon_sanilmiyor(srv):
+    """Bir revizyon ayni dosyalamanin icinde olamaz. Olculdu (AAPL,
+    `period="all"`): 87 donemin 55'i "revize" gorunuyordu ve 2021-03-27'nin iki
+    degeri de ayni erisim numarasindan (0000320193-21-000056) geliyordu -
+    biri uc aylik, oteki alti aylik rakamdi."""
+    r = await srv.get_fact_revisions(ticker="AAPL", concept="revenue",
+                                     period="all", only_revised=True, limit=60)
+    for rev in r.revisions:
+        dosyalamalar = {e.accession_number for e in rev.entries}
+        assert len(dosyalamalar) > 1, (
+            f"{rev.period_end}: 'revizyon'un tum degerleri ayni dosyalamadan "
+            f"geliyor ({dosyalamalar}) - bu bir revizyon degil, farkli "
+            "uzunlukta iki donem")
+    assert not [x for x in r.revisions if x.period_end == "2023-07-01"], (
+        "ayni gun biten uc aylik ve dokuz aylik rakam revizyon sayildi")
+
+
+def test_donem_kovasi_52_haftalik_takvimi_ayni_kovada_tutuyor():
+    """Kova ham gun sayisi OLSAYDI, 52/53 haftalik takvimlerde ayni yillik
+    donem 363 ve 365 gun surer ve listede iki kez cikardi. Ayirmasi gereken
+    sey uzunluk SINIFI: uc aylik, alti aylik, yillik."""
+    from edgar_mcp.server import _donem_kovasi
+    assert _donem_kovasi(363) == _donem_kovasi(364) == _donem_kovasi(365) == 12
+    assert _donem_kovasi(90) == 3 and _donem_kovasi(92) == 3
+    assert _donem_kovasi(181) == 6 and _donem_kovasi(188) == 6
+    assert _donem_kovasi(272) == 9 and _donem_kovasi(279) == 9
+    assert _donem_kovasi(None) is None, "anlik olguda uzunluk yoktur"
+    # Ayirt etmesi gereken siniflar gercekten ayri kovalarda
+    assert len({_donem_kovasi(g) for g in (90, 181, 272, 364)}) == 4

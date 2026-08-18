@@ -113,6 +113,21 @@ def _bol(tag: str) -> tuple[str, str]:
     return VARSAYILAN_TAKSONOMI, tag
 
 
+def _donem_kovasi(days: int | None) -> int | None:
+    """Donem uzunlugunu AY sayisina yuvarlar; anlik olgularda None.
+
+    Neden ham gun sayisi degil (17 Agu 2026): sirketler 52/53 haftalik takvim
+    kullaniyor, ayni yillik donem bir dosyalamada 363 baska birinde 365 gun
+    surebiliyor. Ham gun sayisiyla anahtarlamak bunlari AYRI donem sayardi ve
+    ayni mali yil listede iki kez cikardi. Aya yuvarlamak 363/364/365'i tek
+    kovaya (12) koyuyor, uc aylik (90) ile alti aylik (181) rakamlari ise ayri
+    tutuyor - ayirmasi gereken tam olarak bu.
+    """
+    if days is None:
+        return None
+    return round(days / 30.4)
+
+
 def _gun_farki(start: str, end: str) -> int:
     a = date(*(int(x) for x in start.split("-")))
     b = date(*(int(x) for x in end.split("-")))
@@ -1379,10 +1394,17 @@ async def get_concept_series(
 
     # Ayni donem hem birden fazla dosyalamada hem birden fazla etikette gecer.
     # En son SUNULAN kayit kazanir; esitlikte takma ad sirasi belirler.
+    #
+    # Anahtar donem UZUNLUGUNU da tasiyor. Yalnizca bitis tarihine bakan bir
+    # anahtar, ayni gun biten UC AYLIK ve YIL BASINDAN BERI rakamlari ayni
+    # kayit sayar ve birini sessizce dusurur (17 Agu 2026, canli olcum: AAPL
+    # `period="all"` cagrisinda 2025-03-29 icin donen deger 219.659 - yani alti
+    # aylik toplam; o ceyregin kendi rakami 95.359 listede HIC yok). Bir olgu
+    # [baslangic, bitis] araligi hakkindadir; bitis tek basina kimlik degildir.
     oncelik = {t: i for i, t in enumerate(adaylar)}
-    dedup: dict[tuple[str, str], FactPoint] = {}
+    dedup: dict[tuple[str, str, int | None], FactPoint] = {}
     for pt in noktalar:
-        k = (pt.period_end, pt.unit)
+        k = (pt.period_end, pt.unit, _donem_kovasi(pt.days))
         mevcut = dedup.get(k)
         if mevcut is None or (pt.filed, -oncelik.get(pt.source_tag, 99)) > (
             mevcut.filed,
@@ -1858,7 +1880,7 @@ async def get_fact_revisions(
 
     # Seri aracindan farki: burada dedup YAPILMAZ. Ayni donemin farkli
     # dosyalamalardaki tum degerleri korunur - revizyonun kendisi cikti.
-    gruplar: dict[tuple[str, str, str], list[dict]] = {}
+    gruplar: dict[tuple[str, str, str, int | None], list[dict]] = {}
     for tag, v in veriler:
         for birim, satirlar in _kullanilabilir_birimler(v):
             for row in satirlar:
@@ -1874,12 +1896,22 @@ async def get_fact_revisions(
                 days = _gun_farki(start, end) if start else None
                 if not _donem_uyuyor(period, days, end, ay_gun):
                     continue
-                gruplar.setdefault((tag, end, birim), []).append(
+                # Anahtarda donem UZUNLUGU da var. Yoksa ayni gun biten uc
+                # aylik ve yil basindan beri rakamlar ayni gruba duser ve
+                # aralarindaki fark REVIZYON diye raporlanir. Canli olculdu
+                # (17 Agu 2026, AAPL `period="all"`): 87 donemin 55'i "revize"
+                # gorunuyordu ve ornegin 2021-03-27 icin iki deger AYNI
+                # dosyalamadan geliyordu (0000320193-21-000056) - bir revizyon
+                # ayni dosyalamanin icinde olamaz. Ikisi de dogruydu: 201.023
+                # alti aylik, 89.584 uc aylik.
+                gruplar.setdefault(
+                    (tag, end, birim, _donem_kovasi(days)), []
+                ).append(
                     {**row, "_tag": tag, "_start": start, "_days": days}
                 )
 
     revizyonlar: list[FactRevision] = []
-    for (tag, end, birim), satirlar in gruplar.items():
+    for (tag, end, birim, _kova), satirlar in gruplar.items():
         satirlar.sort(key=lambda r: (str(r.get("filed", "")), str(r.get("accn", ""))))
 
         # Ayni deger bircok dosyalamada tekrarlanir (karsilastirma yillari).

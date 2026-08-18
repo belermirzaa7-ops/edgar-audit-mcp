@@ -1453,3 +1453,88 @@ Hicbiri yanlis bir sey ogretmiyor ama hepsi ayni sinif - dokumanda duran, kodun
 dogrulamadigi iddia. `test_dokumanlardaki_sayilar_gercekle_ayni` ucunu de
 kaynagindan sayiyor (harness listesi, `### P-` basliklari, ve pytest'in kendi
 topladigi test sayisi). Sayilar buyudukce test kirmiziya donecek; dogrusu bu.
+
+### KK-45: Bir donemin kimligi bitis tarihi DEGIL, [baslangic, bitis] araligidir
+
+17 Agu 2026, v39 kurulduktan sonra **canli kullanimda** bulundu - test paketi
+bunu gormuyordu. Iki arac da ayni koku paylasiyordu.
+
+**Belirti 1 - seri sessizce satir dusuruyordu.** `sec_edgar_get_concept_series`
+dedup anahtari `(donem_sonu, birim)` idi. Bir 10-Q hem CEYREGI hem YIL
+BASINDAN BERI toplami raporlar ve ikisi AYNI GUN biter. Olculdu (AAPL,
+`period="all"`): 2025-03-29 icin donen deger **219.659** - alti aylik toplam;
+o ceyregin kendi rakami **95.359** listede HIC yok. `days` alani uzunlugu
+soyluyordu, yani dikkatli bir okuyucu fark edebilirdi; ama kayip rakam icin
+hicbir isaret yoktu.
+
+**Belirti 2 - revizyon araci uydurma revizyon uretiyordu.** Ayni sinif hata:
+gruplama anahtari `(etiket, bitis, birim)`. Olculdu (AAPL, `period="all"`):
+**87 donemin 55'i "revize" gorunuyordu** ve orneklerden birinde 2021-03-27'nin
+iki degeri de AYNI erisim numarasindan geliyordu (`0000320193-21-000056`).
+Bir revizyon ayni dosyalamanin icinde olamaz; ikisi de dogruydu - 201.023 alti
+aylik, 89.584 uc aylik rakamdi.
+
+**Neden testler gormedi:** sahte veri ayni gun biten iki farkli uzunlukta donem
+tasimiyordu. P-4'un tekrari - mock gercegin sozlesmesini taklit etmiyorsa test
+yazarin varsayimini dogrular, kaynagi degil. `period="annual"` ve
+`"quarterly"` modlarinda gun-uzunlugu filtresi kazayla koruyordu; `"all"`
+belgelenmis bir secenek ve orada koruma yoktu.
+
+**Karar:** anahtar donem UZUNLUGUNU da tasiyor. Ham gun sayisi degil, AYA
+yuvarlanmis kova (`_donem_kovasi`): 52/53 haftalik takvimlerde ayni yillik
+donem 363-365 gun surebiliyor ve ham gun sayisi bunlari AYRI donem sayardi -
+ayni mali yil listede iki kez cikardi. Kova 363/364/365'i 12'de birlestiriyor,
+90 / 181 / 272'yi ayri tutuyor.
+
+**Ayrica kendi dokumantasyon hatam:** README'nin iki dilinde de "Apple'in FY2023
+geliriyle **olculdu**: 383.285 -> 383.290" yaziyordu. O sayilar TEST
+FIXTURE'INDAN geliyordu, canli bir olcumden degil - yani depo, kendi kural
+kitabinin (§1: olc, hatirlama) disina cikmisti. Yerine gercek ve canli
+dogrulanmis bir ornek konuldu: **Tesla FY2017 geliri**, `as_of=2019-01-01` ile
+`11.758.751.000` (2018-02-23 tarihli dosyalama), kesimsiz `11.759.000.000`
+(2020-02-13 tarihli dosyalama). Ayni donem, iki farkli cevap, ayirici tek sey
+sunulma tarihi.
+
+Uc yeni enjeksiyon dogruluyor. P-33 olarak kayda gecti.
+
+### KK-46: Kesimli kosu olculdu - %82 -> %90, ve notlandiricinin kendi gurultusu
+
+17 Agu 2026. KK-43'te "%92 hala bir PROJEKSIYON" yazmistim. Olculdu:
+**%90 ham, %91,9 sinif-dengeli** (kontrol kolu %26 / %32,6). Projeksiyon iki
+varsayima dayaniyordu ve **ikisi de yanlis cikti**: bes donem uyusmazliginin
+hepsinin duzelecegi (ucu duzeldi, ucu kaldi - id 10, 11, 49) ve hicbir cevabin
+ters yone gitmeyecegi (id 49 dogru'dan kismen'e dustu). Net +4, +5 degil.
+
+**Elli sorunun hepsi yeniden kosuldu.** Yalnizca yanlis cikan besini kosmak
+secmeli olcum olurdu ve tam da kacinilan sey basimiza gelirdi: kesim, dogru
+cikmis bir cevabi bozabiliyor ve bozdu.
+
+**Kesim gercekten tutuldu mu - denetlendi, varsayilmadi.** Arac kolunun
+okudugunu bildirdigi 64 farkli erisim numarasinin 2025 yili kodlu 37'si tek tek
+SEC'e karsi tarihlendirildi: **kesimden sonra tek dosyalama yok**, en gec
+kullanilan dosyalama 2025-05-09. Ham denetim
+`evaluation/benchmark/kesimli_denetim.json`.
+
+**Beklenmedik ve degerli bir olcum: notlandirici gurultusu.** Ikinci kosuda
+kontrol kolunun cevaplari YENIDEN KOSULMADI - ayni metin yeniden notlandirildi.
+Bu bir deney olarak tasarlanmamisti ama bir deney: ayni elli cevap, iki ayri
+notlandirici.
+
+| | uyum |
+|---|---|
+| birebir not (dogru/kismen/yanlis/cevapyok) | 43/50 - **%86** |
+| ikili (dogru mu, degil mi) | 47/50 - **%94** |
+| basliga etkisi | 12 dogru -> 13 dogru |
+
+Yani kontrol kolunun %24'u ile %26'si ayni olcumun iki kez notlandirilmis
+hali; kontrol degismedi. **Her rakam, baska hicbir hata kaynagi olmadan once
+yaklasik ±2 puan notlandirici gurultusu tasiyor.** 64 puanlik farkin yaninda
+kucuk; iki arac kosusu arasindaki 8 puanin yaninda degil - donem
+uyusmazliklarinin notlandirmada tartisilmak yerine ARACTA duzeltilip yeniden
+olculmesinin sebebi tam olarak bu.
+
+Bu ayni zamanda zaaf 2'nin (notlandirici bir dil modeli) ilk gercek olcumu:
+artik "notlandirici belirsizligi var" demiyoruz, ne kadar oldugunu soyluyoruz.
+
+Maliyet de dustu: 202 arac cagrisi (soru basina 4,0), ilk kosuda 239 (4,8).
+Kesim aramayi genisletmedi, daralttti.

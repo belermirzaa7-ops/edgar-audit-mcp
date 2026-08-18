@@ -13,7 +13,7 @@ Built against the **2026-07-28 MCP specification** using the Python SDK `v2.0.0`
 
 [![CI](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml)
 
-**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured: 24% correct without this server, 82% with it](evaluation/benchmark.md) · [32 failures that shipped here, each with the test that guards it](PATTERNS.md)
+**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured: 26% correct without this server, 90% with it](evaluation/benchmark.md) · [33 failures that shipped here, each with the test that guards it](PATTERNS.md)
 
 ---
 
@@ -358,9 +358,20 @@ would make the cutoff meaningless.
 The cut is on the **filing date**, not the period. A restated figure has the
 same period end as the original — only the filing date separates them, so a
 filter on the period would let every restatement through while appearing to
-work. Measured on Apple's FY2023 revenue: `383,285,000,000` as reported in the
-2023 annual report, `383,290,000,000` after the 2024 one restated it. With
-`as_of=2024-01-01` the tool returns the first.
+work.
+
+Measured live against SEC on Tesla's FY2017 revenue, which was restated two
+years after the fact:
+
+| call | FY2017 revenue | from a filing dated |
+|---|---|---|
+| `as_of=2019-01-01` | `11,758,751,000` | 2018-02-23 |
+| no cutoff | `11,759,000,000` | 2020-02-13 |
+
+Same period, same company, same concept. The first is what an analyst reading
+Tesla's accounts in 2018 saw; the second is the number that replaced it. Without
+a cutoff a tool answers a 2018 question with a 2020 filing and nothing marks the
+substitution.
 
 Three details follow from taking the guarantee seriously:
 
@@ -526,18 +537,26 @@ companies with calendar-year, ending-year and starting-year fiscal conventions.
 [`evaluation/benchmark.md`](evaluation/benchmark.md) reports what changes when a
 model has this server: the same model answered the 50 public questions of the
 [Vals AI Finance Agent Benchmark](https://huggingface.co/datasets/vals-ai/finance_agent_benchmark)
-twice — once with no tools, once with only these ten.
+twice — once with no tools, once with only these.
 
 | | correct | partial | wrong | no answer |
 |---|---|---|---|---|
-| **With this server** | **41 (82%)** | 8 | 0 | 1 |
-| Without tools | 12 (24%) | 20 | 0 | 18 |
+| **With this server** | **45 (90%)** | 4 | 0 | 1 |
+| Without tools | 13 (26%) | 17 | 3 | 17 |
+
+The run is point-in-time to 2025-05-16, the date the dataset was published, so
+the questions are answered against the filings that existed when they were
+written. Every accession number the tool arm read was checked against SEC
+afterwards: **none postdates the cutoff**, and the latest one used was filed
+2025-05-09.
 
 Neither answering arm saw the expected answers; a separate grader saw the two
 answers in randomised order without being told which produced which. Every
-artifact — both arms' raw answers, the grading input, the grades, the arm key —
-is in `evaluation/benchmark/`, and the limits of the number are written out in
-the report rather than left for the reader to find.
+artifact — both runs' raw answers, the grading inputs, the grades, the arm key,
+the compliance audit — is in `evaluation/benchmark/`, and the limits of the
+number are written out in the report rather than left for the reader to find,
+including a direct measurement of how much the grader itself moves it (two
+graders agreed on 86% of the same fifty answers).
 
 ### Evaluation set
 

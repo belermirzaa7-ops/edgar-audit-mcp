@@ -155,8 +155,8 @@ ENJEKSIYONLAR = [
 
  ("Dedup anahtarina source_tag ekle (ayni donem cift sayilsin)",
   "src/edgar_mcp/server.py",
-  "        k = (pt.period_end, pt.unit)",
-  "        k = (pt.period_end, pt.unit, pt.source_tag)",
+  "        k = (pt.period_end, pt.unit, _donem_kovasi(pt.days))",
+  "        k = (pt.period_end, pt.unit, _donem_kovasi(pt.days), pt.source_tag)",
   "test_ortusen_donemde_en_son_sunulan_kazanir"),
 
  ("SEC User-Agent zorunlulugunu kaldir",
@@ -384,8 +384,8 @@ ENJEKSIYONLAR = [
 
  ("Revizyon: ayni donemin eski degerlerini at (seri gibi dedup et)",
   "src/edgar_mcp/server.py",
-  "                gruplar.setdefault((tag, end, birim), []).append(",
-  "                gruplar.__setitem__((tag, end, birim), []) or gruplar[(tag, end, birim)].append(",
+  "                gruplar.setdefault(\n                    (tag, end, birim, _donem_kovasi(days)), []\n                ).append(",
+  "                gruplar.setdefault(\n                    (tag, end, birim, _donem_kovasi(days)), []\n                ).clear() or gruplar[(tag, end, birim, _donem_kovasi(days))].append(",
   "test_revizyon_degisen_degeri_yakalar"),
 
  ("Revizyon: tekrarlanan ayni degeri de farkli deger say",
@@ -1196,6 +1196,24 @@ ENJEKSIYONLAR = [
   "        elif (not _form_uyuyor(al(formlar, i), form_type)\n              or _kesimden_sonra(al(tarihler, i), as_of)):",
   "        elif not _form_uyuyor(al(formlar, i), form_type):",
   "test_as_of_sahiplik_araclarini_da_kesiyor"),
+
+ ("N: seri anahtarindan donem uzunlugunu cikar",
+  "src/edgar_mcp/server.py",
+  "        k = (pt.period_end, pt.unit, _donem_kovasi(pt.days))",
+  "        k = (pt.period_end, pt.unit)",
+  "test_ayni_gun_biten_farkli_uzunluktaki_donemler_birbirini_dusurmuyor"),
+
+ ("N: revizyon anahtarindan donem uzunlugunu cikar",
+  "src/edgar_mcp/server.py",
+  "                gruplar.setdefault(\n                    (tag, end, birim, _donem_kovasi(days)), []\n                ).append(",
+  "                gruplar.setdefault(\n                    (tag, end, birim, None), []\n                ).append(",
+  "test_farkli_uzunluktaki_donemler_revizyon_sanilmiyor"),
+
+ ("N: donem kovasini ham gun sayisina cevir (52/53 hafta)",
+  "src/edgar_mcp/server.py",
+  "    return round(days / 30.4)",
+  "    return days",
+  "test_donem_kovasi_52_haftalik_takvimi_ayni_kovada_tutuyor"),
 
  ("L: OCI sahiplik etiketini baska bir ada cevir",
   "Dockerfile",

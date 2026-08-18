@@ -45,6 +45,7 @@ can verify rather than remember.
 | [P-30](#p-30) | Does a missing optional dependency turn a loader into a silent no-op? | `test_env_yukleyici_bagimlilik_olmadan_da_yukluyor`, `test_env_yukleyici_bom_lu_dosyayi_okuyor` |
 | [P-31](#p-31) | Does my cleanup depend on my process getting a chance to run it? | `test_enjeksiyon_kontrol_modu_yarim_kalan_kosuyu_goruyor`, `test_enjeksiyon_parcali_kosu_hicbir_enjeksiyonu_dusurmuyor` |
 | [P-32](#p-32) | Is "the latest filing" the latest as of *when* — and does my filter cut on the period or on the filing date? | `test_as_of_o_tarihte_bilinen_degeri_donduruyor`, `test_as_of_bilinmeyen_tarih_iceri_alinmiyor` |
+| [P-33](#p-33) | Am I identifying a period by its end date alone, when the same day ends a quarter and a year-to-date total? | `test_ayni_gun_biten_farkli_uzunluktaki_donemler_birbirini_dusurmuyor`, `test_farkli_uzunluktaki_donemler_revizyon_sanilmiyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -952,6 +953,51 @@ months later, and phrases like "the last three years" had moved on. The tool arm
 had found the right document by the wrong clock. Counting those five as correct
 would have put the run at 92% rather than 82%; the lower number was published
 and the cause was fixed in the tools rather than in the grading.
+
+---
+
+<a id="p-33"></a>
+### P-33 · A period identified by its end date alone
+
+**Symptom.** Two different failures from one cause, both silent.
+
+Asking a company for every reported period returned the year-to-date figure
+where the quarter's own figure belonged. Measured on Apple with
+`period="all"`: the row ending 2025-03-29 came back as `219,659,000,000` — the
+six-month total — and that quarter's own `95,359,000,000` was not in the list at
+all. The response was well-formed, the row carried a correct value, and the
+missing row left no trace.
+
+Asking the same company which figures had been restated reported **55 of 87
+periods as revised**. One of them offered two values for the period ending
+2021-03-27, both traced to the same accession number. A restatement cannot
+happen inside a single filing.
+
+**Root cause.** Both tools identified a period by `(tag, end_date, unit)`. A
+quarterly report carries the quarter *and* the year-to-date total, and both end
+on the same day; only the start date separates them. Under that key the two
+collapse into one entry — the series keeps whichever was filed later and drops
+the other, while the revision tool treats the difference between them as a
+restatement.
+
+The naive fix is worse than it looks. Keying on the raw day count splits
+periods that should be together: a 52/53-week fiscal calendar makes the same
+annual period run 363 days in one filing and 365 in another, so the same fiscal
+year would appear twice.
+
+**Detection.** The key carries the period's **length class**, rounded to
+months: 363, 364 and 365 days all fall into 12, while 90, 181 and 272 stay
+apart. Three fault injections cover it — dropping the length from the series
+key, dropping it from the revision key, and replacing the rounded class with
+the raw day count.
+
+**Incident.** 17 Aug 2026, found by using the tools against live SEC data
+immediately after a release, not by the test suite. The suite could not see it:
+the mock carried no two periods sharing an end date, so the assumption was never
+put to a case that would break it — P-4 again, three months after P-4 was
+written down. `period="annual"` and `period="quarterly"` were accidentally safe,
+because their day-length filter separated the two rows; `period="all"` is a
+documented option and had no such protection.
 
 ---
 
