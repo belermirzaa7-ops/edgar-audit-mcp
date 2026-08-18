@@ -8,7 +8,12 @@ WORKDIR /app
 # documentation (16 Aug 2026), not recalled.
 LABEL io.modelcontextprotocol.server.name="io.github.belermirzaa7-ops/sec-edgar-mcp"
 
-COPY pyproject.toml README.md ./
+# LICENSE de kopyalaniyor: `pyproject.toml` `license = { file = "LICENSE" }`
+# diyor ve hatchling onu build aninda ARIYOR. Eksikken imaj hic derlenmiyordu
+# (`OSError: License file does not exist: LICENSE`) - iki README, PUBLISHING.md
+# ve vaka calismasi calismayan bir komut gosteriyordu. P-20'nin tekrari:
+# belgelenen dagitim yolu calistirilmadan dogru sayilmis.
+COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 

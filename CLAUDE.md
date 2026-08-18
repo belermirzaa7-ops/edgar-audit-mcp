@@ -1538,3 +1538,182 @@ artik "notlandirici belirsizligi var" demiyoruz, ne kadar oldugunu soyluyoruz.
 
 Maliyet de dustu: 202 arac cagrisi (soru basina 4,0), ilk kosuda 239 (4,8).
 Kesim aramayi genisletmedi, daralttti.
+
+### KK-47: Kapsamli dusman denetimi - yedi goz, sekiz gercek hata, ucu kritik
+
+18 Agu 2026. Piyasaya cikmadan once repo yedi ayri "dusman gozle" denetimden
+gecirildi; hepsi SALT OKUNUR calisti, duzeltmeleri ben yaptim ve her bulguyu
+kendim yeniden uretmeden hicbirine dokunmadim. Denetim eksenleri: en taze kod,
+dokuman-kod uyumu, testlerin ve mock'larin sadakati, olcum makinesi (harness +
+benchmark), ve UC AYRI canli veri turu (XBRL serileri, metin/tablo/arama,
+sahiplik/boyutlar).
+
+**Toplam 81 bulgu raporlandi.** Hepsi gecerli degil - bir kismi zaten
+belgelenmis sinirlar, bir kismi tekrar. Asagidakiler DOGRULANMIS ve
+DUZELTILMIS olanlar.
+
+**Kritik 1 - mali yil etiketi 52/53 haftalik takvimde bozuk.** Canli olcum
+(US Foods, bagimsiz olarak Kraft Heinz'de de dogrulandi): `fiscal_year` 2016
+IKI KEZ cikiyordu - 2016-01-02 ve 2016-12-31'de biten iki AYRI mali yil icin -
+ve FY2015 ile FY2020 seriden tumuyle kayboluyordu. Ayni kok neden, mali yil
+sonunu degistiren sirkette (Perrigo, Haziran -> Aralik) bir rejimin BUTUN
+etiketlerini bir yil kaydiriyordu; ustelik hangi rejimin kaydigi hangi
+etiketlerin cekildigine bagliydi, yani ayni sirketin ayni donemi sorgu
+`revenue` mi ham etiket mi diye soruldugu icin farkli yil aliyordu - **arac
+kendi kendisiyle celisiyordu.**
+
+Kok neden: tum gecmis icin TEK bir kayma ve TEK bir (ay, gun) turetiliyordu.
+Yerine `Takvim` sinifi geldi: SEC'in kendi `fy` alanindan cikan (donem_sonu,
+mali_yil) capalari tutuluyor ve bir donem, KENDISINDEN SONRAKI ilk capanin
+mali yilina ait sayiliyor. Rejim degisikligi kendiliginden dogru sonuc veriyor,
+cunku her donem kendi rejimindeki capaya bakiyor. Uc incelik: yil sonunda biten
+donem ile yil ICINDE biten donem farkli yuvarlaniyor (biri tam sayida yil
+uzakta, oteki bir sonraki yil sonuna ait); ayni bitise dusen birden fazla `fy`
+varsa EN KUCUGU dogru olandir (buyugu bir karsilastirma satiri artigidir);
+capa dizisi tutarsizsa cogunluk kaymasina uymayan dusuyor.
+Ve yeni `fiscal_year_source` alani, etiketin SEC'in soyledigi bir yil mi
+(`reported`) yoksa bizim saydigimiz bir yil mi (`derived`/`extrapolated`)
+oldugunu ayirt ediyor - ikisi ayni alanda dururken susmak, dogrulanmis bir
+etiketle tahmini ayirt edilemez birakiyordu.
+
+**Kritik 2 - ortak Form 4 dosyalamasi sahip sayisi kadar cogaltiliyordu.**
+Islem tablolari SAHIP dongusunun icinde okunuyordu; oysa tablolar BELGEYE ait,
+sahibe degil. Olculdu (CoreWeave, dort sahipli bir Magnetar dosyalamasi):
+belgede 24 satir / 307.131 hisse, arac 96 satir / 1.228.524 hisse. "Iceriden
+alim" diye okunacak bir sayi tam dort katina cikiyordu. Ortak dosyalamada islem
+tek bir kisiye atfedilemedigi icin artik imzalayanlarin hepsi yaziyor ve
+`owner_count` kac kisi oldugunu soyluyor.
+
+**Kritik 3 - `code_totals` turev ve turev-olmayan satirlari topluyordu.** Bir
+opsiyon kullanimi AYNI dosyalamada iki satir uretir (turev tarafinda `M`, hisse
+tarafinda `A`); ikisini toplamak ayni hisseyi iki kez sayar. Olculdu (TSLA):
+608.022.232'ye karsi gercek 304.011.116. **Aracin kendi arac aciklamasi bu cift
+sayimi zaten UYARIYORDU ve kod tam da onu yapiyordu** - dokumanin kodu
+denetlemedigi bir yer daha (P-14).
+
+**Ciddi 4 - mutabakat donem uzunlugunu yok sayiyordu.** KK-45'te iki REST
+aracinda duzeltilen hata, boyutlu aracin mutabakatinda KALMISTI. Bir 10-Q hem
+uc aylik hem yil basindan beri rakamlari tasir ve ikisi ayni gun biter; iki
+tutarli kirilim tek satira yigiliyor ve konsolide deger sessizce uzerine
+yaziliyordu - "fark" rakami dosyalamadaki eleman SIRASINA bagli hale
+geliyordu. Bir duzeltmenin kardes cagri yerini atlamasi bu depoda ucuncu kez
+oluyor (P-27, P-33).
+
+**Ciddi 5 - eksende ic ice kirilim duzeyleri.** Olculdu (AAPL
+`srt:ProductOrServiceAxis`): uye toplami konsolidenin TAM iki kati, cunku
+Urun/Hizmet ile bes yollu urun kirilimi AYNI eksende duruyor. Arac
+`agrees:false` deyip dosyalayani sucluyordu; oysa 10-K'da mutabakat tam
+tutuyor. Hangi uyenin hangisinin ustu oldugu TANIM LINKBASE'inde ve bu arac onu
+okumuyor - dolayisiyla karar verilmiyor, `member_values` ile her uye tek tek
+gosteriliyor ve alan aciklamasi bu sinirin adini koyuyor. **Bilinen ve
+kapanmamis sinir olarak kayitli.**
+
+**Ciddi 6 - mutabakat sessizce bos donuyordu.** Modern segment dipnotlarinin
+neredeyse tamaminda her fact ikinci bir eksen de tasiyor
+(`ConsolidationItemsAxis`), dolayisiyla hepsi `multi_axis` diye eleniyor ve
+liste bos kaliyordu - belgelenen ozellik hic calismiyormus gibi. Bos liste
+"mutabakat yapilamadi" ile "her sey tuttu"yu ayirt edilemez birakir; artik
+satir kaliyor, sebebi yaninda.
+
+**Ciddi 7 - bolum indeksi gercek basliklari eliyordu.** Olculdu (JPMorgan
+10-K): Item 7 (MD&A) ve Item 8 `available_sections` icinde YOK ve isimle
+istenince "bu dosyalamada bulunamadi" hatasi doniyordu - metinde apacik
+dururken. Sebep: bir aday ancak KENDISINDEN SONRAKI ilk adaya olan mesafe
+esigi asiyorsa bolum sayiliyor ve banka MD&A'yi sayfa referansiyla dahil
+ettigi icin Item 7/7A/8 pesi sira duruyor. Var olan bir seyin YOKLUGUNU iddia
+etmek, bulamamaktan kotudur: indeks kacirdiginda govde araniyor ve bulunan
+`section_source="search"` diye isaretleniyor.
+
+**Ciddi 8 - tek noktali ilgisiz etiket seriyi ele geciriyordu.** Olculdu
+(Perrigo): `Revenues` etiketinde SEC'te TEK bir veri noktasi var, 800.000
+dolar; `SalesRevenueNet`'te 42 nokta ve ayni donem icin 3.539.800.000. Ikisi
+de ayni gun dosyalandigi icin `filed` esit cikiyor ve siralama alias sirasina
+dusup copu seciyordu. Seri "3,17 mlr -> 0,8 mn -> 3,91 mlr" okunuyordu.
+Esitlik bozucu artik etiketin AGIRLIGI (sirketin fiilen kullandigi etiket), ve
+iki etiket ayni donem icin celistiginde `tag_conflicts` bunu bildiriyor -
+dogru secilse bile cagirani olculmemis bir kesinlikle birakmamak icin.
+
+**Ayrica:** 13F-HR/A duzeltmesi hicbir isaret olmadan tam portfoy gibi
+donuyordu (olculdu: Berkshire'in bir duzeltmesi "1,7 milyar dolar, tek
+pozisyon" gibi gorunuyordu; gercek portfoy ~313 milyar). `RESTATEMENT`
+orijinalin YERINE gecer, `NEW HOLDINGS` ona EKLENIR - simdi ikisi de yanitta.
+Form 4/A da ayni sekilde bildiriliyor.
+
+**Denetimin kendi dersi:** bulgularin cogu CANLI kullanimdan geldi, test
+paketinden degil. Test paketi 268 yesildi ve bu sekiz hatanin hicbirini
+gormuyordu - cunku sahte veri gercegin sozlesmesindeki bu durumlari
+tasimiyordu (ayni gun biten iki donem, cok sahipli Form 4, arka arkaya duran
+basliklar, tek noktali etiket, duzeltme kutulari). **P-4, dorduncu kez.** Her
+duzeltme once fixture'a girdi, sonra koda.
+
+Yirmi dokuz yeni enjeksiyon dogruluyor. Ikisi ilk turda "KORUMASIZ" dondu ve
+ikisi de testin ne olctugunu duzeltti - biri fixture'in senaryoyu hic
+uretmedigini, oteki kuralin yanlis capayi tuttugunu gosterdi.
+
+### KK-48: Denetimin ikinci yarisi - olcum makinesi ve dokumanlar
+
+18 Agu 2026, ayni denetim turu. Kodun disindaki bulgular.
+
+**`--kontrol` kendi kapatmasi gereken bosluga acikti (P-36).** KK-41'de
+"cokmeden sonra paketlenmesin" diye yazilan kontrol, kaynak dosyalari YALNIZCA
+`.enjeksiyon_yedek/` varsa karsilastiriyordu - ve o dizin `.gitignore`'da. Taze
+klon, `git clean -fdx` ya da elle temizlik tek kaniti siliyor; enjekte kalmis
+dosya duruyorken cikti "TEMIZ" diyor ve exit 0 donuyordu. Denetci bunu depo
+kopyasinda ELLE URETTI. Ikinci yarisi CI'daydi: kontrol adiminda `if: always()`
+yoktu, yani yalnizca sweep ZATEN basarili oldugunda kosuyordu - bulunacak bir
+sey olmayan tek durumda.
+
+Duzeltme uc parcali: (1) karsilastiracak yedek yokken cikti artik "TEMIZ"
+DEMIYOR, neye bakip neye bakmadigini soyluyor; (2) `--sert` ikinci ve bagimsiz
+bir kaynak olarak `git diff`e bakiyor, teyit edemezse exit 3; (3) CI
+`--kontrol --sert` ve `if: always()`. `--sert` varsayilan DEGIL cunku calisma
+kopyasinda korunan dosyalar HEAD'den zaten farkli olur ve her seferinde
+basarisiz olan bir kontrol, gormezden gelinmeyi ogretir.
+
+**Docker imaji DERLENMIYORDU (P-20'nin tekrari).** `Dockerfile` yalnizca
+`pyproject.toml README.md src/` kopyaliyor, ama `pyproject.toml`
+`license = { file = "LICENSE" }` diyor. `pip install .` build aninda
+`OSError: License file does not exist: LICENSE` veriyor. Iki README, PUBLISHING
+ve vaka calismasi calismayan bir komut gosteriyordu. Kopyalanan dosya kumesi
+bos bir dizine cikarilip ayni backend calistirilarak uretildi; `LICENSE`
+eklenince build gecti. **`tests/test_http_tasima.py` Dockerfile'in yalnizca
+METNINI greplediği icin bunu goremiyor** - imaji derlemiyor. CI'daki `docker`
+isi yakalardi; yani hata "CI hic kosmamis" degil, "CI'nin yakaladigi bir sey
+belgede aylardir yanlis duruyordu".
+
+**`server.json` imajin konusmadigi tasimayi ilan ediyordu:** `stdio`, oysa
+Dockerfile'in tek `CMD`'si streamable-HTTP. Kayit defterinden bu girdiyi okuyup
+imaji stdio bekleyerek baslatan istemci hicbir zaman cevap alamazdi. Mevcut
+kimlik testi yalnizca ADI karsilastiriyordu; tasima da ayni dosyada duran bir
+vaat ve artik o da testli.
+
+**Benchmark raporunda uc hucre yanlisti.** Tur bazli tablonun "Without"
+sutununda uc satir ILK kosunun rakamlarini tasiyordu (Numerical Reasoning 2/8
+yerine 3/8, Qualitative 2/9 yerine 1/9, Adjustments 4/4 yerine 3/4). Elle
+kopyalanmis, yeniden hesaplanmamis. Tablo artik ham JSON'dan uretildi. Ayni
+bolumdeki "sifir yanlis, on sekiz cekimser" cumlesi de ilk kosuya aitti; ikinci
+kosuda kontrol kolu UC yanlis rakam veriyor ve 17 soruyu cevaplamiyor - manset
+"araci kol hic yanlis rakam vermedi" derken kontrol kolu icin de ayni seyi ima
+ediyordu. Duzeltildi.
+
+**`.env.example` iki degiskeni belgelemiyordu** (`SEC_RATE_LIMIT_PER_SEC`,
+`SEC_AS_OF`) ve bekci test TEK YONLUYDU: belgelenen her degiskenin kodda
+gectigini kontrol ediyor, kodun okudugu her degiskenin belgelendigini degil.
+P-14'un bekcisi P-14'e acikti. Test iki yonlu yapildi; ayrica degisken adi bir
+SABIT uzerinden okundugu icin (`AS_OF_ORTAM`) `os.environ.get("...")` kalibini
+aramak yetmiyor - kaynaklardaki her `SEC_*` dizgesi taraniyor.
+
+**Bayat dokuman sayilari:** "dort arac ilerleme bildiriyor" (sekiz bildiriyor),
+Turkce README'de 12 takma ad (15 var), "ten measured questions" (22 var).
+Vaka calismasindaki bir "Measured" blogu ise DUZELTILMIS degil DUZELTILMEMIS
+davranisi gosteriyordu ve dosyanin basligi "her sayi bir testle yeniden
+uretiliyor" diyordu - ikisi birlikte, artik yeniden uretilemeyen bir rakami
+uretilebilir gibi sunuyordu. Blok "duzeltmeden onceki surumde olculdu" diye
+etiketlendi ve baslik daraltildi.
+
+**Kapanmamis olarak kayda geciyor:** notlandirici tam anlamiyla "kor" degil -
+araci kolun cevaplari erisim numarasi tasiyor, kontrol kolununkiler tasimiyor,
+yani bicim tek basina hangi kolun hangisi oldugunu ele veriyor olabilir. Rapor
+"blind" diyor; dogrusu "hangi sistemin hangisi oldugu SOYLENMEDI" ve bu ikisi
+ayni sey degil. Bir sonraki olcum turunda cevaplar notlamadan once
+normalize edilecek. Bugun rapora yazildi, duzeltilmedi.

@@ -143,8 +143,8 @@ def testler() -> list[str] | None:
 ENJEKSIYONLAR = [
  ("Mali yili SEC'in fy alanindan al (ESKI HATAM)",
   "src/edgar_mcp/server.py",
-  "fiscal_year=temel + kayma,",
-  "fiscal_year=row.get('fy') or (temel + kayma),",
+  "            mali_yil, kaynak = takvim.yil(end)",
+  "            mali_yil, kaynak = (row.get('fy') or takvim.yil(end)[0]), 'reported'",
   "test_donem_yili_bitis_tarihinden_gelir"),
 
  ("Donem uzunlugu filtresini kaldir (ceyreklik sizsin)",
@@ -219,23 +219,23 @@ ENJEKSIYONLAR = [
   'name="get_concept_series",',
   "test_arac_isimleri_servis_onekli"),
 
- ("H-1: mali yil kaymasini turetme, eski heuristige don",
+ ("H-1: donemden SONRAKI capayi arama (kural: yil, yilin sonunda biter)",
   "src/edgar_mcp/server.py",
-  "kayma = sorted(set(kaymalar), key=lambda k: (-kaymalar.count(k), k))[0]",
-  "kayma = 0",
-  "test_kayma_target_tipi_eksi_bir"),
+  "        sonraki = next(((e, fy) for e, fy in self.capalar if e > end), None)",
+  "        sonraki = None if True else next(iter(self.capalar))",
+  "test_takvim_baslangic_yiliyla_adlandiran_perakendeci"),
 
  ("H-1: capa yokken 'turetildi' de (yalan bayrak)",
   "src/edgar_mcp/server.py",
-  "    if not capalar:\n        return 0, False",
-  "    if not capalar:\n        return 0, True",
-  "test_kayma_capa_yoksa_turetilmedi_isaretlenir"),
+  "        return bool(self.capalar)",
+  "        return True",
+  "test_takvim_capa_yoksa_takvim_yili_ve_isaret"),
 
  ("H-1: ceyreklik satirlari da capa say",
   "src/edgar_mcp/server.py",
   "        if start and not (300 <= _gun_farki(start, end) <= 400):\n            continue",
   "        if False:\n            continue",
-  "test_kayma_ceyreklik_satirlari_capa_saymaz"),
+  "test_takvim_ceyreklik_satirlari_capa_saymaz"),
 
  ("H-2: ilk eslesen etikette dur (gecmisi kirp)",
   "src/edgar_mcp/server.py",
@@ -245,8 +245,8 @@ ENJEKSIYONLAR = [
 
  ("H-2: ortusen donemde eski kaydi tut",
   "src/edgar_mcp/server.py",
-  "        if mevcut is None or (pt.filed, -oncelik.get(pt.source_tag, 99)) > (",
-  "        if mevcut is None or (pt.filed, -oncelik.get(pt.source_tag, 99)) < (",
+  "        kazanan, kaybeden = ((pt, mevcut) if sira(pt) > sira(mevcut)",
+  "        kazanan, kaybeden = ((pt, mevcut) if sira(pt) < sira(mevcut)",
   "test_ortusen_donemde_en_son_sunulan_kazanir"),
 
  ("H-2: source_tag'i sabitle (kaynak izlenebilirligi)",
@@ -779,16 +779,10 @@ ENJEKSIYONLAR = [
   "        if False:\n            pass\n        elif tag in (\"td\", \"th\"):",
   "test_gizli_blok_icinde_ayirici_uretilmiyor"),
 
- ("F: anlik sinirini yine takvim yilinda kur",
+ ("F: anlik sinirinda komsu yillari deneme (52/53 haftalik takvim)",
   "src/edgar_mcp/server.py",
-  "            sinir = date(_fy_sonuna_gore_yil(end, ay_gun), ay, gun)",
-  "            sinir = date(_yil(end), ay, gun)",
-  "test_yil_sonu_aralik_ocak_arasinda_oynayan_takvim"),
-
- ("F: yillik satirda yine bitis yilini kullan",
-  "src/edgar_mcp/server.py",
-  "            temel = _yil(end) if ay_gun is None else _fy_sonuna_gore_yil(end, ay_gun)",
-  "            temel = _yil(end)",
+  "        for aday_yil in (hedef, hedef - 1, hedef + 1):",
+  "        for aday_yil in (hedef,):",
   "test_yil_sonu_aralik_ocak_arasinda_oynayan_takvim"),
 
  ("F: mutabakati yine uye-filtreli kume uzerinden hesapla",
@@ -1215,6 +1209,138 @@ ENJEKSIYONLAR = [
   "    return days",
   "test_donem_kovasi_52_haftalik_takvimi_ayni_kovada_tutuyor"),
 
+ ("O: Form 4 tablolarini her sahip icin yeniden oku (ortak dosyalama)",
+  "src/edgar_mcp/sahiplik.py",
+  "                owner_count=sahip_sayisi,\n            ))\n    return out",
+  "                owner_count=sahip_sayisi,\n            ))\n    out.islemler = out.islemler * sahip_sayisi\n    return out",
+  "test_ortak_form4_islemleri_sahip_sayisi_kadar_cogaltmiyor"),
+
+ ("O: ortak dosyalamada yalnizca ilk sahibi yaz",
+  "src/edgar_mcp/sahiplik.py",
+  '    ad = "; ".join(out.owners)',
+  '    ad = out.owners[0] if out.owners else ""',
+  "test_ortak_form4_islemleri_sahip_sayisi_kadar_cogaltmiyor"),
+
+ ("O: Form 4/A bayragini dusur",
+  "src/edgar_mcp/sahiplik.py",
+  '    out.amendment = (_deger(kok, "documentType") or "").strip().upper().endswith("/A")',
+  "    out.amendment = False",
+  "test_form4_duzeltmesi_bildiriliyor"),
+
+ ("O: turev satirlarini kod toplamina kat",
+  "src/edgar_mcp/server.py",
+  "        if t.is_derivative:\n            turev_disarida += 1\n            continue",
+  "        if False:\n            turev_disarida += 1\n            continue",
+  "test_turev_satirlari_kod_toplamina_girmiyor"),
+
+ ("O: mutabakat anahtarindan donem uzunlugunu cikar",
+  "src/edgar_mcp/server.py",
+  "        return (bitis or \"\", birim, _donem_kovasi(gun))",
+  "        return (bitis or \"\", birim, None)",
+  "test_ayni_gun_biten_iki_donem_mutabakati_tek_satira_yigilmiyor"),
+
+ ("O: mutabakatta uye degerlerini gizle",
+  "src/edgar_mcp/server.py",
+  "            member_values=dict(sorted(uyeler.get(k, {}).items())),",
+  "            member_values={},",
+  "test_mutabakat_uye_degerlerini_gosteriyor"),
+
+ ("O: hicbir sey toplanamayinca sessizce bos don",
+  "src/edgar_mcp/server.py",
+  "    if not out and disarida:",
+  "    if False:",
+  "test_sayisal_olmayan_ve_nil_fact_sessizce_sayiya_cevrilmiyor"),
+
+ ("P: yil sonu / yil ici ayrimini kaldir (yuvarlama modu)",
+  "src/edgar_mcp/server.py",
+  "        yil_sonunda = self._yil_sonunda_mi(end)",
+  "        yil_sonunda = False",
+  "test_etiket_degisiminde_gecmis_kirpilmaz"),
+
+ ("P: capa eslesme toleransini yil boyuna cikar",
+  "src/edgar_mcp/server.py",
+  "FY_SONU_TOLERANSI = 10",
+  "FY_SONU_TOLERANSI = 400",
+  "test_takvim_52_53_haftalik_yilda_iki_yil_ayni_etiketi_almiyor"),
+
+ ("P: capa cakismasinda buyuk fy'yi sec",
+  "src/edgar_mcp/server.py",
+  "        if e not in en_kucuk or fy < en_kucuk[e]:",
+  "        if e not in en_kucuk or fy > en_kucuk[e]:",
+  "test_donem_yili_bitis_tarihinden_gelir"),
+
+ ("P: tutarsiz capada YANLIS capayi tut (cogunluk kuralini kaldir)",
+  "src/edgar_mcp/server.py",
+  "            if kayma == cogunluk and (onceki_fy - _yil(onceki_e)) != cogunluk:\n                temiz[-1] = (e, fy)\n            continue",
+  "            continue",
+  "test_takvim_tutarsiz_capa_dizisi_temizleniyor"),
+
+ ("P: mali yil kaynagini her zaman 'reported' de",
+  "src/edgar_mcp/server.py",
+  '            return fy - n, ("derived" if n == 0 else "extrapolated")',
+  '            return fy - n, "reported"',
+  "test_takvim_capa_araligi_disinda_etiket_tahmin_oldugunu_soyluyor"),
+
+ ("P: takvim degisikligi bayragini dusur",
+  "src/edgar_mcp/server.py",
+  "        self.takvim_degisti = len(aylar) > 1",
+  "        self.takvim_degisti = False",
+  "test_takvim_mali_yil_sonu_degisince_iki_rejim_de_dogru"),
+
+ ("R: indeks kacirinca govdeye bakmayi kapat (JPM MD&A vakasi)",
+  "src/edgar_mcp/server.py",
+  "            vurus = bolum_govdede_ara(cikti.metin, section)",
+  "            vurus = None",
+  "test_bitisik_gercek_basliklar_bulunamadi_diye_reddedilmiyor"),
+
+ ("R: govde aramasinda icindekiler satirini sec (ilk vurus)",
+  "src/edgar_mcp/belge.py",
+  "        if en_iyi is None or (son - m.start()) > (en_iyi[2] - en_iyi[1]):",
+  "        if en_iyi is None:",
+  "test_bitisik_gercek_basliklar_bulunamadi_diye_reddedilmiyor"),
+
+ ("R: bolum kaynagini her zaman indeks de",
+  "src/edgar_mcp/server.py",
+  '                bolum_kaynagi = "search"',
+  '                bolum_kaynagi = "index"',
+  "test_bitisik_gercek_basliklar_bulunamadi_diye_reddedilmiyor"),
+
+ ("S: 13F duzeltme bayragini dusur",
+  "src/edgar_mcp/sahiplik.py",
+  "        amendment=(duzeltme_no is not None or duzeltme_tipi is not None\n                   or str(bayrak or \"\").strip().lower() in (\"true\", \"y\", \"1\")),",
+  "        amendment=False,",
+  "test_13f_duzeltmesi_duzeltme_oldugunu_soyluyor"),
+
+ ("S: 13F duzeltme turunu rapor turuyle karistir",
+  "src/edgar_mcp/sahiplik.py",
+  '    duzeltme_tipi = bul("amendmentType")',
+  '    duzeltme_tipi = bul("reportType")',
+  "test_13f_duzeltmesi_duzeltme_oldugunu_soyluyor"),
+
+ ("T: etiket agirligini siralamadan cikar (tek noktali cop kazansin)",
+  "src/edgar_mcp/server.py",
+  "        return (pt.filed, agirlik.get(pt.source_tag, 0),\n                -oncelik.get(pt.source_tag, 99))",
+  "        return (pt.filed, 0, -oncelik.get(pt.source_tag, 99))",
+  "test_tek_noktali_ilgisiz_etiket_seriyi_ele_gecirmiyor"),
+
+ ("T: etiket celiskisini bildirme",
+  "src/edgar_mcp/server.py",
+  "            catismalar.append(TagConflict(",
+  "            [] .append(TagConflict(",
+  "test_etiketler_celistiginde_celiski_bildiriliyor"),
+
+ ("T: celiskiyi ayni etiketin iki dosyalamasinda da bildir",
+  "src/edgar_mcp/server.py",
+  "        if (kazanan.source_tag != kaybeden.source_tag\n                and kazanan.value != kaybeden.value):",
+  "        if kazanan.value != kaybeden.value:",
+  "test_etiketler_celistiginde_celiski_bildiriliyor"),
+
+ ("U: Dockerfile'dan LICENSE kopyalamayi kaldir (imaj derlenmesin)",
+  "Dockerfile",
+  "COPY pyproject.toml README.md LICENSE ./",
+  "COPY pyproject.toml README.md ./",
+  "test_dockerfile_pyprojectin_istedigi_dosyalari_kopyaliyor"),
+
  ("L: OCI sahiplik etiketini baska bir ada cevir",
   "Dockerfile",
   'LABEL io.modelcontextprotocol.server.name="io.github.belermirzaa7-ops/sec-edgar-mcp"',
@@ -1298,17 +1424,61 @@ def bol(liste: list[tuple], ifade: str) -> list[tuple]:
     return liste[(k - 1) * adim: k * adim]
 
 
-def kontrol() -> int:
+def git_temiz_mi() -> bool | None:
+    """Korunan dosyalar HEAD ile ayni mi. Karar verilemiyorsa None.
+
+    Yedek dizininden BAGIMSIZ ikinci bir kaynak. Neden gerekli (18 Agu 2026,
+    denetimde uretildi): `artiklar()` "enjekte kalmis dosya" listesini yalnizca
+    `.enjeksiyon_yedek/` VARSA hesapliyor, ve o dizin `.gitignore`'da. Taze bir
+    klon, `git clean -fdx` ya da elle temizlik tek kaniti siliyor; kaynak dosya
+    enjekte kalsa bile `--kontrol` "TEMIZ" diyordu. Yani KK-41'de kapatilan
+    bosluk, kapatan aracin kendisinde geri aciliyordu.
+    """
+    try:
+        r = subprocess.run(
+            ["git", "diff", "--quiet", "--", *DOSYALAR],
+            cwd=KOK, capture_output=True, timeout=60,
+            encoding="utf-8", errors="replace",
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode == 0:
+        return True
+    if r.returncode == 1:
+        return False
+    return None                      # git yok, depo degil, ya da baska bir hata
+
+
+def kontrol(sert: bool = False) -> int:
     """Onceki bir calismadan artik kaldi mi. Kirli ise exit 2.
 
     Onarim YAPMAZ (bkz. `artiklar`): CI'nin ve paketleme adiminin gormesi
     gereken sey durumun kendisi. Sessizce onaran bir kontrol, "cokmeden sonra
     paketlendi" olayini gorunmez kilardi - kapatmaya calistigimiz bosluk tam
     olarak buydu.
+
+    `sert=True` ikinci bir kaynak olarak git'e de bakar ve karar veremezse
+    exit 3 doner. Varsayilan olarak KAPALI: normal gelistirmede korunan
+    dosyalar zaten HEAD'den farkli olur ve her cagri exit 3 donerdi. Ama
+    varsayilan haliyle de "TEMIZ" DEMEZ - yalnizca neye baktigini soyler.
     """
     yedek, kilit, farkli, not_ = artiklar()
     if not (yedek or kilit):
-        print("  TEMIZ: enjeksiyon artigi yok.")
+        git = git_temiz_mi()
+        if git is True:
+            print("  TEMIZ: artik yedek/kilit yok ve korunan dosyalar HEAD ile ayni.")
+            return 0
+        if sert:
+            print("  DOGRULANAMADI: artik yedek/kilit yok, ama korunan dosyalarin")
+            print("  HEAD ile ayni oldugu git'ten teyit edilemedi"
+                  + (" (git farkli diyor)." if git is False else " (git okunamadi)."))
+            print("  Yedek dizini .gitignore'da oldugu icin silinmis bir artik")
+            print("  yalnizca git ile gorulebilir.")
+            return 3
+        print("  ARTIK YOK: yedek dizini ve kilit dosyasi bulunmadi.")
+        print("  Kaynak dosyalar KARSILASTIRILMADI - karsilastirilacak yedek yok."
+              + ("" if git is not False else " (git korunan dosyalarda fark goruyor.)"))
+        print("  Kesin kontrol icin: --kontrol --sert (temiz bir calisma agacinda).")
         return 0
     print("  KIRLI: onceki bir enjeksiyon calismasi tamamlanmamis.")
     if kilit:
@@ -1431,5 +1601,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     if "--kontrol" in sys.argv[1:]:
-        sys.exit(kontrol())
+        sys.exit(kontrol(sert="--sert" in sys.argv[1:]))
     sys.exit(main())

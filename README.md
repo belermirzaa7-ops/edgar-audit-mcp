@@ -13,7 +13,7 @@ Built against the **2026-07-28 MCP specification** using the Python SDK `v2.0.0`
 
 [![CI](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml)
 
-**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured: 26% correct without this server, 90% with it](evaluation/benchmark.md) · [33 failures that shipped here, each with the test that guards it](PATTERNS.md)
+**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured: 26% correct without this server, 90% with it](evaluation/benchmark.md) · [36 failures that shipped here, each with the test that guards it](PATTERNS.md)
 
 ---
 
@@ -56,8 +56,9 @@ reports which taxonomies a company actually files under, so the model discovers
 them instead of guessing: financial statements live in `us-gaap`, while public
 float and shares outstanding live in `dei`.
 
-The four tools that can take several seconds — reading a filing, parsing an
-XBRL instance, ranking a frame of thousands of companies — report progress
+The eight tools that can take several seconds — listing filings, full-text
+search, reading a filing, parsing an XBRL instance, ranking a frame of
+thousands of companies, reading Form 4s and a 13F table — report progress
 while they work, which the 2026-07-28 spec defines for exactly this case. The
 rest do not: progress on a call that returns in milliseconds is noise. Nothing
 else beyond `tools` is implemented, deliberately — for a read-only data server
@@ -592,7 +593,7 @@ src/edgar_mcp/client.py   SEC HTTP client, rate limiter, caching
 tests/                    mocked unit tests
 tests/dil.py              language gate for the outward-facing surface
 tests/test_http_tasima.py runs the documented HTTP and stdio transports
-evaluation/questions.xml  ten measured questions with their tool calls
+evaluation/questions.xml  twenty-two measured questions with their tool calls
 arac/enjeksiyon.py        fault-injection harness
 arac/sir_tarama.py        secret scanner
 arac/tani.py              raw single-response diagnostic for one SEC concept

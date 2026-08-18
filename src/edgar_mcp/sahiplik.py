@@ -67,6 +67,7 @@ class Islem:
     nature_of_ownership: str | None
     is_derivative: bool
     is_holding: bool          # islem degil, yalnizca mevcut pozisyon bildirimi
+    owner_count: int = 1      # ortak dosyalamada satirin kac sahibi var
 
 
 @dataclass
@@ -75,7 +76,9 @@ class Form4:
     issuer_name: str | None = None
     issuer_ticker: str | None = None
     period: str | None = None
+    amendment: bool = False
     islemler: list[Islem] = field(default_factory=list)
+    owners: list[str] = field(default_factory=list)
 
 
 def _deger(e: ET.Element | None, ad: str) -> str | None:
@@ -127,62 +130,76 @@ def form4_ayristir(govde: str) -> Form4:
         period=_deger(kok, "periodOfReport"),
     )
 
-    # Bir Form 4 birden fazla `reportingOwner` tasiyabilir (ortak dosyalama).
+    # Bir Form 4 birden fazla `reportingOwner` tasiyabilir (ortak dosyalama:
+    # bir fon grubu, bir aile, bir ortaklik). ISLEM TABLOLARI BELGEYE AITTIR,
+    # sahibe DEGIL - kok altinda tek bir `nonDerivativeTable` vardir.
+    #
+    # 18 Agu 2026, denetimde bulundu: tablolar sahip dongusunun ICINDE
+    # okunuyordu, dolayisiyla dort sahipli bir dosyalamada her islem DORT KEZ
+    # donuyordu. Olculdu (CoreWeave, 0001104659-26-097435, dort sahipli
+    # Magnetar dosyalamasi): belgede 24 satir / 307.131 hisse, arac 96 satir /
+    # 1.228.524 hisse bildiriyordu - tam dort kati. Bu, "iceriden alim" diye
+    # okunacak bir sayiyi dort katina cikaran sessiz bir hata.
     sahipler = kok.findall("reportingOwner")
-    if not sahipler:
-        sahipler = [ET.Element("reportingOwner")]
+    kimlikler = [s.find("reportingOwnerId") for s in sahipler]
+    iliskiler = [s.find("reportingOwnerRelationship") for s in sahipler]
+    adlar = [(_deger(k, "rptOwnerName") or "") for k in kimlikler]
+    out.owners = [a for a in adlar if a]
+    out.amendment = (_deger(kok, "documentType") or "").strip().upper().endswith("/A")
 
-    for sahip in sahipler:
-        kimlik = sahip.find("reportingOwnerId")
-        iliski = sahip.find("reportingOwnerRelationship")
-        ad = _deger(kimlik, "rptOwnerName") or ""
-        cik = _deger(kimlik, "rptOwnerCik")
-        yonetici = _bayrak(iliski, "isDirector")
-        gorevli = _bayrak(iliski, "isOfficer")
-        onda_bir = _bayrak(iliski, "isTenPercentOwner")
-        unvan = _deger(iliski, "officerTitle")
+    # Ortak dosyalamada islem TEK bir kisiye atfedilemez; adlar birlestiriliyor
+    # ve kac sahip oldugu satirda yaziyor. Ilk sahibi secip otekileri dusurmek,
+    # kimin islem yaptigi hakkinda uydurma bir kesinlik verirdi.
+    ad = "; ".join(out.owners)
+    cik = _deger(kimlikler[0], "rptOwnerCik") if kimlikler else None
+    yonetici = any(_bayrak(i, "isDirector") for i in iliskiler)
+    gorevli = any(_bayrak(i, "isOfficer") for i in iliskiler)
+    onda_bir = any(_bayrak(i, "isTenPercentOwner") for i in iliskiler)
+    unvan = next((u for u in (_deger(i, "officerTitle") for i in iliskiler) if u), None)
+    sahip_sayisi = max(1, len(sahipler))
 
-        for tablo_adi, turev in (("nonDerivativeTable", False), ("derivativeTable", True)):
-            tablo = kok.find(tablo_adi)
-            if tablo is None:
+    for tablo_adi, turev in (("nonDerivativeTable", False), ("derivativeTable", True)):
+        tablo = kok.find(tablo_adi)
+        if tablo is None:
+            continue
+        for cocuk in tablo:
+            # `...Transaction` islem, `...Holding` yalnizca mevcut pozisyon.
+            # Ikisini ayni listede ayrimsiz vermek, hic alinip satilmamis bir
+            # pozisyonu "islem" gibi gosterirdi.
+            tutma = cocuk.tag.endswith("Holding")
+            if not (cocuk.tag.endswith("Transaction") or tutma):
                 continue
-            for cocuk in tablo:
-                # `...Transaction` islem, `...Holding` yalnizca mevcut pozisyon.
-                # Ikisini ayni listede ayrimsiz vermek, hic alinip satilmamis bir
-                # pozisyonu "islem" gibi gosterirdi.
-                tutma = cocuk.tag.endswith("Holding")
-                if not (cocuk.tag.endswith("Transaction") or tutma):
-                    continue
-                kodlama = cocuk.find("transactionCoding")
-                miktar = cocuk.find("transactionAmounts")
-                sonrasi = cocuk.find("postTransactionAmounts")
-                doga = cocuk.find("ownershipNature")
-                out.islemler.append(Islem(
-                    owner_name=ad,
-                    owner_cik=cik,
-                    is_director=yonetici,
-                    is_officer=gorevli,
-                    is_ten_percent_owner=onda_bir,
-                    officer_title=unvan,
-                    security=_deger(cocuk, "securityTitle") or "",
-                    transaction_date=_deger(cocuk, "transactionDate"),
-                    code=_deger(kodlama, "transactionCode") if kodlama is not None else None,
-                    shares=_sayi(_deger(miktar, "transactionShares") if miktar is not None else None),
-                    price_per_share=_sayi(
-                        _deger(miktar, "transactionPricePerShare") if miktar is not None else None),
-                    acquired_or_disposed=(
-                        _deger(miktar, "transactionAcquiredDisposedCode")
-                        if miktar is not None else None),
-                    shares_owned_after=_sayi(
-                        _deger(sonrasi, "sharesOwnedFollowingTransaction")
-                        if sonrasi is not None else None),
-                    direct_or_indirect=(
-                        _deger(doga, "directOrIndirectOwnership") if doga is not None else None),
-                    nature_of_ownership=(
-                        _deger(doga, "natureOfOwnership") if doga is not None else None),
-                    is_derivative=turev,
-                    is_holding=tutma,
-                ))
+            kodlama = cocuk.find("transactionCoding")
+            miktar = cocuk.find("transactionAmounts")
+            sonrasi = cocuk.find("postTransactionAmounts")
+            doga = cocuk.find("ownershipNature")
+            out.islemler.append(Islem(
+                owner_name=ad,
+                owner_cik=cik,
+                is_director=yonetici,
+                is_officer=gorevli,
+                is_ten_percent_owner=onda_bir,
+                officer_title=unvan,
+                security=_deger(cocuk, "securityTitle") or "",
+                transaction_date=_deger(cocuk, "transactionDate"),
+                code=_deger(kodlama, "transactionCode") if kodlama is not None else None,
+                shares=_sayi(_deger(miktar, "transactionShares") if miktar is not None else None),
+                price_per_share=_sayi(
+                    _deger(miktar, "transactionPricePerShare") if miktar is not None else None),
+                acquired_or_disposed=(
+                    _deger(miktar, "transactionAcquiredDisposedCode")
+                    if miktar is not None else None),
+                shares_owned_after=_sayi(
+                    _deger(sonrasi, "sharesOwnedFollowingTransaction")
+                    if sonrasi is not None else None),
+                direct_or_indirect=(
+                    _deger(doga, "directOrIndirectOwnership") if doga is not None else None),
+                nature_of_ownership=(
+                    _deger(doga, "natureOfOwnership") if doga is not None else None),
+                is_derivative=turev,
+                is_holding=tutma,
+                owner_count=sahip_sayisi,
+            ))
     return out
 
 
@@ -273,6 +290,14 @@ class KapakSayfasi:
     table_entry_total: int | None = None
     table_value_total: float | None = None
     other_managers: int | None = None
+    # Duzeltme bilgisi. `report_type` BASKA bir kutu (HOLDINGS / NOTICE /
+    # COMBINATION) ve duzeltme durumuyla ilgisi yok - 18 Agu 2026 denetiminde
+    # tam da bu karistirildi: bir 13F-HR/A "13F HOLDINGS REPORT" diye
+    # donuyordu ve okuyan, 1,7 milyar dolarlik tek pozisyonu Berkshire'in tum
+    # portfoyu saniyordu (gercek ~313 milyar).
+    amendment: bool = False
+    amendment_number: int | None = None
+    amendment_type: str | None = None
 
 
 def kapak_ayristir(govde: str) -> KapakSayfasi:
@@ -296,7 +321,17 @@ def kapak_ayristir(govde: str) -> KapakSayfasi:
     # sayfasindaki ilki dosyalayan yoneticidir.
     sayi = _sayi(bul("tableEntryTotal"))
     diger = _sayi(bul("otherIncludedManagersCount"))
+    duzeltme_no = _sayi(bul("amendmentNo"))
+    # `amendmentType` iki degerden biri: RESTATEMENT (orijinalin YERINE gecer)
+    # ya da NEW HOLDINGS (orijinale EKLENIR). Ikisi tumuyle farkli okunur ve
+    # varsayilan yorum yanlis olandir.
+    duzeltme_tipi = bul("amendmentType")
+    bayrak = bul("isAmendment")
     return KapakSayfasi(
+        amendment=(duzeltme_no is not None or duzeltme_tipi is not None
+                   or str(bayrak or "").strip().lower() in ("true", "y", "1")),
+        amendment_number=int(duzeltme_no) if duzeltme_no is not None else None,
+        amendment_type=duzeltme_tipi,
         manager_name=bul("name"),
         report_type=bul("reportType"),
         period_of_report=bul("periodOfReport"),

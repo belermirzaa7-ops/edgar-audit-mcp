@@ -1,8 +1,9 @@
 # Eight ways SEC data answers your question wrongly, and nobody notices
 
 *A case study from building `sec-edgar-mcp`, a read-only MCP server over SEC
-EDGAR. Every number below was measured against live filings; each one is
-reproduced by a test in the repository.*
+EDGAR. Every number below was measured against live filings, and every behaviour
+described is pinned by a test in the repository. Where a figure shows what the
+tool did **before** a fix, it says so — those are recorded, not reproducible.*
 
 ---
 
@@ -61,7 +62,7 @@ Apple reported revenue under `SalesRevenueNet` until ASC 606, then under
 `RevenueFromContractWithCustomerExcludingAssessedTax`. Ask the modern tag and
 you get 2017 onward. Ask the old tag and you get 2007–2017.
 
-Measured:
+Measured on the version that stopped at the first tag that answered:
 
 ```
 alias 'revenue'      ->  9 periods, FY2017 - FY2025
@@ -202,7 +203,8 @@ published.
 
 Neither answering side ever saw the expected answers, and a separate grader saw
 the two answers in randomised order without being told which system produced
-which. The full method, the raw answers from both runs, the grades and the
+which — though it was not told rather than unable to tell, since the two arms'
+answers do not look alike. The full method, the raw answers from both runs, the grades and the
 limits of the number are in
 [`evaluation/benchmark.md`](../evaluation/benchmark.md) — including the three
 period mismatches that survive, and a direct measurement of how much the grader
@@ -211,9 +213,9 @@ read every figure as carrying about ±2 points.
 
 ## How it is kept true
 
-- **268 tests**, no network access — SEC responses are mocked from real captured
+- **286 tests**, no network access — SEC responses are mocked from real captured
   payloads.
-- **178 fault injections.** Every guard above is deliberately broken by an
+- **199 fault injections.** Every guard above is deliberately broken by an
   automated harness, and the test that should catch it must turn red. A guard
   that nothing catches is reported as `KORUMASIZ` — unprotected — and the run
   fails. This has caught guards that looked protected and were not, including
@@ -221,7 +223,7 @@ read every figure as carrying about ±2 points.
 - **A 22-question evaluation set**, every answer produced by running the tools
   against live SEC data with the exact calls recorded, so any answer can be
   re-measured rather than trusted.
-- **[`PATTERNS.md`](../PATTERNS.md)** — 33 failures that actually shipped in
+- **[`PATTERNS.md`](../PATTERNS.md)** — 36 failures that actually shipped in
   this repository, each with symptom, root cause, how it is detected now, and
   the test that guards it. A separate test suite keeps that document from
   drifting: every test it names must exist.

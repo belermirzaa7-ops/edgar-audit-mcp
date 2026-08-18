@@ -14,7 +14,7 @@ can verify rather than remember.
 | # | Check | Guard |
 |---|---|---|
 | [P-1](#p-1) | Did I verify one externally-known value end to end? | **none — manual step** |
-| [P-2](#p-2) | Did I write a rule where the data could tell me the answer? | `test_kayma_target_tipi_eksi_bir`, `test_kayma_apple_tipi_sifir` |
+| [P-2](#p-2) | Did I write a rule where the data could tell me the answer? | `test_takvim_baslangic_yiliyla_adlandiran_perakendeci`, `test_takvim_bitis_yiliyla_adlandiran_sirket` |
 | [P-3](#p-3) | Does stopping at the first match silently truncate anything? | `test_etiket_degisiminde_gecmis_kirpilmaz` |
 | [P-4](#p-4) | Does my mock reproduce the real API's contract, including errors? | `arac/enjeksiyon.py` |
 | [P-5](#p-5) | Did I re-run fault injection after changing code? | `arac/enjeksiyon.py` exits 1, CI job `fault-injection` |
@@ -46,6 +46,9 @@ can verify rather than remember.
 | [P-31](#p-31) | Does my cleanup depend on my process getting a chance to run it? | `test_enjeksiyon_kontrol_modu_yarim_kalan_kosuyu_goruyor`, `test_enjeksiyon_parcali_kosu_hicbir_enjeksiyonu_dusurmuyor` |
 | [P-32](#p-32) | Is "the latest filing" the latest as of *when* — and does my filter cut on the period or on the filing date? | `test_as_of_o_tarihte_bilinen_degeri_donduruyor`, `test_as_of_bilinmeyen_tarih_iceri_alinmiyor` |
 | [P-33](#p-33) | Am I identifying a period by its end date alone, when the same day ends a quarter and a year-to-date total? | `test_ayni_gun_biten_farkli_uzunluktaki_donemler_birbirini_dusurmuyor`, `test_farkli_uzunluktaki_donemler_revizyon_sanilmiyor` |
+| [P-34](#p-34) | Does a loop over one thing quietly repeat work that belongs to another? | `test_ortak_form4_islemleri_sahip_sayisi_kadar_cogaltmiyor` |
+| [P-35](#p-35) | Does the heuristic that filters noise also filter the signal — and does the tool then deny the thing exists? | `test_bitisik_gercek_basliklar_bulunamadi_diye_reddedilmiyor` |
+| [P-36](#p-36) | Does my detector's only evidence live somewhere the cleanup deletes? | `test_enjeksiyon_kontrol_yedek_silinince_temiz_demiyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -141,7 +144,7 @@ test go red. If it stays green, the test is theatre.
 **Incident.** Two cases, 12 Aug 2026.
 1. `test_filings_filter` — fixture had one form type. Fixed by putting 10-K,
    10-Q, 8-K and Form 4 in the fixture.
-2. `test_kayma_ceyreklik_satirlari_capa_saymaz` — the scenario produced the
+2. `test_takvim_ceyreklik_satirlari_capa_saymaz` — the scenario produced the
    same result with and without the filter. Rebuilt so removing the filter
    *must* change the answer.
 
@@ -998,6 +1001,109 @@ put to a case that would break it — P-4 again, three months after P-4 was
 written down. `period="annual"` and `period="quarterly"` were accidentally safe,
 because their day-length filter separated the two rows; `period="all"` is a
 documented option and had no such protection.
+
+---
+
+<a id="p-34"></a>
+### P-34 · A loop over the wrong thing
+
+**Symptom.** An insider-trading report showed 96 transactions totalling
+1,228,524 shares for a filing whose document contains 24 rows totalling
+307,131. Exactly four times too many, and the duplication was in the itemised
+list, not only in the totals — so nothing about the output looked rounded,
+aggregated or approximate. It looked like a company whose insiders had bought
+four times as much stock as they had.
+
+**Root cause.** A Form 4 may be filed jointly: a fund group, a family, a
+partnership. The parser looped over the reporting owners and, inside that loop,
+read the transaction tables from the document root. The tables belong to the
+*document*, not to an owner — there is one `nonDerivativeTable` per filing — so
+every transaction was emitted once per signatory.
+
+The shape is general: an outer loop over A, an inner read of B, where B is not
+scoped to A. It reads naturally and produces a well-formed answer whose only
+defect is that a number is a small integer multiple of the truth. Multiples are
+the hardest error to notice, because nothing about them looks like corruption.
+
+**Detection.** The tables are read once. A joint filing cannot attribute a line
+to any single signatory, so every name is carried on the line and `owner_count`
+says how many signed; `joint_filings_read` counts them at the report level. The
+fixture now contains a three-owner filing — without one, no test could ever
+have distinguished the two implementations.
+
+**Incident.** 18 Aug 2026, found by a hostile review running the tool against
+live SEC data, not by the test suite, which was fully green at the time.
+
+---
+
+<a id="p-35"></a>
+### P-35 · The filter that removes the noise removes the signal too
+
+**Symptom.** Asked to read JPMorgan's management discussion, the tool replied
+that the filing has no such section, and listed 43 headings that did not
+include Item 7, Item 7A or Item 8. The same tool's own search located
+"Item 8. Financial Statements and Supplementary Data." in the body text at a
+specific offset. So the tool denied the existence of something it could see.
+
+**Root cause.** Section headings are separated from table-of-contents entries
+by a threshold: a heading counts only when enough text follows it before the
+next candidate heading. That rule is right for a contents page, where entries
+sit a line apart. It is wrong for a filer who incorporates a section by page
+reference — JPMorgan's Item 7 says, in effect, "refer to pages 133-142", so
+Item 7, Item 7A and Item 8 stand within a few hundred characters of each other
+and all three fail the test.
+
+The general shape: a heuristic tuned to reject a common kind of noise, applied
+as if it were a definition. The failure is invisible in testing because the
+noise it was built for is what the fixtures contain.
+
+**Detection.** The index rule is unchanged — it is right most of the time — but
+it is no longer the only route. When the index does not hold a requested
+section, the text itself is searched for the heading, preferring the occurrence
+with the most text after it, and the answer says `section_source: "search"` so
+the caller knows the index rules did not vouch for it. The error raised when
+neither route finds anything now says so, and says the heading list it prints
+is the first 25 of however many exist.
+
+**Incident.** 18 Aug 2026, hostile review against live filings. Item 5 was
+being dropped across four different filers for the same reason.
+
+---
+
+<a id="p-36"></a>
+### P-36 · The detector whose evidence is disposable
+
+**Symptom.** `enjeksiyon.py --kontrol` — the check written specifically so that
+a half-finished fault-injection sweep could never be packaged unnoticed —
+printed "TEMIZ: enjeksiyon artigi yok" and exited 0 on a tree that had an
+injected source file sitting in it.
+
+**Root cause.** The check compares the source files against the backup
+directory the harness writes at the start of a run. No backup directory, no
+comparison — and the code then reported the absence of evidence as the absence
+of a problem. The backup directory is in `.gitignore`, so a fresh clone, a
+`git clean -fdx`, a container reset, or an operator tidying up removes the only
+thing the check looks at, while leaving the injected file exactly where it was.
+
+So the gap that P-31 was written to close reopened inside the tool that closed
+it: the leftover was, once again, visible from nowhere.
+
+A second half, in CI: the check ran as an ordinary step with no `if: always()`,
+so it executed only when the sweep before it had already succeeded — that is,
+only when there was nothing to find. The case worth catching, a sweep that
+died or was cancelled part-way, skipped the check entirely.
+
+**Detection.** Three changes. Without a backup to compare against, the output
+no longer says "clean" — it says what it checked and what it could not, which
+is a different sentence and an honest one. `--sert` adds a second, independent
+source: `git diff` against HEAD for the guarded files, and a state it cannot
+confirm exits 3 rather than 0. It is off by default, because on a working copy
+those files legitimately differ from HEAD and a check that fails every time
+teaches people to ignore it. CI runs `--kontrol --sert` with `if: always()`.
+
+**Incident.** 18 Aug 2026, produced by a hostile review of the measurement
+machinery itself. The reviewer copied the repository, applied an injection by
+hand, deleted the backup directory, and ran the check.
 
 ---
 

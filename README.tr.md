@@ -11,7 +11,7 @@ belirli bir US-GAAP etiketine ve belirli bir sunulma tarihine kadar izlenebilir.
 
 **Buradan başlayın:** [başka araçların sessizce yanlış yaptığı şeyler](docs/case-study.md) ·
 [ölçüldü: bu sunucu olmadan %26 doğru, onunla %90](evaluation/benchmark.md) ·
-[bu depoda gerçekten yaşanmış 33 hata, her biri bir testle korunuyor](PATTERNS.md)
+[bu depoda gerçekten yaşanmış 36 hata, her biri bir testle korunuyor](PATTERNS.md)
 
 ---
 
@@ -53,8 +53,9 @@ etiketle çağrılır. Etiket taksonomisiyle nitelenebilir — `dei:EntityPublic
 fiilen kullandığı taksonomileri bildirir, böylece model tahmin etmez: mali
 tablolar `us-gaap` içinde, halka açıklık oranı ve hisse adedi `dei` içindedir.
 
-Birkaç saniye sürebilen dört araç — dosyalama okuma, XBRL instance ayrıştırma,
-binlerce şirketlik çerçeve sıralama — çalışırken ilerleme bildiriyor; 2026-07-28
+Birkaç saniye sürebilen sekiz araç — dosyalama listeleme, tam metin arama,
+dosyalama okuma, XBRL instance ayrıştırma, binlerce şirketlik çerçeve sıralama,
+Form 4 ve 13F okuma — çalışırken ilerleme bildiriyor; 2026-07-28
 spesifikasyonu bu yeteneği tam olarak bu durum için tanımlıyor. Diğerleri
 bildirmiyor: milisaniyede dönen bir çağrıda ilerleme gürültüdür. `tools`
 dışında başka hiçbir yetenek bilerek uygulanmadı — salt okunur bir veri
@@ -425,8 +426,9 @@ sec_edgar_get_concept_series(ticker="MSFT", concept="revenue", limit=5)
 ```
 
 Mevcut takma adlar: `capex`, `cash`, `eps_diluted`, `gross_profit`,
-`net_income`, `operating_cash_flow`, `operating_income`, `revenue`,
-`rnd_expense`, `stockholders_equity`, `total_assets`, `total_liabilities`.
+`net_income`, `operating_cash_flow`, `operating_income`, `public_float`,
+`revenue`, `rnd_expense`, `shares_diluted`, `shares_outstanding`,
+`stockholders_equity`, `total_assets`, `total_liabilities`.
 Ham US-GAAP etiketleri de kabul edilir. Bir kavram bulunamadığında hata mesajı
 geçerli takma adları sayar ve keşif aracını gösterir — hata metinleri sadece
 başarısızlığı bildirmek için değil, modelin ona göre hareket edebilmesi için

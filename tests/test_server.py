@@ -116,6 +116,17 @@ SALES_REVENUE = {"label": "Sales Revenue, Net", "units": {"USD": [
 ]}}
 
 
+# TEK NOKTALI, ilgisiz bir etiket. Olculdu (Perrigo, 18 Agu 2026):
+# `Revenues` etiketinde SEC'te tek bir veri noktasi var ve degeri 800.000
+# dolar; `SalesRevenueNet`'te 42 nokta ve ayni donem icin 3.539.800.000. Ikisi
+# de AYNI GUN dosyalanmis - yani `filed` esit - ve siralama alias sirasina
+# dusup tek noktali copu seciyordu. Seri "3,17 mlr -> 0,8 mn -> 3,91 mlr"
+# okunuyordu. Fixture bu durumu tasimadigi surece hicbir test gormez (P-4).
+REVENUES_TEK = {"label": "Revenues", "units": {"USD": [
+    {"start":"2016-09-25","end":"2017-09-30","val":800_000,"fy":2019,"fp":"FY","form":"10-K","filed":"2019-10-31"},
+]}}
+
+
 # --------------------------------------------------------- sahte 10-K belgesi
 # Gercek bir 10-K'nin iki ozelligini tasimali, yoksa metin araci sinanmis olmaz:
 # (1) icindekiler tablosu ayni basliklari ONCE kisa baglantilar olarak icerir,
@@ -347,6 +358,34 @@ INSTANCE_XML = """<?xml version="1.0" encoding="utf-8"?>
     <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier></entity>
     <period><instant>2025-12-31</instant></period>
   </context>
+  <!-- AYNI GUN biten ALTI AYLIK donem: gercek bir 10-Q hem ceyregi hem yil
+       basindan beri toplami tasir ve ikisi ayni gun biter. Fixture bunu
+       tasimadigi surece "bitis tarihi donemin kimligidir" varsayimi hicbir
+       testte gorunmez (P-4). -->
+  <context id="c-y1">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier></entity>
+    <period><startDate>2025-07-01</startDate><endDate>2025-12-31</endDate></period>
+  </context>
+  <context id="c-y2">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier>
+      <segment>
+        <xbrldi:explicitMember dimension="us-gaap:StatementBusinessSegmentsAxis">
+          tsla:AutomotiveSegmentMember
+        </xbrldi:explicitMember>
+      </segment>
+    </entity>
+    <period><startDate>2025-07-01</startDate><endDate>2025-12-31</endDate></period>
+  </context>
+  <context id="c-y3">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier>
+      <segment>
+        <xbrldi:explicitMember dimension="us-gaap:StatementBusinessSegmentsAxis">
+          tsla:EnergySegmentMember
+        </xbrldi:explicitMember>
+      </segment>
+    </entity>
+    <period><startDate>2025-07-01</startDate><endDate>2025-12-31</endDate></period>
+  </context>
   <context id="c-3">
     <entity><identifier scheme="http://www.sec.gov/CIK">0001318605</identifier>
       <segment>
@@ -421,6 +460,9 @@ INSTANCE_XML = """<?xml version="1.0" encoding="utf-8"?>
   <us-gaap:Revenues contextRef="c-4" unitRef="usd" decimals="-6" id="f-3">20690000000</us-gaap:Revenues>
   <us-gaap:Revenues contextRef="c-5" unitRef="usd" decimals="-6" id="f-4">41000000000</us-gaap:Revenues>
   <us-gaap:Revenues contextRef="c-8" unitRef="usd" decimals="-6" id="f-5">10100000000</us-gaap:Revenues>
+  <us-gaap:Revenues contextRef="c-y1" unitRef="usd" decimals="-6" id="f-y1">50000000000</us-gaap:Revenues>
+  <us-gaap:Revenues contextRef="c-y2" unitRef="usd" decimals="-6" id="f-y2">39000000000</us-gaap:Revenues>
+  <us-gaap:Revenues contextRef="c-y3" unitRef="usd" decimals="-6" id="f-y3">11000000000</us-gaap:Revenues>
   <us-gaap:SalesRevenueNet contextRef="c-3" unitRef="usd" decimals="-6" id="f-16">77000000000</us-gaap:SalesRevenueNet>
   <us-gaap:SalesRevenueNet contextRef="c-4" unitRef="usd" decimals="-6" id="f-17">20690000000</us-gaap:SalesRevenueNet>
   <us-gaap:GrossProfit contextRef="c-1" unitRef="usd" decimals="-6" id="f-6">17094000000</us-gaap:GrossProfit>
@@ -511,6 +553,7 @@ LAB_XML = """<?xml version="1.0" encoding="utf-8"?>
 # QName olarak gostermeye devam etmeli - cevabi dusurmemeli.
 DIZIN_ETIKETSIZ_JSON = {"directory": {"item": [
     {"name": "aapl-20250628.htm", "type": "text.gif", "size": "2400"},
+    {"name": "bitisik-basliklar.htm", "type": "text.gif", "size": "1200"},
     {"name": "aapl-20250628_htm.xml", "type": "text.gif", "size": "2667"},
     {"name": "aapl-20250628.xsd", "type": "text.gif", "size": "900"},
 ]}}
@@ -519,6 +562,8 @@ DIZIN_XBRLSIZ_JSON = {"directory": {"item": [
     {"name": "aapl-8k.htm", "type": "text.gif", "size": "2400"},
     {"name": "report.css", "type": "text.gif", "size": "100"},
 ]}}
+
+
 
 
 # WMT tipi: mali yil 31 Ocak'ta biter, yani KENDI ceyrekleri onceki takvim
@@ -719,6 +764,62 @@ FORM4_XML = """<?xml version="1.0"?><ownershipDocument>
 </derivativeTransaction>
 </derivativeTable></ownershipDocument>"""
 
+# ---- Arka arkaya duran GERCEK basliklar. Olculdu (18 Agu 2026, JPMorgan
+# 10-K): banka MD&A'yi sayfa referansiyla dahil ettigi icin Item 7, 7A ve 8
+# birbirinin hemen ardinda duruyor. Indeks kurali ("bir aday, kendisinden
+# sonraki ilk adaya olan mesafe esigi asiyorsa gercek bolumdur") bu ucunu de
+# eliyordu ve arac "bu dosyalamada MD&A yok" diyordu.
+BELGE_BITISIK_BASLIKLAR = ("<html><body>"
+    + "<div>Item 7. MD and A | 33</div>"
+    + "<div>Item 7A. Market Risk | 40</div>"
+    + "<div>Item 8. Financial Statements | 45</div>"
+    + "<div>Item 9. Other Information | 50</div>"
+    + "<p>" + "Cover page narrative. " * 30 + "</p>"
+    + "<div>Item 7. Management's Discussion and Analysis</div>"
+    + "<p>Refer to pages 33 through 142 of the Annual Report.</p>"
+    + "<div>Item 7A. Quantitative and Qualitative Disclosures</div>"
+    + "<p>Refer to the Market Risk Management section.</p>"
+    + "<div>Item 8. Financial Statements and Supplementary Data</div>"
+    + "<p>The Consolidated Financial Statements follow.</p>"
+    + "<div>Note 1. Basis of Presentation</div>"
+    + "<p>" + "Accounting policy detail. " * 60 + "</p>"
+    + "</body></html>")
+
+# ---- ORTAK (cok sahipli) Form 4. Gercek sozlesme: `reportingOwner` birden
+# fazla kez gecer, ISLEM TABLOLARI ise belgede TEK kez bulunur. Sahte veri bunu
+# tasimadigi surece "her sahip icin tablolari yeniden oku" hatasi hicbir testte
+# gorunmez (P-4). Olculdu (CoreWeave 0001104659-26-097435, dort sahipli
+# Magnetar dosyalamasi): belgede 24 satir, arac 96 satir bildiriyordu.
+FORM4_ORTAK_XML = """<?xml version="1.0"?><ownershipDocument>
+<documentType>4/A</documentType><periodOfReport>2025-02-03</periodOfReport>
+<issuer><issuerCik>0000320193</issuerCik><issuerName>Apple Inc.</issuerName>
+<issuerTradingSymbol>AAPL</issuerTradingSymbol></issuer>
+<reportingOwner><reportingOwnerId><rptOwnerCik>0001000001</rptOwnerCik>
+<rptOwnerName>MAGNETAR FINANCIAL LLC</rptOwnerName></reportingOwnerId>
+<reportingOwnerRelationship><isDirector>0</isDirector><isOfficer>0</isOfficer>
+<isTenPercentOwner>1</isTenPercentOwner></reportingOwnerRelationship></reportingOwner>
+<reportingOwner><reportingOwnerId><rptOwnerCik>0001000002</rptOwnerCik>
+<rptOwnerName>MAGNETAR CAPITAL PARTNERS LP</rptOwnerName></reportingOwnerId>
+<reportingOwnerRelationship><isDirector>0</isDirector><isOfficer>0</isOfficer>
+<isTenPercentOwner>1</isTenPercentOwner></reportingOwnerRelationship></reportingOwner>
+<reportingOwner><reportingOwnerId><rptOwnerCik>0001000003</rptOwnerCik>
+<rptOwnerName>SUPERNOVA MANAGEMENT LLC</rptOwnerName></reportingOwnerId>
+<reportingOwnerRelationship><isDirector>1</isDirector><isOfficer>0</isOfficer>
+<isTenPercentOwner>1</isTenPercentOwner><officerTitle>Managing Member</officerTitle>
+</reportingOwnerRelationship></reportingOwner>
+<nonDerivativeTable>
+<nonDerivativeTransaction><securityTitle><value>Common Stock</value></securityTitle>
+<transactionDate><value>2025-02-03</value></transactionDate>
+<transactionCoding><transactionCode>P</transactionCode></transactionCoding>
+<transactionAmounts><transactionShares><value>12000</value></transactionShares>
+<transactionPricePerShare><value>101.50</value></transactionPricePerShare>
+<transactionAcquiredDisposedCode><value>A</value></transactionAcquiredDisposedCode></transactionAmounts>
+<postTransactionAmounts><sharesOwnedFollowingTransaction><value>512000</value></sharesOwnedFollowingTransaction></postTransactionAmounts>
+<ownershipNature><directOrIndirectOwnership><value>I</value></directOrIndirectOwnership>
+<natureOfOwnership><value>By Funds</value></natureOfOwnership></ownershipNature>
+</nonDerivativeTransaction>
+</nonDerivativeTable></ownershipDocument>"""
+
 # ---- 13F. Ad alani ve alan adlari Berkshire'in 2026 Q2 dosyalamasindan
 # olculdu. Iki satir AYNI ihracci: bir yonetici her alt yonetici icin ayri
 # satir yaziyor ve bunlar mukerrer DEGIL, ayni pozisyonun parcalari.
@@ -737,9 +838,16 @@ T13F_TABLO = """<?xml version="1.0"?><informationTable xmlns:xsi="http://www.w3.
 <votingAuthority><Sole>12561737</Sole><Shared>0</Shared><None>0</None></votingAuthority></infoTable>
 </informationTable>"""
 
+# Gercek bir 13F-HR/A kapak sayfasi duzeltme kutularini tasir. Sahte veri
+# bunlari tasimadigi surece "duzeltme bildirilmiyor" hatasi hicbir testte
+# gorunmez (P-4). Olculdu (Berkshire 0000950123-24-005653): `reportType`
+# "13F HOLDINGS REPORT" diyor ve dosyalama yine de bir DUZELTME - ikisi ayri
+# kutu, ve o dosyalamada tek pozisyon var (portfoyun tamami degil, EKI).
 T13F_KAPAK = """<?xml version="1.0"?><edgarSubmission>
 <formData><coverPage><filingManager><name>Apple Asset Management</name></filingManager>
-<reportType>13F HOLDINGS REPORT</reportType></coverPage>
+<reportType>13F HOLDINGS REPORT</reportType>
+<isAmendment>true</isAmendment><amendmentNo>2</amendmentNo>
+<amendmentInfo><amendmentType>NEW HOLDINGS</amendmentType></amendmentInfo></coverPage>
 <summaryPage><otherIncludedManagersCount>14</otherIncludedManagersCount>
 <tableEntryTotal>3</tableEntryTotal><tableValueTotal>88419197133</tableValueTotal></summaryPage></formData>
 <headerData><filerInfo><periodOfReport>03-31-2026</periodOfReport></filerInfo></headerData>
@@ -822,8 +930,18 @@ def handler(request: httpx.Request) -> httpx.Response:
         if "aapl-20250628.htm" in u:
             return httpx.Response(200, text=BELGE_TABLO,
                                   headers={"Content-Type": "text/html"})
-        if "form4.xml" in u:
+        # Ayni dosyalamanin IKI ayri yolu: metin araci STILLI kopyayi
+        # (`xsl.../form4.xml`), Form 4 okuyucusu HAM XML'i (`form4.xml`) ister.
+        # Ikisini ayri yanitlamak, stil onekinin gercekten soyuldugunu de
+        # dogruluyor.
+        if u.endswith("/xslF345X05/form4.xml"):
             return httpx.Response(200, text=BELGE_IKI_VERGI,
+                                  headers={"Content-Type": "text/html"})
+        if u.endswith("/form4.xml"):
+            return httpx.Response(200, text=FORM4_ORTAK_XML,
+                                  headers={"Content-Type": "application/xml"})
+        if "bitisik-basliklar.htm" in u:
+            return httpx.Response(200, text=BELGE_BITISIK_BASLIKLAR,
                                   headers={"Content-Type": "text/html"})
         if "aapl-8k.htm" in u:
             return httpx.Response(200, text=BELGE_8K_KAPAK,
@@ -851,6 +969,8 @@ def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, json=NET_INCOME)
         if "SalesRevenueNet" in u:
             return httpx.Response(200, json=SALES_REVENUE)
+        if u.split("?")[0].endswith("/Revenues.json"):
+            return httpx.Response(200, json=REVENUES_TEK)
         return httpx.Response(404)          # SEC bilinmeyen etikete 404 doner
     return httpx.Response(404)
 
@@ -1155,48 +1275,110 @@ def test_varsayilan_hiz_sec_sinirinin_altinda():
 
 
 # ================================================================ H-1: mali yil
-def test_kayma_apple_tipi_sifir():
-    """Bitis yiliyla adlandiran sirket (Apple, Walmart, Microsoft): kayma 0."""
-    from edgar_mcp.server import _fy_kaymasi
-    rows = [
+def test_takvim_bitis_yiliyla_adlandiran_sirket():
+    """Bitis yiliyla adlandiran sirket (Apple, Walmart, Microsoft)."""
+    from edgar_mcp.server import Takvim
+    t = Takvim([
         {"start":"2022-09-25","end":"2023-09-30","fy":2023,"fp":"FY","form":"10-K"},
         {"start":"2021-09-26","end":"2022-09-24","fy":2023,"fp":"FY","form":"10-K"},
         {"start":"2023-10-01","end":"2024-09-28","fy":2024,"fp":"FY","form":"10-K"},
-    ]
-    assert _fy_kaymasi(rows) == (0, True)
+    ])
+    assert t.var is True and t.takvim_degisti is False
+    assert t.yil("2023-09-30") == (2023, "reported")
+    assert t.yil("2024-09-28") == (2024, "reported")
+    # Yil icindeki bir ceyrek, o yilin capasina ait
+    assert t.yil("2024-03-30") == (2024, "derived")
 
 
-def test_kayma_target_tipi_eksi_bir():
-    """Baslangic yiliyla adlandiran perakendeci (Target/Gap): 3 Subat 2024'te
-    biten yil 'fiscal 2023'tur. Kayma -1 olarak TURETILMELI, varsayilmamali."""
-    from edgar_mcp.server import _fy_kaymasi
-    rows = [
+def test_takvim_baslangic_yiliyla_adlandiran_perakendeci():
+    """Target/Gap tipi: 3 Subat 2024'te biten yil 'fiscal 2023'tur. Bu
+    TURETILMELI, varsayilmamali - evrensel bir kural yok (KK-7)."""
+    from edgar_mcp.server import Takvim
+    t = Takvim([
         {"start":"2023-01-29","end":"2024-02-03","fy":2023,"fp":"FY","form":"10-K"},
-        {"start":"2022-01-30","end":"2023-01-28","fy":2023,"fp":"FY","form":"10-K"},
-    ]
-    assert _fy_kaymasi(rows) == (-1, True)
+        {"start":"2022-01-30","end":"2023-01-28","fy":2022,"fp":"FY","form":"10-K"},
+    ])
+    assert t.yil("2024-02-03") == (2023, "reported")
+    assert t.yil("2023-01-28") == (2022, "reported")
+    # Yil icindeki ceyrek: 2023-02-03'te biten donem FY2023'e ait
+    assert t.yil("2023-04-29") == (2023, "derived")
 
 
-def test_kayma_capa_yoksa_turetilmedi_isaretlenir():
-    """10-K capasi yoksa uydurma yapma - 0 dondur ama TURETILMEDI de."""
-    from edgar_mcp.server import _fy_kaymasi
-    rows = [{"start":"2024-01-01","end":"2024-03-31","fy":2024,"fp":"Q1","form":"10-Q"}]
-    assert _fy_kaymasi(rows) == (0, False)
+def test_takvim_capa_yoksa_takvim_yili_ve_isaret():
+    """10-K capasi yoksa uydurma yapma: takvim yilini dondur ama kaynagi
+    `none` de - cagiran bunun dogrulanmis bir etiket olmadigini bilsin."""
+    from edgar_mcp.server import Takvim
+    t = Takvim([{"start":"2024-01-01","end":"2024-03-31","fy":2024,"fp":"Q1","form":"10-Q"}])
+    assert t.var is False
+    assert t.yil("2024-03-31") == (2024, "none")
 
 
-def test_kayma_ceyreklik_satirlari_capa_saymaz():
+def test_takvim_ceyreklik_satirlari_capa_saymaz():
     """Ilk yazdigim bu test KUSURLUYDU: filtre kaldirilinca da ayni sonucu
-    veriyordu, yani hicbir sey korumuyordu (enjeksiyon yakaladi).
-    Yeniden kuruldu: kisa donemler capa sayilirsa mod 0'dan 1'e KAYMALI."""
-    from edgar_mcp.server import _fy_kaymasi
-    rows = [
-        # tek gecerli capa: yillik donem, kayma 0
+    veriyordu (enjeksiyon yakaladi). Yeniden kuruldu: kisa donemler capa
+    sayilirsa yanlis bir yil sonu ve yanlis etiketler cikar."""
+    from edgar_mcp.server import Takvim
+    t = Takvim([
         {"start":"2022-09-25","end":"2023-09-30","fy":2023,"fp":"FY","form":"10-K"},
-        # kisa donemler; capa sayilirlarsa ikisi de kayma 1 verir ve mod'u calar
+        # kisa donemler; capa sayilirlarsa 2024-09-28 icin fy=2025 cikar
         {"start":"2024-07-01","end":"2024-09-28","fy":2025,"fp":"FY","form":"10-K"},
         {"start":"2025-07-01","end":"2025-09-27","fy":2026,"fp":"FY","form":"10-K"},
-    ]
-    assert _fy_kaymasi(rows) == (0, True), "kisa donemler capa sayilmis"
+    ])
+    assert t.capalar == [("2023-09-30", 2023)], t.capalar
+    assert t.yil("2024-09-28")[0] == 2024, "kisa donem capa sayilmis"
+
+
+def test_takvim_52_53_haftalik_yilda_iki_yil_ayni_etiketi_almiyor():
+    """18 Agu 2026, canli olcumde bulundu (US Foods): yil sonu Aralik sonu ile
+    Ocak basi arasinda oynayan bir takvimde `fiscal_year` 2016 IKI KEZ
+    cikiyordu - 2016-01-02'de ve 2016-12-31'de biten iki AYRI mali yil icin -
+    ve FY2015 seriden tumuyle kayboluyordu. Ayni hata Kraft Heinz'de bagimsiz
+    olarak dogrulandi."""
+    from edgar_mcp.server import Takvim
+    t = Takvim([
+        {"start":"2013-12-29","end":"2014-12-27","fy":2014,"fp":"FY","form":"10-K"},
+        {"start":"2014-12-28","end":"2016-01-02","fy":2015,"fp":"FY","form":"10-K"},
+        {"start":"2016-01-03","end":"2016-12-31","fy":2016,"fp":"FY","form":"10-K"},
+        {"start":"2017-01-01","end":"2017-12-30","fy":2017,"fp":"FY","form":"10-K"},
+    ])
+    etiketler = [t.yil(e)[0] for e in
+                 ("2014-12-27", "2016-01-02", "2016-12-31", "2017-12-30")]
+    assert etiketler == [2014, 2015, 2016, 2017], etiketler
+    assert len(set(etiketler)) == 4, "iki mali yil ayni etiketi aldi"
+
+
+def test_takvim_mali_yil_sonu_degisince_iki_rejim_de_dogru():
+    """18 Agu 2026, canli olcumde bulundu (Perrigo, Haziran -> Aralik gecisi):
+    tek bir global kayma turetiliyordu, dolayisiyla rejimlerden birinin BUTUN
+    etiketleri bir yil kayiyordu. Daha kotusu, hangi rejimin kaydigi hangi
+    etiketlerin cekildigine bagliydi - ayni sirketin ayni donemi, sorgu
+    `revenue` mi ham tag mi diye soruldugu icin farkli yil aliyordu."""
+    from edgar_mcp.server import Takvim
+    t = Takvim([
+        {"start":"2012-07-01","end":"2013-06-29","fy":2013,"fp":"FY","form":"10-K"},
+        {"start":"2013-06-30","end":"2014-06-28","fy":2014,"fp":"FY","form":"10-K"},
+        {"start":"2014-06-29","end":"2015-06-27","fy":2015,"fp":"FY","form":"10-K"},
+        {"start":"2016-01-01","end":"2016-12-31","fy":2016,"fp":"FY","form":"10-K"},
+        {"start":"2017-01-01","end":"2017-12-31","fy":2017,"fp":"FY","form":"10-K"},
+    ])
+    assert t.takvim_degisti is True, "takvim degisikligi bildirilmiyor"
+    assert t.yil("2015-06-27") == (2015, "reported")
+    assert t.yil("2016-12-31") == (2016, "reported")
+    assert t.yil("2017-12-31") == (2017, "reported")
+
+
+def test_takvim_capa_araligi_disinda_etiket_tahmin_oldugunu_soyluyor():
+    """Capalarin disina dusen bir donem SAYILARAK etiketlenir; bu bir tahmin
+    ve oyle isaretlenmeli. Susmak, dogrulanmis bir etiketle sayilmis bir
+    etiketi ayni alanda ayirt edilemez birakirdi."""
+    from edgar_mcp.server import Takvim
+    t = Takvim([
+        {"start":"2022-09-25","end":"2023-09-30","fy":2023,"fp":"FY","form":"10-K"},
+        {"start":"2023-10-01","end":"2024-09-28","fy":2024,"fp":"FY","form":"10-K"},
+    ])
+    assert t.yil("2020-09-26") == (2020, "extrapolated")
+    assert t.yil("2026-09-26") == (2026, "extrapolated")
+    assert t.yil("2024-09-28")[1] == "reported"
 
 
 @pytest.mark.anyio
@@ -1213,7 +1395,8 @@ async def test_etiket_degisiminde_gecmis_kirpilmaz(srv):
     yillar = sorted(p.fiscal_year for p in s.points)
     assert 2017 in yillar, "eski etiketten gelen donemler kayip"
     assert 2023 in yillar, "yeni etiketten gelen donemler kayip"
-    assert set(s.resolved_concepts) == {GERCEK_GELIR_ETIKETI, "SalesRevenueNet"}
+    assert set(s.resolved_concepts) == {GERCEK_GELIR_ETIKETI, "SalesRevenueNet",
+                                        "Revenues"}
 
 
 @pytest.mark.anyio
@@ -1414,18 +1597,33 @@ def test_cekirdek_dotenv_bagimliligi_tasimaz():
 
 
 def test_env_example_gercekten_okunan_degiskeni_belgeler():
-    """Dokuman ile davranis ortusmeli (§1): .env.example'daki degisken adi,
-    kodun gercekte okudugu degisken olmali."""
+    """Dokuman ile davranis ortusmeli (§1) ve IKI YONLU: belgelenen her
+    degisken kodda okunmali, VE kodun okudugu her degisken belgelenmeli.
+
+    18 Agu 2026 denetiminde bulundu: kontrol tek yonluydu, dolayisiyla yeni
+    eklenen `SEC_AS_OF` hicbir yerde belgelenmedigi halde test yesildi -
+    README kullaniciya `cp .env.example .env` diyor ve kopyalayan kisi
+    belgelenen degiskeni orada bulamiyordu. P-14'un bekcisi P-14'e acikti."""
     import pathlib
     import re
 
     kok = pathlib.Path(__file__).resolve().parents[1]
     ornek = (kok / ".env.example").read_text()
-    istemci = (kok / "src" / "edgar_mcp" / "client.py").read_text()
-    belgelenen = set(re.findall(r"^([A-Z_]+)=", ornek, re.M))
+    kaynaklar = "\n".join(
+        (kok / "src" / "edgar_mcp" / ad).read_text()
+        for ad in ("client.py", "server.py")
+    )
+    belgelenen = set(re.findall(r"^#?([A-Z_]+)=", ornek, re.M))
     assert belgelenen, ".env.example hicbir degisken belgelemiyor"
     for ad in belgelenen:
-        assert ad in istemci, f"{ad} belgelenmis ama kod okumuyor"
+        assert ad in kaynaklar, f"{ad} belgelenmis ama kod okumuyor"
+
+    # Degisken adi bir SABIT uzerinden de okunabiliyor (`AS_OF_ORTAM`), yani
+    # `os.environ.get("...")` kalibini aramak yetmiyor - tam da bu yuzden
+    # `SEC_AS_OF` gozden kacti. Kaynaklardaki her `SEC_*` dizgesi aranıyor.
+    okunan = set(re.findall(r'"(SEC_[A-Z_]+)"', kaynaklar))
+    eksik = okunan - belgelenen
+    assert not eksik, f"kod bu degiskenleri okuyor ama .env.example susuyor: {eksik}"
 
 
 # ========================= KO olayi (13 Agu 2026): bos companyconcept yaniti
@@ -2084,7 +2282,7 @@ async def test_segment_kirilimi_geliyor_ve_kaynagina_kadar_izlenebiliyor(srv):
         ticker="AAPL", accession_number="0000320193-25-000041",
         concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
     uyeler = {f.dimensions[0].member: f.value for f in b.facts
-              if len(f.dimensions) == 1}
+              if len(f.dimensions) == 1 and f.period_start == "2025-01-01"}
     assert uyeler["tsla:AutomotiveSegmentMember"] == 77000000000
     assert uyeler["tsla:EnergyGenerationAndStorageSegmentMember"] == 20690000000
 
@@ -2103,8 +2301,10 @@ async def test_uye_toplami_ile_konsolide_yan_yana_veriliyor(srv):
     b = await srv.get_dimensional_facts(
         ticker="AAPL", accession_number="0000320193-25-000041",
         concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
-    assert len(b.reconciliation) == 1
-    m = b.reconciliation[0]
+    # Ayni gun biten iki donem var (yillik ve alti aylik) ve IKISI DE kendi
+    # icinde tutuyor. Tek satira yigilsalardi "fark" uydurma bir rakam olurdu.
+    assert len(b.reconciliation) == 2
+    m = _yillik_mutabakat(b)
     assert m.members_sum == 97690000000
     assert m.consolidated_value == 97690000000
     assert m.agrees is True and m.difference == 0
@@ -2124,6 +2324,15 @@ async def test_tutmayan_toplam_gizlenmiyor(srv):
     assert m.difference == 13094000000
 
 
+def _yillik_mutabakat(b):
+    """Yillik (12 aylik) mutabakat satiri. Ayni gun biten alti aylik satir da
+    donuyor - donem uzunlugu artik anahtarda (18 Agu 2026 denetimi)."""
+    satirlar = [r for r in b.reconciliation
+                if r.period_start == "2025-01-01" and r.period_end == "2025-12-31"]
+    assert len(satirlar) == 1, [(r.period_start, r.period_end) for r in b.reconciliation]
+    return satirlar[0]
+
+
 @pytest.mark.anyio
 async def test_cok_boyutlu_fact_toplamaya_girmiyor(srv):
     """Segment VE cografya ile nitelenmis bir rakam, segment kiriliminin bir
@@ -2135,7 +2344,7 @@ async def test_cok_boyutlu_fact_toplamaya_girmiyor(srv):
     assert cok, "cok boyutlu fact hic donmemis - fixture bozulmus olabilir"
     assert {d.axis for d in cok[0].dimensions} == {
         "us-gaap:StatementBusinessSegmentsAxis", "srt:StatementGeographicalAxis"}
-    assert b.reconciliation[0].members_sum == 97690000000, \
+    assert _yillik_mutabakat(b).members_sum == 97690000000, \
         "41 milyarlik kesisim toplama karismis"
 
 
@@ -2172,10 +2381,18 @@ async def test_sayisal_olmayan_ve_nil_fact_sessizce_sayiya_cevrilmiyor(srv):
         concept="revenue", axis="srt:StatementGeographicalAxis")
     nil = [x for x in n.facts if x.is_nil]
     assert nil and nil[0].value is None, "nil fact sifir sanilmis"
-    # Toplanacak sayisal uye kalmadiginda mutabakat satiri HIC uretilmiyor.
-    # "members_sum = 0" demek, sifirlarin toplandigini soylerdi; dogru olan,
-    # toplanacak bir sey olmadigini soylemek.
-    assert n.reconciliation == [], "nil fact toplama girmis ve 0 diye raporlanmis"
+    # Toplanacak sayisal uye kalmadiginda `members_sum` SIFIR degil None:
+    # "0" demek, sifirlarin toplandigini soylerdi. Ama satir da tamamen
+    # susmuyor - 18 Agu 2026'da olculdu ki modern segment dipnotlarinda her
+    # fact ikinci bir eksen tasidigi icin HEPSI eleniyor ve mutabakat listesi
+    # bos donuyordu; bos liste "mutabakat yapilamadi" ile "her sey tuttu"yu
+    # ayirt edilemez birakir. Satir kaliyor, sebebi yaninda.
+    assert n.reconciliation, "eleme sebebi hic bildirilmedi"
+    assert all(r.members_sum is None for r in n.reconciliation), \
+        "nil fact toplama girmis"
+    assert all(r.agrees is None for r in n.reconciliation)
+    assert any(r.excluded_from_sum for r in n.reconciliation), \
+        "neden toplanamadigi soylenmiyor"
 
 
 @pytest.mark.anyio
@@ -2361,7 +2578,7 @@ async def test_mutabakat_disarida_biraktiklarini_sayiyor(srv):
     b = await srv.get_dimensional_facts(
         ticker="AAPL", accession_number="0000320193-25-000041",
         concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
-    m = b.reconciliation[0]
+    m = _yillik_mutabakat(b)
     assert m.members_counted == 2
     assert m.excluded_from_sum == {"multi_axis": 1}, m.excluded_from_sum
 
@@ -2489,7 +2706,7 @@ async def test_takma_ad_boyutlu_fact_te_cift_saymiyor(srv):
         concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
     assert {f.tag for f in b.facts} == {b.resolved_tag}, \
         f"birden fazla etiket karismis: {sorted({f.tag for f in b.facts})}"
-    assert b.reconciliation[0].members_sum == 97690000000
+    assert _yillik_mutabakat(b).members_sum == 97690000000
 
 
 # ============ Ilerleme bildirimi (MCP 2026-07-28, basic/utilities/progress)
@@ -2640,11 +2857,12 @@ async def test_uye_filtresi_mutabakati_bozmuyor(srv):
         concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis",
         member="tsla:AutomotiveSegmentMember")
     # Iki fact: uyenin tek basina oldugu context ve segment+cografya kesisimi.
-    assert tek.total_matching == 2, "uye filtresi uygulanmamis"
+    assert tek.total_matching == 3, "uye filtresi uygulanmamis"
     assert all(any(d.member == "tsla:AutomotiveSegmentMember" for d in f.dimensions)
                for f in tek.facts)
-    assert tek.reconciliation[0].members_sum == hepsi.reconciliation[0].members_sum
-    assert tek.reconciliation[0].agrees is True
+    assert (_yillik_mutabakat(tek).members_sum
+            == _yillik_mutabakat(hepsi).members_sum)
+    assert _yillik_mutabakat(tek).agrees is True
 
 
 @pytest.mark.anyio
@@ -3299,7 +3517,7 @@ async def test_form4_islemleri_kod_anlamiyla_donuyor(srv):
     r = await srv.get_insider_transactions(ticker="AAPL")
     assert r.issuer_name == "Apple Inc." and r.ticker == "AAPL"
     kodlar = {t.code for t in r.transactions}
-    assert kodlar == {"A", "F", "S"}, kodlar
+    assert kodlar == {"A", "F", "S", "P"}, kodlar
     odul = [t for t in r.transactions if t.code == "A"][0]
     assert odul.code_meaning and "no cash" in odul.code_meaning
     assert odul.price_per_share == 0 and odul.shares == 511000
@@ -3333,7 +3551,8 @@ async def test_form4_pozisyon_bildirimi_islem_sanilmiyor(srv):
     assert tutma[0].shares is None and tutma[0].shares_owned_after == 57378
     assert tutma[0].nature_of_ownership == "By 401(k) plan"
     # Pozisyon satiri kod toplamlarina GIRMEMELI: alinip satilan bir sey yok.
-    assert sum(k.transactions for k in genis.code_totals) == 3
+    # Uc satir birinci dosyalamadan (A/F/S), bir satir ortak dosyalamadan (P).
+    assert sum(k.transactions for k in genis.code_totals) == 4
 
 
 @pytest.mark.anyio
@@ -3643,3 +3862,254 @@ def test_donem_kovasi_52_haftalik_takvimi_ayni_kovada_tutuyor():
     assert _donem_kovasi(None) is None, "anlik olguda uzunluk yoktur"
     # Ayirt etmesi gereken siniflar gercekten ayri kovalarda
     assert len({_donem_kovasi(g) for g in (90, 181, 272, 364)}) == 4
+
+
+@pytest.mark.anyio
+async def test_ortak_form4_islemleri_sahip_sayisi_kadar_cogaltmiyor(srv):
+    """18 Agu 2026, denetimde bulundu: islem tablolari SAHIP dongusunun icinde
+    okunuyordu. Bir Form 4 birden fazla `reportingOwner` tasiyabilir (fon
+    grubu, aile, ortaklik) ama TABLOLAR BELGEYE aittir - kok altinda tek bir
+    `nonDerivativeTable` vardir. Uc sahipli bir dosyalamada her satir uc kez
+    donuyordu; canli olcumde dort sahipli bir dosyalama 24 satir yerine 96
+    satir, 307.131 hisse yerine 1.228.524 hisse bildirdi.
+
+    Bu, "iceriden alim" diye okunacak bir sayiyi sahip sayisi kadar buyuten
+    sessiz bir hata: cikti iyi bicimli, rakam dort kati."""
+    r = await srv.get_insider_transactions(ticker="AAPL", limit=100)
+    p_satirlari = [t for t in r.transactions if t.code == "P"]
+    assert len(p_satirlari) == 1, f"ortak dosyalama cogaltildi: {len(p_satirlari)} satir"
+    assert p_satirlari[0].shares == 12000
+
+    toplam = {k.code: k for k in r.code_totals}
+    assert toplam["P"].shares == 12000 and toplam["P"].transactions == 1
+
+    # Islem tek bir kisiye atfedilemez; imzalayanlarin hepsi yaziyor.
+    assert p_satirlari[0].owner_count == 3
+    for ad in ("MAGNETAR FINANCIAL LLC", "SUPERNOVA MANAGEMENT LLC"):
+        assert ad in p_satirlari[0].owner_name, p_satirlari[0].owner_name
+    # Iliski bayraklari sahiplerin BIRLESIMI: biri yonetici, hepsi %10 ustu
+    assert p_satirlari[0].is_ten_percent_owner is True
+    assert p_satirlari[0].is_director is True
+    assert r.joint_filings_read == 1
+
+
+@pytest.mark.anyio
+async def test_turev_satirlari_kod_toplamina_girmiyor(srv):
+    """Bir opsiyon kullanimi AYNI dosyalamada iki satir uretir: turev tarafinda
+    `M`, hisse tarafinda `A`. Ikisini toplamak ayni hisseyi iki kez sayar.
+    Aracin kendi arac aciklamasi bunu uyariyordu ve kod tam da bunu yapiyordu
+    (18 Agu 2026, TSLA'da olculdu: 608.022.232'ye karsi gercek 304.011.116).
+
+    Turev satirlari GORUNMEYE devam ediyor - yalnizca toplama girmiyor - ve
+    kacinin disarida kaldigi ayri bir alanda yaziyor: sessiz eleme olmuyor."""
+    genis = await srv.get_insider_transactions(ticker="AAPL",
+                                               include_derivative=True, limit=100)
+    turevler = [t for t in genis.transactions if t.is_derivative]
+    assert turevler, "turev satiri hic donmedi, test bir sey olcmuyor"
+    assert any(t.code == "M" for t in turevler)
+
+    kodlar = {k.code for k in genis.code_totals}
+    assert "M" not in kodlar, f"turev kodu toplama sizdi: {kodlar}"
+    assert genis.derivative_lines_excluded_from_totals == len(turevler)
+
+    # Turevler kapaliyken toplamlar AYNI kalmali: toplam, gosterilen satir
+    # kumesine degil, turev-olmayan gercege bagli.
+    dar = await srv.get_insider_transactions(ticker="AAPL", limit=100)
+    assert {k.code: k.shares for k in dar.code_totals} == \
+           {k.code: k.shares for k in genis.code_totals}
+    assert dar.derivative_lines_excluded_from_totals == 0
+
+
+@pytest.mark.anyio
+async def test_form4_duzeltmesi_bildiriliyor(srv):
+    """Bir 4/A daha onceki bir dosyalamayi DUZELTIR, yeni islem bildirmez.
+    Ayni satiri iki kez saymamak icin cagiranin bunu bilmesi gerekiyor;
+    susmak, duzeltmeyi yeni bir islem gibi gosterirdi."""
+    r = await srv.get_insider_transactions(ticker="AAPL", limit=100)
+    assert r.amendments_read == 1
+
+
+@pytest.mark.anyio
+async def test_ayni_gun_biten_iki_donem_mutabakati_tek_satira_yigilmiyor(srv):
+    """18 Agu 2026, denetimde uretildi: mutabakat anahtari donemi YALNIZCA
+    bitis tarihiyle tanimliyordu. Bir 10-Q hem uc aylik hem yil basindan beri
+    rakamlari tasir, ikisi de ayni gun biter ve ikisi de segment kirilimlidir.
+    Sonuc: iki TUTARLI kirilim tek satira yigiliyor, konsolide deger belge
+    sirasindaki sonuncuyla uzerine yaziliyor ve arac uydurma bir "fark"
+    bildiriyordu - ustelik o farkin isareti dosyalamadaki eleman sirasina
+    bagliydi.
+
+    Ayni hata KK-45'te iki REST aracinda duzeltilmisti; boyutlu aracin
+    mutabakatinda kalmisti - bir duzeltmenin kardes cagri yerini atlamasi bu
+    depoda ucuncu kez oluyor (P-27, P-33)."""
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
+
+    ayni_bitis = [r for r in b.reconciliation if r.period_end == "2025-12-31"]
+    assert len(ayni_bitis) == 2, [(r.period_start, r.members_sum) for r in ayni_bitis]
+
+    yillik = _yillik_mutabakat(b)
+    alti_aylik = [r for r in ayni_bitis if r.period_start == "2025-07-01"][0]
+
+    # Her iki donem de KENDI icinde tutuyor; hicbiri otekinin toplamini almiyor.
+    assert yillik.members_sum == 97690000000 and yillik.agrees is True
+    assert alti_aylik.members_sum == 50000000000 and alti_aylik.agrees is True
+    assert alti_aylik.consolidated_value == 50000000000
+    assert yillik.consolidated_value == 97690000000
+
+
+@pytest.mark.anyio
+async def test_mutabakat_uye_degerlerini_gosteriyor(srv):
+    """Uye toplami konsolideyle tutmadiginda sebep filan degil, eksende ic ice
+    KIRILIM DUZEYLERI olmasi da olabilir - bir segment ve icindeki urunler ayni
+    eksende durur ve hepsini toplamak ayni parayi iki kez sayar. Olculdu
+    (AAPL `srt:ProductOrServiceAxis`): uye toplami konsolidenin TAM iki kati.
+    Arac hangi uyenin hangisinin ustu oldugunu bilemez - o bilgi tanim
+    linkbase'inde ve bu arac onu okumuyor - ama uyeleri tek tek gostererek
+    cagiranin gormesini saglayabilir."""
+    b = await srv.get_dimensional_facts(
+        ticker="AAPL", accession_number="0000320193-25-000041",
+        concept="revenue", axis="us-gaap:StatementBusinessSegmentsAxis")
+    m = _yillik_mutabakat(b)
+    assert m.member_values, "uye degerleri gorunmuyor"
+    assert m.member_values["tsla:AutomotiveSegmentMember"] == 77000000000
+    assert abs(sum(m.member_values.values()) - m.members_sum) < 1
+
+
+def test_takvim_tutarsiz_capa_dizisi_temizleniyor():
+    """Capalar mali yillara gore ARTAN olmak zorunda: daha buyuk bir mali yil,
+    daha erken biten bir doneme capa olamaz. Bu, bir 10-K'nin KARSILASTIRMA
+    satirindan gelen artiktir - o satir kendi doneminden buyuk bir `fy` tasir
+    (KK-1) - ve birakilirsa ondan sonraki her donem yanlis etiketlenir, cunku
+    `yil()` "bu tarihten sonraki ilk capa" kuralini kullaniyor.
+
+    Onemli olan HANGISININ dusuruldugu: artik hem once hem sonra durabilir,
+    dolayisiyla "sirayi bozani at" kurali yanlis capayi tutabilir. Burada
+    cogunluk kaymasina uymayan dusuyor."""
+    from edgar_mcp.server import Takvim
+    t = Takvim([
+        {"start": "2019-01-01", "end": "2019-12-31", "fy": 2019, "fp": "FY",
+         "form": "10-K"},
+        # Artik: 2022 mali yili grubunda bu etiketin YALNIZCA 2020 verisi var,
+        # dolayisiyla "her fy grubunda en gec biten donem" kurali 2020'ye capa
+        # atiyor. Bu capa birakilirsa ondan sonraki her donem kayar.
+        {"start": "2020-01-01", "end": "2020-12-31", "fy": 2022, "fp": "FY",
+         "form": "10-K"},
+        {"start": "2021-01-01", "end": "2021-12-31", "fy": 2021, "fp": "FY",
+         "form": "10-K"},
+    ])
+    yillar = [fy for _, fy in t.capalar]
+    assert yillar == sorted(set(yillar)), f"capa dizisi tutarsiz: {t.capalar}"
+    assert ("2020-12-31", 2022) not in t.capalar, "artik capa temizlenmedi"
+    assert ("2021-12-31", 2021) in t.capalar, "dogru capa atilmis"
+    # Ve sonucu: 2021'de biten donem dogru etiketleniyor
+    assert t.yil("2021-12-31") == (2021, "reported")
+
+
+@pytest.mark.anyio
+async def test_bitisik_gercek_basliklar_bulunamadi_diye_reddedilmiyor(srv):
+    """18 Agu 2026, canli denetimde bulundu (JPMorgan 10-K): indeks kurali bir
+    adayi ancak KENDISINDEN SONRAKI ilk adaya olan mesafe esigi asiyorsa
+    gercek bolum sayiyor. Banka MD&A'yi SAYFA REFERANSIYLA dahil ettigi icin
+    Item 7, 7A ve 8 arka arkaya duruyordu ve ucu de eleniyordu - arac
+    "bu dosyalamada MD&A yok" diyordu, metinde apacik dururken.
+
+    Var olan bir seyin yoklugunu iddia etmek, bulamamaktan kotudur. Indeks
+    kaciriyorsa govde araniyor ve bulunan sey "aramayla bulundu" diye
+    isaretleniyor - indeks kurallari onu onaylamadi, cagiran bunu bilsin."""
+    b = await srv.read_filing_text(
+        ticker="AAPL", accession_number="0000320193-25-000058",
+        document="bitisik-basliklar.htm", section="Item 8",
+        max_characters=4000)
+    assert "Consolidated Financial Statements follow" in b.text
+    assert b.section_matched and "item 8" in b.section_matched.lower()
+    assert b.section_source == "search", b.section_source
+    # Ve icindekiler satirini DEGIL govdedeki basligi secmis olmali
+    assert "| 45" not in b.text[:200]
+
+
+@pytest.mark.anyio
+async def test_bolum_indekste_varsa_kaynagi_indeks_diyor(srv):
+    """Yedek yol yalnizca indeks kacirdiginda devreye girmeli; her zaman
+    calisan bir yedek, indeksin kendisini olculemez yapardi (P-30)."""
+    b = await srv.read_filing_text(
+        ticker="AAPL", accession_number="0000320193-25-000012",
+        section="taxes", max_characters=4000)
+    assert b.section_source == "index"
+
+
+@pytest.mark.anyio
+async def test_hicbir_yerde_yoksa_hata_listenin_kirpildigini_soyluyor(srv):
+    """Hata mesaji basliklarin ilk 25'ini veriyordu ama "It has these
+    headings" diyerek tamami sanilmasina yol aciyordu."""
+    with pytest.raises(ValueError) as e:
+        await srv.read_filing_text(
+            ticker="AAPL", accession_number="0000320193-25-000058",
+            document="bitisik-basliklar.htm", section="Item 99")
+    mesaj = str(e.value)
+    assert "neither in its heading index nor in its text" in mesaj
+
+
+@pytest.mark.anyio
+async def test_13f_duzeltmesi_duzeltme_oldugunu_soyluyor(srv):
+    """18 Agu 2026, canli denetimde bulundu: bir 13F-HR/A hicbir isaret
+    olmadan tam portfoy gibi donuyordu. Olculen ornekte (Berkshire
+    0000950123-24-005653) yanit "1,7 milyar dolar, tek pozisyon" diyordu;
+    gercek portfoy ~313 milyar dolar - cunku o dosyalama bir EK.
+
+    Ayrim kritik: `RESTATEMENT` orijinalin YERINE gecer, `NEW HOLDINGS` ona
+    EKLENIR. `report_type` bu bilgiyi tasimiyor - o baska bir kutu ve
+    duzeltmede bile "13F HOLDINGS REPORT" yaziyor, yani susmak degil,
+    YANILTMAK oluyordu."""
+    h = await srv.get_institutional_holdings(ticker="AAPL")
+    assert h.is_amendment is True, "duzeltme bildirilmiyor"
+    assert h.amendment_number == 2
+    assert h.amendment_type == "NEW HOLDINGS"
+    # Rapor turu kutusu ayri kalmali; duzeltme bilgisini oraya sikistirmak
+    # iki farkli seyi tek alanda karistirirdi.
+    assert h.report_type == "13F HOLDINGS REPORT"
+
+
+@pytest.mark.anyio
+async def test_tek_noktali_ilgisiz_etiket_seriyi_ele_gecirmiyor(srv):
+    """18 Agu 2026, canli olcumde bulundu (Perrigo): `Revenues` etiketinde
+    SEC'te tek bir veri noktasi var - 800.000 dolar - ve `SalesRevenueNet`'te
+    ayni donem icin 3.539.800.000. Ikisi de AYNI GUN dosyalandigi icin `filed`
+    esit cikiyor ve siralama alias sirasina dusuyordu; tek noktali cop
+    kazaniyordu. Seri "3,17 mlr -> 0,8 mn -> 3,91 mlr" diye okunuyordu: bir
+    yilda %99,98 dusus ve ertesi yil tam geri donus.
+
+    Esitlik bozucu artik ETIKETIN AGIRLIGI: sirketin o kavram icin fiilen
+    kullandigi etiket kazanir. `filed` hala birinci olcut - ayni etiketin
+    sonraki dosyalamasi bir duzeltmedir ve kazanmali (KK-8)."""
+    s = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=40)
+    donem = [p for p in s.points if p.period_end == "2017-09-30"]
+    assert donem, "ortusen donem seride yok"
+    assert donem[0].value == 229_234_000_000, "tek noktali cop etiket kazandi"
+    assert donem[0].source_tag == "SalesRevenueNet"
+
+
+@pytest.mark.anyio
+async def test_etiketler_celistiginde_celiski_bildiriliyor(srv):
+    """Secim yapmak yetmez: iki aday etiket ayni donem icin FARKLI deger
+    veriyorsa cagiran bunu gormeli. Sessizce secmek, dogru secilse bile
+    cagirani olculmemis bir kesinlikle birakir."""
+    s = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=40)
+    catisma = [c for c in s.tag_conflicts if c.period_end == "2017-09-30"]
+    assert catisma, f"celiski bildirilmedi: {s.tag_conflicts}"
+    c = catisma[0]
+    assert {c.chosen_tag, c.other_tag} == {"SalesRevenueNet", "Revenues"}
+    assert c.chosen_value == 229_234_000_000 and c.other_value == 800_000
+
+    # AYNI etiketin iki dosyalamasi arasindaki fark bir etiket celiskisi
+    # DEGIL, bir revizyondur - onun araci `sec_edgar_get_fact_revisions`.
+    # Ikisini ayni listede vermek, duzeltmeyi "iki etiket celisiyor" diye
+    # okuturdu ve fixture'da boyle bir donem VAR (FY2023: 383.285 -> 383.290).
+    assert all(c.chosen_tag != c.other_tag for c in s.tag_conflicts), \
+        [c for c in s.tag_conflicts if c.chosen_tag == c.other_tag]
+
+    # Celismeyen bir seride liste BOS kalmali; her cagride dolan bir alan
+    # uyari olmaktan cikar.
+    n = await srv.get_concept_series(ticker="AAPL", concept="net_income")
+    assert n.tag_conflicts == []

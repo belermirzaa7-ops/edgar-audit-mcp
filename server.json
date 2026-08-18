@@ -13,7 +13,8 @@
       "registryType": "oci",
       "identifier": "ghcr.io/belermirzaa7-ops/sec-edgar-mcp:0.1.0",
       "transport": {
-        "type": "stdio"
+        "type": "streamable-http",
+        "url": "http://localhost:8000/mcp"
       },
       "environmentVariables": [
         {

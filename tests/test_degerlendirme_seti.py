@@ -202,3 +202,27 @@ def test_dokumanlardaki_sayilar_gercekle_ayni():
     test_iddia = _iddia_edilen_sayilar(vaka, r"\*\*(\d+) tests\*\*")
     assert test_iddia == [toplanan], (
         f"vaka calismasi {test_iddia} test diyor, pytest {toplanan} topluyor")
+
+
+def test_server_json_tasimasi_imajin_gercekten_konustugu_tasima():
+    """18 Agu 2026 denetiminde bulundu: `server.json` OCI paketini `stdio`
+    diye ilan ediyordu, oysa `Dockerfile`'in tek `CMD`'si streamable-HTTP
+    calistiriyor. Kayit defterinden bu girdiyi okuyup imaji stdio bekleyerek
+    baslatan bir istemci hicbir zaman cevap alamazdi.
+
+    Mevcut kimlik testi yalnizca ADI karsilastiriyordu; tasima ayni dosyada
+    duran ikinci bir vaat ve o da denetlenmeli."""
+    import json
+
+    paket = json.loads((KOK / "server.json").read_text(encoding="utf-8"))
+    oci = [p for p in paket["packages"] if p["registryType"] == "oci"]
+    assert oci, "server.json bir OCI paketi ilan etmiyor"
+    tasima = oci[0]["transport"]["type"]
+
+    docker = (KOK / "Dockerfile").read_text(encoding="utf-8")
+    if "transport='streamable-http'" in docker or 'transport="streamable-http"' in docker:
+        beklenen = "streamable-http"
+    else:
+        beklenen = "stdio"
+    assert tasima == beklenen, (
+        f"server.json '{tasima}' diyor, Dockerfile '{beklenen}' calistiriyor")

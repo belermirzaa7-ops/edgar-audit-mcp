@@ -539,3 +539,56 @@ def test_env_satir_ayristirma(satir, beklenen):
     import importlib
     ortam = importlib.import_module("arac.ortam")
     assert ortam._ayristir(satir) == beklenen
+
+
+def test_enjeksiyon_kontrol_yedek_silinince_temiz_demiyor(tmp_path, monkeypatch):
+    """18 Agu 2026, denetimde uretildi: `--kontrol` "enjekte kalmis dosya"
+    listesini yalnizca `.enjeksiyon_yedek/` VARSA hesapliyordu ve o dizin
+    `.gitignore`'da. Taze bir klon, `git clean -fdx` ya da elle temizlik tek
+    kaniti siliyor; kaynak dosya enjekte kalsa bile cikti "TEMIZ: enjeksiyon
+    artigi yok" diyor ve exit 0 donuyordu.
+
+    Yani KK-41'de kapatilan bosluk, kapatan aracin KENDISINDE geri aciliyordu:
+    "artik, harness'tan baska hicbir yerden gorulmuyor".
+
+    Duzeltme iki parcali: (1) yedek yokken cikti artik "TEMIZ" DEMIYOR, neye
+    bakip neye bakmadigini soyluyor; (2) `--sert` ikinci bir kaynak olarak
+    git'e bakiyor ve teyit edemezse exit 3 donuyor."""
+    import importlib
+
+    mod = importlib.import_module("arac.enjeksiyon")
+    kok = tmp_path / "kok"
+    (kok / "src").mkdir(parents=True)
+    (kok / "src/a.py").write_text("x = 1\n")
+    monkeypatch.setattr(mod, "KOK", kok)
+    monkeypatch.setattr(mod, "YEDEK_DIZIN", tmp_path / "yedek")   # YOK
+    monkeypatch.setattr(mod, "KILIT", tmp_path / "kilit")         # YOK
+    monkeypatch.setattr(mod, "UYGULANAN", tmp_path / "yedek" / "_uygulanan.txt")
+    monkeypatch.setattr(mod, "DOSYALAR", ["src/a.py"])
+    # Git yok: kaynak dogrulanamiyor.
+    monkeypatch.setattr(mod, "git_temiz_mi", lambda: None)
+
+    import contextlib
+    import io
+
+    tampon = io.StringIO()
+    with contextlib.redirect_stdout(tampon):
+        kod = mod.kontrol()
+    cikti = tampon.getvalue()
+    assert kod == 0, "gunluk kullanimda engel olmamali"
+    assert "TEMIZ" not in cikti, (
+        "dogrulanmamis bir durum 'TEMIZ' diye raporlandi:\n" + cikti)
+    assert "KARSILASTIRILMADI" in cikti, "neye bakilmadigi soylenmiyor"
+
+    # Sert modda karar verilemeyen durum basarisizliktir.
+    tampon = io.StringIO()
+    with contextlib.redirect_stdout(tampon):
+        assert mod.kontrol(sert=True) == 3
+    assert "DOGRULANAMADI" in tampon.getvalue()
+
+    # Git temiz diyorsa "TEMIZ" demek artik dayanakli.
+    monkeypatch.setattr(mod, "git_temiz_mi", lambda: True)
+    tampon = io.StringIO()
+    with contextlib.redirect_stdout(tampon):
+        assert mod.kontrol(sert=True) == 0
+    assert "TEMIZ" in tampon.getvalue()

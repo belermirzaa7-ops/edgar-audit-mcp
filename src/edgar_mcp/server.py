@@ -6,6 +6,7 @@ DIKKAT: v2'de giris noktasi FastMCP degil MCPServer'dir.
 """
 from __future__ import annotations
 
+import math
 import os
 import re
 from datetime import date
@@ -17,7 +18,7 @@ from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
-from .belge import Cikti, Tablo, bolum_sec, bolumler, cevir
+from .belge import Cikti, Tablo, bolum_govdede_ara, bolum_sec, bolumler, cevir
 from .client import SEC_WWW, EdgarClient
 from .sahiplik import (
     BIRIM_SINIRI,
@@ -138,20 +139,13 @@ def _yil(end: str) -> int:
     return int(end.split("-")[0])
 
 
-def _fy_kaymasi(rows: list[dict]) -> tuple[int, bool]:
-    """Sirketin mali yil ADLANDIRMA kaymasini SEC verisinden turetir.
+def _capalar(rows: list[dict]) -> list[tuple[str, int]]:
+    """SEC'in KENDI soyledigi (donem_sonu, mali_yil) ciftleri, tarihe gore sirali.
 
-    Neden heuristik degil (bkz. CLAUDE.md KK-7): "Ocak-Haziran'da biten donem
-    onceki yila sayilir" kurali olculdu ve WMT/NKE/MSFT'de YANLIS cikti. Ters
-    kural da guvenli degil - Target/Gap Subat'ta biten yili BASLADIGI yilla
-    adlandirir. Yani evrensel bir kural yok.
-
-    Turetme: SEC'in `fy` alani bir 10-K'nin KENDI donemi icin dogrudur (DEI
+    SEC'in `fy` alani bir 10-K'nin KENDI donemi icin dogrudur (DEI
     DocumentFiscalYearFocus'tan gelir); yanlis olan sadece ayni dosyalamadaki
-    karsilastirma yillaridir. Her `fy` grubunda en gec biten donem, o
-    dosyalamanin kendi donemidir -> capa. kayma = fy - bitis_yili.
-
-    Doner: (kayma, veriden_turetildi_mi). Capa yoksa (0, False).
+    KARSILASTIRMA yillaridir (KK-1). Her `fy` grubunda en gec biten yillik
+    donem, o dosyalamanin kendi donemidir - yani bir capa.
     """
     capalar: dict[int, str] = {}
     for r in rows:
@@ -165,66 +159,140 @@ def _fy_kaymasi(rows: list[dict]) -> tuple[int, bool]:
         if fy not in capalar or end > capalar[fy]:
             capalar[fy] = end
 
-    if not capalar:
-        return 0, False
+    # Ayni bitis tarihine birden fazla `fy` dusebilir: bir 10-K karsilastirma
+    # yillarini da KENDI fy'siyle etiketler (KK-1), ve o yilin KENDI donemi bu
+    # etikette hic raporlanmamissa "her fy grubunda en gec biten donem" kurali
+    # eski bir tarihe capa atar. Boyle bir cakismada EN KUCUK fy dogru olandir:
+    # donemin kendi dosyalamasindan gelen odur, buyuk olan sonraki bir
+    # dosyalamanin karsilastirma satiridir.
+    en_kucuk: dict[str, int] = {}
+    for fy, e in capalar.items():
+        if e not in en_kucuk or fy < en_kucuk[e]:
+            en_kucuk[e] = fy
 
-    kaymalar = [fy - _yil(end) for fy, end in capalar.items()]
-    # En sik gorulen kayma; tek tuk transition period'lar sonucu bozmasin.
-    # Esitlikte kucuk kayma kazanir - sonuc deterministik olsun.
-    kayma = sorted(set(kaymalar), key=lambda k: (-kaymalar.count(k), k))[0]
-    return kayma, True
-
-
-def _mali_yil_sonu(rows: list[dict]) -> tuple[int, int] | None:
-    """Sirketin mali yilinin bittigi (ay, gun). Capalardan turetilir.
-
-    52/53 haftalik takvimlerde tarih her yil birkac gun kayar (AAPL: 09-27,
-    09-28, 10-01), bu yuzden EN SIK gorulen ay aliniyor ve gun o ayin
-    ortalamasi degil, o aydaki en gec gun olarak birakiliyor - karsilastirmalar
-    zaten toleransli yapiliyor.
-    """
-    capalar: dict[int, str] = {}
-    for r in rows:
-        if r.get("fp") != "FY" or not str(r.get("form", "")).startswith("10-K"):
+    # Kalan capa dizisi mali yillara gore ARTAN olmali: daha buyuk bir mali
+    # yil, daha erken biten bir doneme capa olamaz. Boyle bir cift varsa biri
+    # artiktir - ama HANGISI oldugunu sira soylemez, cunku artik hem once hem
+    # sonra durabilir. Karar veriye birakiliyor: her capanin ima ettigi kayma
+    # (fy - bitis yili) hesaplaniyor ve cogunluga UYMAYAN dusuruluyor.
+    # Esitlikte buyuk `fy` dusuyor - bir karsilastirma satiri artigi her zaman
+    # kendi doneminden BUYUK bir fy tasir.
+    sirali = sorted(en_kucuk.items(), key=lambda x: x[0])
+    kaymalar = [fy - _yil(e) for e, fy in sirali]
+    if kaymalar:
+        cogunluk = max(set(kaymalar), key=kaymalar.count)
+    temiz: list[tuple[str, int]] = []
+    for (e, fy), kayma in zip(sirali, kaymalar, strict=True):
+        if temiz and fy <= temiz[-1][1]:
+            onceki_e, onceki_fy = temiz[-1]
+            # Ikisinden hangisi cogunluga uyuyorsa o kaliyor.
+            if kayma == cogunluk and (onceki_fy - _yil(onceki_e)) != cogunluk:
+                temiz[-1] = (e, fy)
             continue
-        end, start, fy = r.get("end"), r.get("start"), r.get("fy")
-        if not end or fy is None:
-            continue
-        if start and not (300 <= _gun_farki(start, end) <= 400):
-            continue
-        if fy not in capalar or end > capalar[fy]:
-            capalar[fy] = end
-    if not capalar:
-        return None
-    aylar = [int(e[5:7]) for e in capalar.values()]
-    ay = max(set(aylar), key=aylar.count)
-    gunler = [int(e[8:10]) for e in capalar.values() if int(e[5:7]) == ay]
-    return ay, max(gunler)
+        temiz.append((e, fy))
+    return temiz
 
 
 # 52/53 haftalik mali takvimlerde yil sonu birkac gun oynar; esitlik aramak
 # yerine pencere kullaniliyor.
 FY_SONU_TOLERANSI = 10
+YIL_GUNU = 365.25
 
 
-def _fy_sonuna_gore_yil(end: str, ay_gun: tuple[int, int]) -> int:
-    """Bir donem sonu, hangi mali yila ait? (kayma UYGULANMADAN, takvim yili)
+MaliYilKaynagi = Literal["reported", "derived", "extrapolated", "none"]
 
-    Neden gerekli (15 Agu 2026'da bulunan hata): kayma YILLIK capalardan
-    turetiliyordu ama her satira, ceyrekliklere de, oldugu gibi uygulaniyordu.
-    Ocak/Subat'ta biten mali yillarda ceyrekler bir onceki takvim yilinda biter,
-    dolayisiyla etiket bir yil geri kayardi: WMT'nin FY2026'si icin arac yila
-    FY2026, KENDI ilk ceyregine FY2025 diyordu. Ayni araç, ayni sirket, iki ayri
-    cevap.
+
+class Takvim:
+    """Sirketin mali yil takvimi, SEC'in kendi `fy` alanindan turetilmis.
+
+    NEDEN CAPA LISTESI, TEK BIR KAYMA DEGIL (18 Agu 2026, denetimde bulundu):
+    onceki surum tum gecmis icin TEK bir `kayma` ve TEK bir `(ay, gun)`
+    turetiyordu - yani "bu sirketin tek bir mali takvimi var" varsayimi. Iki
+    yaygin durumda yanlis:
+
+    1. **52/53 haftalik takvim.** Yil sonu Aralik sonu ile Ocak basi arasinda
+       gidip geliyor. Olculdu (US Foods, USFD): `fiscal_year` 2016 IKI KEZ
+       cikiyordu (2016-01-02 ve 2016-12-31 biten iki AYRI mali yil icin) ve
+       FY2015 ile FY2020 seriden tumuyle kayboluyordu. Ayni hata Kraft
+       Heinz'de bagimsiz olarak dogrulandi.
+    2. **Mali yil sonunu degistiren sirket.** Olculdu (Perrigo, PRGO: Haziran
+       -> Aralik): rejimlerden birinin BUTUN etiketleri bir yil kayiyordu, ve
+       hangi rejimin kaydigi hangi etiketlerin cekildigine bagliydi - yani
+       ayni sirketin ayni donemi, sorgu `revenue` mi `SalesRevenueNet` mi
+       diye soruldugu icin farkli mali yil aliyordu. Arac kendi kendisiyle
+       celisiyordu.
+
+    Yeni kural: bir donem sonu, KENDISINDEN SONRA gelen ilk capanin mali
+    yilina aittir (bir mali yil, o yilin sonunda biter). Aradaki mesafe bir
+    yildan buyukse geri sayilir. Boylece rejim degisikligi kendiliginden
+    dogru sonuc verir: her donem kendi rejimindeki capaya bakar.
     """
-    ay, gun = ay_gun
-    yil = _yil(end)
-    try:
-        sinir = date(yil, ay, gun)
-    except ValueError:                      # 29 Subat gibi
-        sinir = date(yil, ay, 28)
-    bu = date(*(int(x) for x in end.split("-")))
-    return yil if (bu - sinir).days <= FY_SONU_TOLERANSI else yil + 1
+
+    def __init__(self, rows: list[dict]) -> None:
+        self.capalar = _capalar(rows)
+        aylar = {int(e[5:7]) for e, _ in self.capalar}
+        self.takvim_degisti = len(aylar) > 1
+        self.ay_gun: tuple[int, int] | None = None
+        if self.capalar:
+            ay_listesi = [int(e[5:7]) for e, _ in self.capalar]
+            ay = max(set(ay_listesi), key=ay_listesi.count)
+            gunler = [int(e[8:10]) for e, _ in self.capalar if int(e[5:7]) == ay]
+            self.ay_gun = (ay, max(gunler))
+
+    @property
+    def var(self) -> bool:
+        return bool(self.capalar)
+
+    def yil(self, end: str) -> tuple[int, MaliYilKaynagi]:
+        """(mali_yil, kaynak). Kaynak: reported / derived / extrapolated / none.
+
+        Kaynak alani sussa, cagiran SEC'in soyledigi bir yil ile bizim
+        saydigimiz bir yili ayirt edemezdi - ikisi ayni alanda dururken
+        birinin dogrulanabilir otekinin tahmin oldugunu soylemek sart.
+        """
+        if not self.capalar:
+            return _yil(end), "none"
+
+        for capa_sonu, fy in self.capalar:
+            if abs(_gun_farki(capa_sonu, end)) <= FY_SONU_TOLERANSI:
+                return fy, "reported"
+
+        # Donemin kendisi bir YIL SONU mu, yoksa yil icinde mi bitiyor?
+        # Ikisi farkli sayilmali: bir yil sonu tam sayida mali yil uzaktadir
+        # (yuvarlama dogru olan), yil icinde biten bir ceyrek ise bir sonraki
+        # yil sonuna aittir (asagi yuvarlama dogru olan). Tek bir kural
+        # ikisinden birini her zaman bir yil kaydirirdi.
+        yil_sonunda = self._yil_sonunda_mi(end)
+
+        sonraki = next(((e, fy) for e, fy in self.capalar if e > end), None)
+        if sonraki is not None:
+            capa_sonu, fy = sonraki
+            mesafe = _gun_farki(end, capa_sonu)
+            n = (round(mesafe / YIL_GUNU) if yil_sonunda
+                 else int(mesafe // YIL_GUNU))
+            return fy - n, ("derived" if n == 0 else "extrapolated")
+
+        capa_sonu, fy = self.capalar[-1]
+        mesafe = _gun_farki(capa_sonu, end)
+        n = (round(mesafe / YIL_GUNU) if yil_sonunda
+             else max(1, math.ceil(mesafe / YIL_GUNU)))
+        return fy + max(1, n), "extrapolated"
+
+    def _yil_sonunda_mi(self, end: str) -> bool:
+        """Bu tarih sirketin mali yil sonu kalibina uyuyor mu (± tolerans)."""
+        if self.ay_gun is None:
+            return False
+        ay, gun = self.ay_gun
+        bu = date(*(int(x) for x in end.split("-")))
+        for yil in (bu.year - 1, bu.year, bu.year + 1):
+            try:
+                sinir = date(yil, ay, gun)
+            except ValueError:
+                sinir = date(yil, ay, 28)
+            if abs((bu - sinir).days) <= FY_SONU_TOLERANSI:
+                return True
+        return False
+
 
 _client: EdgarClient | None = None
 
@@ -403,16 +471,35 @@ class FilingSearchResults(BaseModel):
 
 class FactPoint(BaseModel):
     fiscal_year: int = Field(
-        description="The company's own fiscal year label, derived from SEC data rather than guessed"
+        description="The company's own fiscal year label, taken from SEC data rather than guessed"
+    )
+    fiscal_year_source: Literal["reported", "derived", "extrapolated", "none"] = Field(
+        default="none",
+        description="How the label was arrived at. reported: SEC states this "
+        "fiscal year for this very period end. derived: the period falls inside "
+        "a fiscal year whose end SEC states. extrapolated: counted from the "
+        "nearest stated year end, so it can be wrong if the company changed its "
+        "fiscal calendar outside the range SEC states. none: no annual report "
+        "was available to anchor it and the calendar year is used",
     )
     source_tag: str = Field(description="US-GAAP tag this value was reported under")
     period_start: str | None = Field(default=None, description="Period start date; empty for instant (point-in-time) facts")
-    period_end: str = Field(description="Period end date - the only reliable identifier of a period")
+    period_end: str = Field(description="Period end date - one of the two dates that identify a period; the other is period_start")
     days: int | None = Field(default=None, description="Period length in days")
     value: float
     unit: str
     form: str = Field(description="Filing type the value was taken from")
     filed: str = Field(description="Date this value was filed with the SEC")
+
+
+class TagConflict(BaseModel):
+    """Iki aday etiket ayni donem icin farkli deger verdi."""
+    period_end: str
+    unit: str
+    chosen_tag: str = Field(description="Tag whose value is in the series")
+    chosen_value: float
+    other_tag: str = Field(description="Tag that was not used for this period")
+    other_value: float
 
 
 class ConceptSeries(BaseModel):
@@ -422,9 +509,20 @@ class ConceptSeries(BaseModel):
         description="US-GAAP tags that returned data and were MERGED into this series"
     )
     fiscal_year_derived: bool = Field(
-        description="True: fiscal year labels were derived from the company's own SEC "
-        "filings. False: no anchor filing was found, so the calendar year of the "
-        "period end was used instead - treat these labels as less reliable."
+        description="True: fiscal year labels come from the company's own SEC "
+        "filings. False: no annual report was found to anchor them, so the "
+        "calendar year of the period end was used instead - treat those labels "
+        "as less reliable. Each point also carries fiscal_year_source, which "
+        "says whether SEC states that label for that very period or whether it "
+        "was counted from a nearby one."
+    )
+    fiscal_calendar_changed: bool = Field(
+        default=False,
+        description="True when the anchors show more than one fiscal year-end "
+        "month, which means the company moved its year end at some point. "
+        "Labels on either side of that move come from different calendars, so "
+        "comparing a year before it with a year after it compares different "
+        "spans"
     )
     taxonomy: str
     label: str | None = None
@@ -444,6 +542,16 @@ class ConceptSeries(BaseModel):
         "recent are returned first-to-last, so raise limit to reach further back"
     )
     as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
+    tag_conflicts: list[TagConflict] = Field(
+        default_factory=list,
+        description="Periods where two of the merged tags reported different "
+        "values. The series carries one of them; this says which and what the "
+        "other was. An alias merges every tag a company has used for a "
+        "concept, and now and then a tag holds a single stray fact that does "
+        "not mean what the main tag means - measured on one filer whose stray "
+        "fact was four thousand times smaller. Empty means the tags agreed "
+        "wherever they overlapped",
+    )
     points: list[FactPoint]
 
 
@@ -602,6 +710,15 @@ class FilingText(BaseModel):
         default=None,
         description="Heading this response was cut from; empty when the whole "
         "document was read",
+    )
+    section_source: Literal["index", "search"] | None = Field(
+        default=None,
+        description="How the section was located. index: it is one of the "
+        "headings in available_sections. search: the index did not hold it, so "
+        "the text itself was searched for the heading - which happens when "
+        "several real headings sit close together, as they do when a filer "
+        "incorporates a section by page reference. Read a search hit with more "
+        "care: the index rules did not vouch for it",
     )
     total_characters: int = Field(
         description="Characters in the selected section, or in the whole "
@@ -1168,6 +1285,7 @@ def _facts_kayit(facts: dict, tag: str) -> dict | None:
 def _donem_uyuyor(
     period: str, days: int | None, end: str | None = None,
     ay_gun: tuple[int, int] | None = None,
+    takvim: Takvim | None = None,
 ) -> bool:
     """Donem filtresi TEK yerde. Seri ve revizyon araclari ayni kurali
     kullanmali; kopyalanirsa biri duzeltilip oteki unutulur ve ayrica
@@ -1199,13 +1317,22 @@ def _donem_uyuyor(
         # takvim yilinda kurulursa Aralik'ta biten her yil sona ~360 gun uzak
         # cikar ve tolerans HIC tutmaz: yil sonu bilancolarinin yarisi sessizce
         # elenirdi (15 Agu 2026'da olculdu).
+        # Sinir, donemin AIT OLDUGU mali yilda kuruluyor - takvim yilinda
+        # degil. 52/53 haftalik takvimlerde yil sonu Aralik ile Ocak arasinda
+        # oynadigi icin (Kellanova: 2022-12-31, sonraki yil 2024-01-04) komsu
+        # yillarin siniri da deneniyor; yoksa yil sonu bilancolarinin yarisi
+        # sessizce elenir (15 Agu 2026'da olculdu).
         ay, gun = ay_gun
-        try:
-            sinir = date(_fy_sonuna_gore_yil(end, ay_gun), ay, gun)
-        except ValueError:
-            sinir = date(_fy_sonuna_gore_yil(end, ay_gun), ay, 28)
+        hedef = takvim.yil(end)[0] if (takvim is not None and takvim.var) else _yil(end)
         bu = date(*(int(x) for x in end.split("-")))
-        return abs((bu - sinir).days) <= FY_SONU_TOLERANSI
+        for aday_yil in (hedef, hedef - 1, hedef + 1):
+            try:
+                sinir = date(aday_yil, ay, gun)
+            except ValueError:
+                sinir = date(aday_yil, ay, 28)
+            if abs((bu - sinir).days) <= FY_SONU_TOLERANSI:
+                return True
+        return False
     if period == "all":
         return True
     if period == "annual":
@@ -1213,8 +1340,7 @@ def _donem_uyuyor(
     return 60 <= days <= 120
 
 
-def _noktalar(veri: dict, tag: str, period: str, kayma: int,
-              ay_gun: tuple[int, int] | None = None,
+def _noktalar(veri: dict, tag: str, period: str, takvim: Takvim,
               as_of: str | None = None) -> list[FactPoint]:
     out: list[FactPoint] = []
     for unit, rows in _kullanilabilir_birimler(veri):
@@ -1233,21 +1359,18 @@ def _noktalar(veri: dict, tag: str, period: str, kayma: int,
 
             # SEC'in fy/fp alanlari DOSYALAMANIN donemini gosterir, verinin
             # kendi donemini DEGIL (KK-1). Donem start/end'den belirlenir.
-            if not _donem_uyuyor(period, days, end, ay_gun):
+            if not _donem_uyuyor(period, days, end, takvim.ay_gun, takvim):
                 continue
 
-            # Yillik satirda donemin bitis yili mali yila esittir; ceyreklik ve
-            # ani satirlarda DEGILDIR - hangi mali yila dustugu, sirketin yil
-            # sonu tarihine gore bulunur.
-            # Yillik satirlar da ayni esleme kuralindan gecer. "Yillik donemin
-            # bitis yili = mali yil" kisayolu, yil sonu Aralik/Ocak arasinda
-            # oynayan takvimlerde IKI ARDISIK yila ayni etiketi veriyordu
-            # (olculdu: 2022-12-31 ve 2022-01-01 ikisi de FY2021).
-            temel = _yil(end) if ay_gun is None else _fy_sonuna_gore_yil(end, ay_gun)
+            # Mali yil, sirketin KENDI capalarindan okunuyor (bkz. Takvim).
+            # `fiscal_year_source` bunun SEC'in soyledigi bir yil mi yoksa
+            # bizim saydigimiz bir yil mi oldugunu ayirt ediyor.
+            mali_yil, kaynak = takvim.yil(end)
 
             out.append(
                 FactPoint(
-                    fiscal_year=temel + kayma,
+                    fiscal_year=mali_yil,
+                    fiscal_year_source=kaynak,
                     source_tag=tag,
                     period_start=start,
                     period_end=end,
@@ -1385,12 +1508,11 @@ async def get_concept_series(
         r for _, v in veriler for _, rows in _kullanilabilir_birimler(v) for r in rows
         if not _kesimden_sonra(r.get("filed"), kesim)
     ]
-    kayma, turetildi = _fy_kaymasi(tum_satirlar)
-    ay_gun = _mali_yil_sonu(tum_satirlar)
+    takvim = Takvim(tum_satirlar)
 
     noktalar: list[FactPoint] = []
     for tag, v in veriler:
-        noktalar.extend(_noktalar(v, _bol(tag)[1], period, kayma, ay_gun, kesim))
+        noktalar.extend(_noktalar(v, _bol(tag)[1], period, takvim, kesim))
 
     # Ayni donem hem birden fazla dosyalamada hem birden fazla etikette gecer.
     # En son SUNULAN kayit kazanir; esitlikte takma ad sirasi belirler.
@@ -1402,15 +1524,51 @@ async def get_concept_series(
     # aylik toplam; o ceyregin kendi rakami 95.359 listede HIC yok). Bir olgu
     # [baslangic, bitis] araligi hakkindadir; bitis tek basina kimlik degildir.
     oncelik = {t: i for i, t in enumerate(adaylar)}
+    # Esitlik bozucu olarak ETIKETIN AGIRLIGI: sirketin o kavram icin fiilen
+    # kullandigi etiket, tek tuk gecen bir etiketten daha guvenilir.
+    #
+    # Neden (18 Agu 2026, canli olcum - Perrigo): `Revenues` etiketinde SEC'te
+    # tek bir veri noktasi var ve degeri 800.000 dolar; `SalesRevenueNet`'te
+    # 42 nokta var ve ayni donem icin 3.539.800.000. Ikisi de AYNI GUN
+    # dosyalanmis, yani `filed` esit; siralama alias sirasina dusuyor ve tek
+    # noktali cop kazaniyordu. Seri "FY2012 3,17 mlr -> FY2013 0,8 mn ->
+    # FY2014 3,91 mlr" diye okunuyordu: bir yilda %99,98 dusus ve ertesi yil
+    # tam geri donus. Bu rakamla hesaplanan her buyume orani ve marj cop.
+    #
+    # `filed` HALA birinci olcut: ayni etiketin sonraki dosyalamasi bir
+    # duzeltmedir ve kazanmalidir (KK-8, KK-32 §3).
+    agirlik: dict[str, int] = {}
+    for pt in noktalar:
+        agirlik[pt.source_tag] = agirlik.get(pt.source_tag, 0) + 1
+
+    def sira(pt: FactPoint) -> tuple[str, int, int]:
+        return (pt.filed, agirlik.get(pt.source_tag, 0),
+                -oncelik.get(pt.source_tag, 99))
+
     dedup: dict[tuple[str, str, int | None], FactPoint] = {}
+    catismalar: list[TagConflict] = []
     for pt in noktalar:
         k = (pt.period_end, pt.unit, _donem_kovasi(pt.days))
         mevcut = dedup.get(k)
-        if mevcut is None or (pt.filed, -oncelik.get(pt.source_tag, 99)) > (
-            mevcut.filed,
-            -oncelik.get(mevcut.source_tag, 99),
-        ):
+        if mevcut is None:
             dedup[k] = pt
+            continue
+        kazanan, kaybeden = ((pt, mevcut) if sira(pt) > sira(mevcut)
+                             else (mevcut, pt))
+        dedup[k] = kazanan
+        # Iki aday etiket ayni donem icin FARKLI deger veriyorsa bu, sessizce
+        # secilecek bir sey degil: cagiran hangi etiketlerin celistigini ve ne
+        # kadar celistigini gormeli.
+        if (kazanan.source_tag != kaybeden.source_tag
+                and kazanan.value != kaybeden.value):
+            catismalar.append(TagConflict(
+                period_end=pt.period_end,
+                unit=pt.unit,
+                chosen_tag=kazanan.source_tag,
+                chosen_value=kazanan.value,
+                other_tag=kaybeden.source_tag,
+                other_value=kaybeden.value,
+            ))
 
     # §16: model, gordugu serinin tamami mi yoksa en yenisi mi oldugunu
     # bilmeden "sirketin N donemlik gecmisi var" diye sonuclandirabilir.
@@ -1421,7 +1579,8 @@ async def get_concept_series(
         cik=cik,
         requested_concept=concept,
         resolved_concepts=[t for t, _ in veriler],
-        fiscal_year_derived=turetildi,
+        fiscal_year_derived=takvim.var,
+        fiscal_calendar_changed=takvim.takvim_degisti,
         taxonomy=", ".join(dict.fromkeys(_bol(t)[0] for t, _ in veriler)),
         label=veriler[0][1].get("label"),
         source_endpoint=kaynak_uc,
@@ -1429,6 +1588,7 @@ async def get_concept_series(
         returned=len(ordered),
         has_more=len(tumu) > len(ordered),
         as_of_applied=kesim,
+        tag_conflicts=catismalar[:20],
         points=ordered,
     )
 
@@ -1757,13 +1917,33 @@ async def read_filing_text(
     basliklar = [b[0] for b in bulunanlar]
 
     secilen = None
+    bolum_kaynagi: Literal["index", "search"] | None = None
     if section:
         vurus = bolum_sec(bulunanlar, section)
+        if vurus is not None:
+            bolum_kaynagi = "index"
+        else:
+            # Indeks bir bolumu kacirmis olabilir: bir aday ancak KENDISINDEN
+            # SONRAKI ilk adaya olan mesafe esigi asiyorsa gercek bolum
+            # sayiliyor, ve arka arkaya duran gercek basliklar bu kurala
+            # takiliyor. Olculdu (18 Agu 2026, JPMorgan 10-K): Item 7, 7A ve 8
+            # pesi sira duruyor cunku banka MD&A'yi sayfa referansiyla dahil
+            # ediyor - arac "bu dosyalamada MD&A yok" diyordu. Metinde apacik
+            # duran bir seyin yoklugunu iddia etmek, bulamamaktan kotudur.
+            vurus = bolum_govdede_ara(cikti.metin, section)
+            if vurus is not None:
+                bolum_kaynagi = "search"
         if vurus is None:
+            gosterilen = basliklar[:25]
+            kuyruk = (f" (first 25 of {len(basliklar)})"
+                      if len(basliklar) > len(gosterilen) else "")
             raise ValueError(
-                f"No section matching '{section}' was found in this filing. "
-                f"It has these headings: {'; '.join(basliklar[:25]) or 'none'}. "
-                "Call this tool without section to read from the start."
+                f"No section matching '{section}' was found in this filing, "
+                f"neither in its heading index nor in its text. The index "
+                f"holds these headings{kuyruk}: "
+                f"{'; '.join(gosterilen) or 'none'}. Call this tool without "
+                "section to read from the start, or use search to find a "
+                "phrase wherever it appears."
             )
         secilen = vurus[0]
         metin = metin[vurus[1]:vurus[2]]
@@ -1797,6 +1977,7 @@ async def read_filing_text(
         search_hits=vurgular,
         available_sections=basliklar,
         section_matched=secilen,
+        section_source=bolum_kaynagi,
         total_characters=len(metin),
         offset=offset,
         returned_characters=len(parca),
@@ -1873,10 +2054,11 @@ async def get_fact_revisions(
 ) -> RevisionReport:
     kesim = _as_of_coz(as_of)
     cik, adaylar, veriler, kaynak_uc = await _kavram_verisi(ticker, concept)
-    ay_gun = _mali_yil_sonu([r for _, v in veriler
-                             for _, satirlar in _kullanilabilir_birimler(v)
-                             for r in satirlar
-                             if not _kesimden_sonra(r.get("filed"), kesim)])
+    takvim = Takvim([r for _, v in veriler
+                     for _, satirlar in _kullanilabilir_birimler(v)
+                     for r in satirlar
+                     if not _kesimden_sonra(r.get("filed"), kesim)])
+    ay_gun = takvim.ay_gun
 
     # Seri aracindan farki: burada dedup YAPILMAZ. Ayni donemin farkli
     # dosyalamalardaki tum degerleri korunur - revizyonun kendisi cikti.
@@ -1894,7 +2076,7 @@ async def get_fact_revisions(
                     continue
                 start = row.get("start")
                 days = _gun_farki(start, end) if start else None
-                if not _donem_uyuyor(period, days, end, ay_gun):
+                if not _donem_uyuyor(period, days, end, ay_gun, takvim):
                     continue
                 # Anahtarda donem UZUNLUGU da var. Yoksa ayni gun biten uc
                 # aylik ve yil basindan beri rakamlar ayni gruba duser ve
@@ -2610,6 +2792,13 @@ class DimensionalFact(BaseModel):
 
 class Reconciliation(BaseModel):
     period_end: str
+    period_start: str | None = Field(
+        default=None,
+        description="Start of the period this row covers. It matters: a "
+        "quarterly report carries both the quarter and the year to date, and "
+        "both end on the same day, so the end date alone does not identify "
+        "which one this is",
+    )
     unit: str | None = None
     consolidated_value: float | None = Field(
         default=None,
@@ -2625,6 +2814,16 @@ class Reconciliation(BaseModel):
     members_counted: int = Field(
         default=0, description="How many facts went into members_sum"
     )
+    member_values: dict[str, float] = Field(
+        default_factory=dict,
+        description="Each member on this axis and what it contributed. Read it "
+        "before treating a mismatch as the filer's error: an axis often carries "
+        "more than one level of a hierarchy - a segment and the products inside "
+        "it sit on the same axis - and adding every level counts the same money "
+        "twice. Which members are parents of which is declared in the filing's "
+        "definition linkbase, which this tool does not read, so it cannot tell "
+        "the levels apart for you",
+    )
     excluded_from_sum: dict[str, int] = Field(
         default_factory=dict,
         description="Facts deliberately left out of members_sum, by reason: "
@@ -2637,8 +2836,10 @@ class Reconciliation(BaseModel):
     agrees: bool | None = Field(
         default=None,
         description="True when the two agree. False is NOT necessarily an error "
-        "in this tool: the members may be an incomplete breakdown, or the total "
-        "may itself be tagged on a parent member. Nothing is summed silently - "
+        "in this tool nor in the filing: the members may be an incomplete "
+        "breakdown, the total may itself be tagged on a parent member, or the "
+        "axis may carry nested levels whose sum therefore counts twice - see "
+        "member_values. Nothing is summed silently - "
         "both numbers are shown so the discrepancy is visible",
     )
 
@@ -2974,15 +3175,32 @@ def _mutabakat(
 
     Bu yuzden arac hangisinin dogru oldugunu SECMEZ; ikisini de gosterir.
     """
-    toplamlar: dict[tuple[str, str | None], float] = {}
-    sayilar: dict[tuple[str, str | None], int] = {}
-    disarida: dict[tuple[str, str | None], dict[str, int]] = {}
+    Anahtar = tuple[str, str | None, int | None]
+    toplamlar: dict[Anahtar, float] = {}
+    sayilar: dict[Anahtar, int] = {}
+    disarida: dict[Anahtar, dict[str, int]] = {}
+    uyeler: dict[Anahtar, dict[str, float]] = {}
+    baslangiclar: dict[Anahtar, str | None] = {}
 
-    def _dis(k: tuple[str, str | None], sebep: str) -> None:
+    def _dis(k: Anahtar, sebep: str) -> None:
         disarida.setdefault(k, {})[sebep] = disarida.setdefault(k, {}).get(sebep, 0) + 1
 
+    def _anahtar(bitis: str | None, baslangic: str | None,
+                 birim: str | None) -> Anahtar:
+        # Donem UZUNLUGU anahtarda: bir 10-Q hem uc aylik hem yil basindan beri
+        # rakamlari tasir ve ikisi AYNI GUN biter. Yalnizca bitise bakan bir
+        # anahtar iki tutarli kirilimi tek satira yigiyor ve iki toplamdan
+        # birini sessizce uzerine yaziyordu - "fark" rakami dosyalamadaki
+        # eleman SIRASINA bagli hale geliyordu (18 Agu 2026, denetimde
+        # uretildi). Ayni hata KK-45'te iki REST aracinda duzeltilmisti;
+        # burada kalmis.
+        gun = (_gun_farki(baslangic, bitis)
+               if baslangic and bitis else None)
+        return (bitis or "", birim, _donem_kovasi(gun))
+
     for f in tum_fact:
-        k = (f.period_end or "", f.unit)
+        k = _anahtar(f.period_end, f.period_start, f.unit)
+        baslangiclar.setdefault(k, f.period_start)
         # Cok boyutlu fact toplama girmez: segment VE cografya ile nitelenmis
         # bir rakam, segment kiriliminin bir parcasi degil kesisimidir; toplama
         # katmak cift sayar.
@@ -2997,19 +3215,25 @@ def _mutabakat(
             continue
         toplamlar[k] = toplamlar.get(k, 0.0) + f.value
         sayilar[k] = sayilar.get(k, 0) + 1
+        for b in f.dimensions:
+            # `typedMember` icin `member` bos olabilir; o zaman eksen adi
+            # kullaniliyor - anahtarsiz birakmak satiri gorunmez yapardi.
+            uye = b.member or b.axis or "?"
+            uyeler.setdefault(k, {})[uye] = (
+                uyeler.setdefault(k, {}).get(uye, 0.0) + f.value)
 
-    genel: dict[tuple[str, str | None], float] = {}
+    genel: dict[Anahtar, float] = {}
     for o in inst.boyutsuz():
         if o.tag != etiket or not sayi_mi(o.deger) or o.nil:
             continue
         baglam, birim = _olcu(inst, o)
-        genel[(baglam.end or "", birim or None)] = float(o.deger or 0)
+        genel[_anahtar(baglam.end, baglam.start, birim or None)] = float(o.deger or 0)
 
     out: list[Reconciliation] = []
-    for (donem, birim), toplam in sorted(toplamlar.items()):
-        gen = genel.get((donem, birim))
+    for k, toplam in sorted(toplamlar.items()):
+        donem, birim, _kova = k
+        gen = genel.get(k)
         fark = None if gen is None else gen - toplam
-        k = (donem, birim)
         # Esik mutlak degil GORECELI: 1 dolarlik tolerans milyarlik kalemlerde
         # anlamsiz derecede dar, kurus kalemlerde anlamsiz derecede genis.
         # `decimals` zaten "sunlarin altini yuvarladim" diyor; milyona
@@ -3017,21 +3241,54 @@ def _mutabakat(
         esik = max(1.0, abs(gen or 0) * 1e-6)
         out.append(Reconciliation(
             period_end=donem,
+            period_start=baslangiclar.get(k),
             unit=birim,
             consolidated_value=gen,
             members_sum=toplam,
             members_counted=sayilar.get(k, 0),
+            member_values=dict(sorted(uyeler.get(k, {}).items())),
             excluded_from_sum=disarida.get(k, {}),
             difference=fark,
             agrees=None if fark is None else abs(fark) <= esik,
         ))
+
+    # Hicbir sey toplanamadiginda SESSIZ KALINMIYOR. Modern segment
+    # dipnotlarinin cogunda her fact ikinci bir eksen de tasiyor
+    # (`us-gaap:ConsolidationItemsAxis`), dolayisiyla hepsi `multi_axis` diye
+    # eleniyor ve mutabakat listesi bos donuyordu - belgelenen ozellik hic
+    # calismiyormus gibi (18 Agu 2026, AAPL ve HON'da olculdu). Bos liste
+    # "mutabakat yapilamadi" ile "her sey tuttu"yu ayirt edilemez birakir.
+    if not out and disarida:
+        for k, sebepler in sorted(disarida.items()):
+            donem, birim, _kova = k
+            out.append(Reconciliation(
+                period_end=donem,
+                period_start=baslangiclar.get(k),
+                unit=birim,
+                consolidated_value=genel.get(k),
+                members_sum=None,
+                members_counted=0,
+                excluded_from_sum=sebepler,
+                difference=None,
+                agrees=None,
+            ))
     return out
 
 
 
 # --------------------------------------------------------------- sahiplik
 class InsiderTransaction(BaseModel):
-    owner_name: str = Field(description="Person or entity that filed the form")
+    owner_name: str = Field(
+        description="Person or entity that filed the form. When several filed "
+        "together, every name appears here separated by a semicolon, because "
+        "the filing reports the group's transactions and no single line can be "
+        "attributed to one of them"
+    )
+    owner_count: int = Field(
+        default=1,
+        description="How many people signed the filing this line came from. "
+        "Above one means a joint filing"
+    )
     owner_cik: str | None = None
     is_director: bool = False
     is_officer: bool = False
@@ -3110,7 +3367,27 @@ class InsiderReport(BaseModel):
         "read - not only the ones returned. They are NOT netted into a single "
         "buy or sell figure on purpose: a grant, a tax withholding and an "
         "open-market purchase are different events and adding them produces a "
-        "number that means nothing",
+        "number that means nothing. Derivative lines are never counted here, "
+        "even when they are returned: an option exercise appears on both the "
+        "derivative and the share side of the same filing, so counting both "
+        "counts the same shares twice",
+    )
+    derivative_lines_excluded_from_totals: int = Field(
+        default=0,
+        description="Derivative lines that were read but kept out of "
+        "code_totals. Above zero only when include_derivative was set",
+    )
+    joint_filings_read: int = Field(
+        default=0,
+        description="Filings read that were submitted by more than one "
+        "reporting person. A joint filing reports the group's transactions "
+        "once; owner_names on each line lists everyone who signed it",
+    )
+    amendments_read: int = Field(
+        default=0,
+        description="Form 4/A filings among those read. An amendment corrects "
+        "an earlier filing rather than reporting new trades, so a line from "
+        "one may restate a line already counted",
     )
     coverage_note: str = Field(
         description="What this report does and does not cover"
@@ -3149,7 +3426,24 @@ class InstitutionalHoldings(BaseModel):
     filing_date: str
     as_of_applied: str | None = Field(default=None, description=AS_OF_ALANI)
     report_type: str | None = Field(
-        default=None, description="13F HOLDINGS REPORT, or an amendment"
+        default=None,
+        description="The cover page's Report Type box: HOLDINGS REPORT, NOTICE "
+        "or COMBINATION. It says nothing about whether this filing is an "
+        "amendment - read is_amendment for that",
+    )
+    is_amendment: bool = Field(
+        default=False,
+        description="True when this filing amends an earlier one. It changes "
+        "what the numbers mean, so read amendment_type before using them",
+    )
+    amendment_number: int | None = None
+    amendment_type: str | None = Field(
+        default=None,
+        description="RESTATEMENT: this filing REPLACES the original, so it is "
+        "the whole portfolio. NEW HOLDINGS: it ADDS to the original, so these "
+        "positions are a supplement and reading them as the portfolio "
+        "understates it - measured on a Berkshire amendment that shows a "
+        "single position against a portfolio of hundreds",
     )
     period_of_report: str | None = Field(
         default=None, description="Quarter end the holdings are as of"
@@ -3286,6 +3580,8 @@ async def get_insider_transactions(
     okunacak = kayitlar[:filings]
     islemler: list[InsiderTransaction] = []
     ihrac_adi = None
+    ortak_sayisi = 0
+    duzeltme_sayisi = 0
     for n, f in enumerate(okunacak):
         await _ilerleme(ctx, n, len(okunacak) + 1, f"Reading Form 4 {f.accession_number}")
         dizin = (f"{SEC_WWW}/Archives/edgar/data/{int(cik)}/"
@@ -3294,6 +3590,10 @@ async def get_insider_transactions(
         govde, url = await _xml_belgesi(dizin, ad)
         belge = form4_ayristir(govde)
         ihrac_adi = ihrac_adi or belge.issuer_name
+        if len(belge.owners) > 1:
+            ortak_sayisi += 1
+        if belge.amendment:
+            duzeltme_sayisi += 1
         for i in belge.islemler:
             if i.is_derivative and not include_derivative:
                 continue
@@ -3301,6 +3601,7 @@ async def get_insider_transactions(
                 continue
             islemler.append(InsiderTransaction(
                 owner_name=i.owner_name,
+                owner_count=i.owner_count,
                 owner_cik=i.owner_cik,
                 is_director=i.is_director,
                 is_officer=i.is_officer,
@@ -3325,7 +3626,18 @@ async def get_insider_transactions(
     # Kod bazinda toplam. TEK BIR "net alim" sayisi bilincli olarak
     # URETILMIYOR: odul (A), vergi kesintisi (F) ve piyasadan alim (P) farkli
     # olaylar ve toplami hicbir seyi olcmez (KK-31'deki mutabakat ilkesi).
+    #
+    # Toplamlara YALNIZCA turev-olmayan satirlar giriyor, `include_derivative`
+    # acik olsa bile. 18 Agu 2026, denetimde olculdu (TSLA): opsiyon kullanimi
+    # hem turev tablosunda hem hisse tablosunda `M` kodlu bir satir uretiyor;
+    # ikisini toplamak ayni hisseyi iki kez sayiyor ve kod toplami gercegin iki
+    # katina cikiyordu (608.022.232'ye karsi 304.011.116). Aracin kendi arac
+    # aciklamasi bu cift sayimi zaten UYARIYORDU - ve kendisi yapiyordu.
+    # Turev satirlari `transactions` listesinde gorunmeye devam ediyor; ayrica
+    # `derivative_lines_excluded_from_totals` kac satirin toplam disinda
+    # kaldigini soyluyor, sessiz bir eleme olmuyor.
     sayaclar: dict[str, list[float]] = {}
+    turev_disarida = 0
     for t in islemler:
         # `is_holding` BURADA KONTROL EDILMIYOR: pozisyon satirinin `shares`
         # alani zaten yok (`nonDerivativeHolding` icinde `transactionAmounts`
@@ -3333,6 +3645,9 @@ async def get_insider_transactions(
         # yol aciyordu - birini bozmak otekini devrede birakiyor ve hicbir test
         # kirmiziya donmuyordu (P-30'un dersi).
         if t.shares is None:
+            continue
+        if t.is_derivative:
+            turev_disarida += 1
             continue
         kutu = sayaclar.setdefault(t.code or "?", [0.0, 0.0])
         kutu[0] += 1
@@ -3354,6 +3669,9 @@ async def get_insider_transactions(
         has_more=len(islemler) > limit or len(kayitlar) > len(okunacak),
         transactions=islemler[:limit],
         code_totals=toplamlar,
+        derivative_lines_excluded_from_totals=turev_disarida,
+        joint_filings_read=ortak_sayisi,
+        amendments_read=duzeltme_sayisi,
         coverage_note=(
             "Form 4 covers people the company has to report on - directors, "
             "officers and holders of more than ten percent. It does not show "
@@ -3467,6 +3785,9 @@ async def get_institutional_holdings(
         filing_date=kayit["filing_date"],
         as_of_applied=kesim,
         report_type=kapak.report_type,
+        is_amendment=kapak.amendment,
+        amendment_number=kapak.amendment_number,
+        amendment_type=kapak.amendment_type,
         period_of_report=kapak.period_of_report,
         value_basis="thousands" if bin_mi else "whole_dollars",
         total_value_usd=sum((p.value_usd or 0) for p in birlesik.values()),

@@ -55,7 +55,7 @@ jobs:
     # must turn red. Run on both OSes: the harness shells out to pytest, so it
     # is exposed to the same platform differences as the code it checks.
     #
-    # Sharded: the full sweep is 163 injections and each one runs the whole test
+    # Sharded: the full sweep is ~200 injections and each one runs the whole test
     # suite, so a single process lives a long time -- and on 16 Aug 2026 one was
     # killed part-way through, leaving an injected file behind. Four shards keep
     # each process short and make a failed shard cheap to repeat. `fail-fast` is
@@ -75,7 +75,18 @@ jobs:
       - run: python arac/enjeksiyon.py --parca ${{ matrix.shard }}
       # The harness restores every file it breaks. That claim is checked here
       # rather than assumed: a leftover backup or an injected file exits 2.
-      - run: python arac/enjeksiyon.py --kontrol
+      #
+      # `if: always()` matters more than it looks. Without it the check only
+      # ran when the sweep had already succeeded -- that is, only when there
+      # was nothing to find. The case worth catching is the sweep that failed
+      # or was cancelled part-way, which is exactly the case that skipped it.
+      #
+      # `--sert` adds a second, independent source: the backup directory is
+      # gitignored, so wiping it hides the only evidence a plain check has.
+      # In CI the tree is a clean checkout, so comparing against HEAD is
+      # meaningful; on a working copy it would flag ordinary edits.
+      - run: python arac/enjeksiyon.py --kontrol --sert
+        if: always()
 
   docker:
     # The README advertises running this server over streamable HTTP in a

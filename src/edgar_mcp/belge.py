@@ -468,6 +468,50 @@ def bolumler(metin: str, esik: int = BOLUM_ESIGI) -> list[tuple[str, int, int]]:
     return sorted(en_uzun.values(), key=lambda b: b[1])
 
 
+def bolum_govdede_ara(
+    metin: str, istek: str, esik: int = BOLUM_ESIGI
+) -> tuple[str, int, int] | None:
+    """Indeks bir bolumu kaciridiginda, govdede DOGRUDAN aranir.
+
+    Neden gerekli (18 Agu 2026, canli denetimde bulundu): `bolumler()` bir
+    adayi ancak KENDISINDEN SONRAKI ilk adaya olan mesafe esigi asiyorsa
+    gercek bolum sayiyor. Bu kural icindekiler tablosunu eliyor - ama gercek
+    bir govde basligini da eleyebiliyor: JPMorgan'in 10-K'sinda "Item 7",
+    "Item 7A" ve "Item 8" arka arkaya duruyor cunku banka MD&A'yi SAYFA
+    REFERANSIYLA dahil ediyor. Sonuc: arac, dosyada MD&A'nin BULUNMADIGINI
+    soyluyordu - hem de metinde apacik dururken. Var olan bir seyin yoklugunu
+    iddia etmek, bulamamaktan kotudur.
+
+    Bu fonksiyon indeksin yerine gecmiyor; yalnizca indeks bos dondugunde
+    devreye giriyor ve bulunani "aramayla bulundu" diye isaretliyor.
+    """
+    q = " ".join(istek.split()).lower().rstrip(".")
+    kod = re.match(r"^(item|note)\s+(\d{1,2}[a-c]?)$", q)
+    if kod:
+        kalip = re.compile(
+            _ONEK + rf"{kod.group(1)}\s+{re.escape(kod.group(2))}\b\s*[.\-:—|]?\s*(.{{0,90}})$",
+            re.IGNORECASE | re.MULTILINE)
+    else:
+        kalip = re.compile(re.escape(q), re.IGNORECASE)
+
+    vuruslar = [m for m in kalip.finditer(metin)]
+    if not vuruslar:
+        return None
+
+    # Ayni baslik hem icindekilerde hem govdede gecer. Govdedeki olan, ARDINDAN
+    # gercek metin geleni - yani bir sonraki vurusa (ya da belge sonuna) olan
+    # mesafesi en buyuk olan.
+    en_iyi = None
+    for i, m in enumerate(vuruslar):
+        son = vuruslar[i + 1].start() if i + 1 < len(vuruslar) else len(metin)
+        if son - m.start() < esik:
+            continue
+        if en_iyi is None or (son - m.start()) > (en_iyi[2] - en_iyi[1]):
+            baslik = " ".join(m.group(0).split()).strip(" |*-.")
+            en_iyi = (baslik, m.start(), son)
+    return en_iyi
+
+
 def bolum_sec(
     bolumler_listesi: list[tuple[str, int, int]], istek: str
 ) -> tuple[str, int, int] | None:

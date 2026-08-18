@@ -153,3 +153,36 @@ def test_stdio_tasimasi_resmi_istemciyle_araclari_listeliyor():
     assert "sec_edgar_get_fact_revisions" in adlar
     assert len(adlar) == 12, adlar
     assert all(a.startswith("sec_edgar_") for a in adlar), adlar
+
+
+def test_dockerfile_pyprojectin_istedigi_dosyalari_kopyaliyor():
+    """18 Agu 2026, denetimde uretildi: imaj HIC DERLENMIYORDU. `Dockerfile`
+    yalnizca `pyproject.toml README.md src/` kopyaliyordu ama `pyproject.toml`
+    `license = { file = "LICENSE" }` diyor; hatchling o dosyayi build aninda
+    ariyor ve `OSError: License file does not exist: LICENSE` veriyordu.
+
+    Iki README, PUBLISHING.md ve vaka calismasi calismayan bir komut
+    gosteriyordu - P-20'nin ("belgelenen dagitim yolu hic calistirilmadi")
+    tekrari. Bu test metni greplemekle yetinmiyor: `pyproject.toml`'un dosya
+    olarak ISTEDIGI her yolun konteynere kopyalandigini kontrol ediyor, yani
+    yarin `readme` ya da baska bir alan degistiginde de tutuyor."""
+    import re
+
+    proje = (KOK / "pyproject.toml").read_text(encoding="utf-8")
+    docker = (KOK / "Dockerfile").read_text(encoding="utf-8")
+
+    kopyalanan: set[str] = set()
+    for satir in docker.splitlines():
+        if satir.strip().startswith("COPY "):
+            parcalar = satir.split()[1:-1]
+            kopyalanan.update(p.strip("./") for p in parcalar)
+
+    # `license = { file = "X" }` ve `readme = "X"` gibi dosya referanslari
+    istenen = set(re.findall(r'file\s*=\s*"([^"]+)"', proje))
+    istenen |= set(re.findall(r'^readme\s*=\s*"([^"]+)"', proje, re.M))
+    assert istenen, "pyproject.toml hicbir dosyaya atif yapmiyor - test bos"
+
+    eksik = [d for d in istenen if d not in kopyalanan]
+    assert not eksik, (
+        f"pyproject.toml bu dosyalari istiyor ama Dockerfile kopyalamiyor: "
+        f"{eksik}. Imaj build aninda patlar.")

@@ -7,8 +7,8 @@ answers.
 
 **Headline: 26% correct without the server, 90% with it.** Class-balanced, the
 metric the benchmark's own paper reports: **32.6% against 91.9%**. The tool arm
-stated no confident wrong figure; the control arm could not answer 34% of the
-questions at all, and the tool arm could not answer one.
+stated no wrong figure at all; the control arm stated three, and refused 17 more
+questions outright. The tool arm failed to answer one.
 
 ## Two runs, and why there are two
 
@@ -109,15 +109,15 @@ By question type (correct / total):
 
 | Type | With server | Without |
 |---|---|---|
-| Numerical Reasoning | **8/8** | 2/8 |
-| Qualitative Retrieval | **9/9** | 2/9 |
+| Qualitative Retrieval | **9/9** | 1/9 |
+| Numerical Reasoning | **8/8** | 3/8 |
+| Adjustments | **4/4** | 3/4 |
+| Complex Retrieval | **3/3** | 2/3 |
+| Market Analysis | **3/3** | 1/3 |
+| Trends | **3/3** | 1/3 |
 | Beat or Miss | 6/7 | 0/7 |
-| Quantitative Retrieval | 6/9 | 1/9 |
-| Adjustments | **4/4** | 4/4 |
-| Complex Retrieval | 3/3 | 2/3 |
-| Trends | 3/3 | 1/3 |
-| Market Analysis | 3/3 | 1/3 |
 | Financial Modeling | 3/4 | 1/4 |
+| Quantitative Retrieval | 6/9 | 1/9 |
 
 Class-balanced — each type weighted equally, which is what the benchmark's own
 paper reports — **91.9% against 32.6%**.
@@ -159,11 +159,15 @@ the tools and re-measured, rather than argued about in the grading.
 ## What the number does not say
 
 - **n = 50.** The public slice, not the full 537-question benchmark.
-- **The grader is a language model**, blind to which arm produced which answer
-  but not adversarial. Every grade is published per question so the judgement
-  can be checked rather than trusted. Two graders on the same 50 control answers
-  agreed 86% of the time (see above), so treat every figure as ±2 points before
-  anything else.
+- **The grader is a language model**, and "blind" needs a caveat: it was not
+  told which system produced which answer, but the two arms' answers do not
+  look alike — the tool arm cites accession numbers, the control arm hedges —
+  so format alone may give it away. What was measured is a grader that was not
+  told, which is weaker than a grader that could not tell. The next measurement
+  round will normalise both arms before grading; this one did not. Every grade
+  is published per question so the judgement can be checked rather than
+  trusted. Two graders on the same 50 control answers agreed 86% of the time
+  (see above), so treat every figure as ±2 points before anything else.
 - **The control arm's answers were condensed to their factual claims** before
   grading, while the tool arm's were graded verbatim. The grader was told to
   ignore length, but this asymmetry exists and is not measurable away.
@@ -178,10 +182,12 @@ the tools and re-measured, rather than argued about in the grading.
   rejected $7.3bn offer where the filings show a $55.00/share agreement, and
   id 9 applies a three-year exponent to a two-year span. Both were graded
   against what the question asks, and both are noted in the grades file.
-- **The control arm was told to admit ignorance.** That is why it has zero
-  confident wrong answers and eighteen refusals. A model told to always produce
-  an answer would trade those refusals for wrong figures — which is the failure
-  this server exists to prevent, but it is not what was measured here.
+- **The control arm was told to admit ignorance.** That is why most of its
+  failures are refusals — 17 of them — rather than wrong figures. It is not
+  perfect at it: three answers were graded wrong, all three figures it
+  volunteered without the filings. A model told to always produce an answer
+  would trade the refusals for more of those, which is the failure this server
+  exists to prevent, but it is not what was measured here.
 - **The published baseline for this benchmark is not a like-for-like
   comparison** — see the section below, which sets out what it does and does
   not establish.
@@ -212,7 +218,8 @@ published here:
 1. **Different questions.** Their figure covers all 537; this run covers the 50
    public ones. The public split is a sample of the same set, not the set.
 2. **Different grader.** They use rubric-based grading with a dedicated
-   contradiction rubric. This run used a single blind judge with four grades.
+   contradiction rubric. This run used a single judge, not told which arm was which, with
+   four grades.
    Two graders on the same answers do not have to agree.
 3. **Different tools.** Their agents had general web search; this run had ten
    SEC tools and nothing else. That cuts both ways — web search reaches
