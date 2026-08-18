@@ -40,6 +40,50 @@ def hashle(f):
     return hashlib.sha256((KOK / f).read_bytes()).hexdigest()
 
 
+def ciktiyi_utf8_yap() -> None:
+    """Kendi ciktimizi da yerel kod sayfasina birakma (P-37'nin ikinci yuzu).
+
+    Enjeksiyon adlari `§` gibi karakterler tasiyor. Cikti bir dosyaya ya da
+    boruya yonlendirildiginde Python yerel kod sayfasini kullanir; ASCII'ye
+    dusen bir ortamda ilk `print` `UnicodeEncodeError` ile harness'i olduruyor.
+
+    Bu, CI'yi kiran hatanin AYNISI DEGIL: `§` hem cp1252'de hem cp1254'te var,
+    yani Windows runner'inda bu satir patlamazdi. 18 Agu 2026'da duzeltmeyi
+    dogrulamak icin ASCII yerel ayarda kosarken cikti - yani CI'dan daha DAR
+    bir ortamda. Ayni sinif oldugu ve tek satir oldugu icin burada kapatiliyor;
+    olcum aracinin kendi ciktisi, uzerinde kostugu makinenin kod sayfasina
+    bagli olmamali.
+    """
+    for akis in (sys.stdout, sys.stderr):
+        yeniden = getattr(akis, "reconfigure", None)
+        if yeniden is not None:
+            yeniden(encoding="utf-8", errors="replace")
+
+
+def oku(yol: pathlib.Path) -> str:
+    """Kaynagi HER ZAMAN UTF-8 olarak oku. `read_text()` KULLANMA.
+
+    Neden (18 Agu 2026, CI #15-#30 - KK-49): `Path.read_text()` encoding
+    verilmezse yerel kod sayfasini kullanir. Windows runner'inda bu cp1252;
+    `belge.py` icindeki `–`/`—` karakterleri UTF-8'den cp1252'ye YANLIS
+    cozuluyor (`Â–`) ve o dosyayi hedefleyen enjeksiyon dizgisi artik
+    eslesmiyordu. Harness bunu dogru sekilde "ENJEKSIYON UYGULANAMADI" diye
+    raporladi ve exit 1 dondu (KK-10) - yani CI dort gun boyunca hakli olarak
+    kirmiziydi ve kirmizinin sebebi korunan kod degil, olcen aracin kendisiydi.
+
+    Bayt duzeyinde okuyup acikca cozmek encoding'i sabitlemekle kalmiyor,
+    universal-newline cevrimini de kapatiyor: `read_text()` CRLF'i LF'e cevirir,
+    `write_text()` geri cevirir ve dosya, hicbir enjeksiyon uygulanmadan
+    bayt olarak degisir.
+    """
+    return yol.read_bytes().decode("utf-8")
+
+
+def yaz(yol: pathlib.Path, metin: str) -> None:
+    """Kaynagi HER ZAMAN UTF-8 olarak yaz. Gerekce icin bkz. `oku`."""
+    yol.write_bytes(metin.encode("utf-8"))
+
+
 def yedekle():
     YEDEK_DIZIN.mkdir(exist_ok=True)
     for f in DOSYALAR:
@@ -1496,6 +1540,7 @@ def kontrol(sert: bool = False) -> int:
 
 
 def main() -> int:
+    ciktiyi_utf8_yap()
     if not kilitle():
         return 1
     atexit.register(kilidi_birak)
@@ -1546,7 +1591,7 @@ def main() -> int:
     try:
         for i, (ad, dosya, eski, yeni_metin, beklenen) in enumerate(secili, 1):
             print(f"  [{i}/{len(secili)}] {ad[:60]}", flush=True)
-            metin = (YEDEK_DIZIN / pathlib.Path(dosya).name).read_text()
+            metin = oku(YEDEK_DIZIN / pathlib.Path(dosya).name)
             if eski not in metin:
                 sonuc.append((ad, "ENJEKSIYON UYGULANAMADI", False))
                 continue
@@ -1559,9 +1604,9 @@ def main() -> int:
             # Once "kim uygulandi" diske yazilir, sonra dosya bozulur. Ters
             # sirada yazilsa, tam aradaki sert oldurme izsiz kalirdi.
             UYGULANAN.write_text(f"[{i}/{len(secili)}] {ad} -> {dosya}", encoding="utf-8")
-            (KOK / dosya).write_text(bozuk)
+            yaz(KOK / dosya, bozuk)
             k = testler()
-            (KOK / dosya).write_text(metin)
+            yaz(KOK / dosya, metin)
             UYGULANAN.unlink(missing_ok=True)
             if k is None:
                 # Olculemedi: "koruma yok" ile ayni satira yazilmamali.

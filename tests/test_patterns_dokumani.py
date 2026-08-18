@@ -38,7 +38,7 @@ def test_atif_yapilan_dosyalar_gercekten_var():
 
 
 def test_atif_yapilan_ci_isleri_gercekten_var():
-    ci = yaml.safe_load((KOK / ".github" / "workflows" / "ci.yml").read_text())
+    ci = yaml.safe_load((KOK / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
     atif = {a or b for a, b in re.findall(r"CI job `([\w-]+)`|job `([\w-]+)`", PATTERNS)}
     eksik = atif - set(ci["jobs"])
     assert not eksik, f"PATTERNS.md var olmayan CI isine atif yapiyor: {sorted(eksik)}"

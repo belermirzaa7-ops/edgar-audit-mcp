@@ -49,6 +49,7 @@ can verify rather than remember.
 | [P-34](#p-34) | Does a loop over one thing quietly repeat work that belongs to another? | `test_ortak_form4_islemleri_sahip_sayisi_kadar_cogaltmiyor` |
 | [P-35](#p-35) | Does the heuristic that filters noise also filter the signal — and does the tool then deny the thing exists? | `test_bitisik_gercek_basliklar_bulunamadi_diye_reddedilmiyor` |
 | [P-36](#p-36) | Does my detector's only evidence live somewhere the cleanup deletes? | `test_enjeksiyon_kontrol_yedek_silinince_temiz_demiyor` |
+| [P-37](#p-37) | Does this read or write text without naming an encoding — and would another machine's code page change what it reads? | `test_harness_kaynagi_yerel_kod_sayfasindan_bagimsiz_okuyup_yaziyor`, `test_hicbir_metin_dosyasi_okumasi_yerel_kod_sayfasina_birakilmiyor`, `test_hicbir_tanimlayici_ascii_disi_karakter_tasimiyor` |
 
 Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
 are marked `none` in the table and `Guard: none` in the entry. All three are
@@ -1104,6 +1105,69 @@ teaches people to ignore it. CI runs `--kontrol --sert` with `if: always()`.
 **Incident.** 18 Aug 2026, produced by a hostile review of the measurement
 machinery itself. The reviewer copied the repository, applied an injection by
 hand, deleted the backup directory, and ran the check.
+
+---
+
+<a id="p-37"></a>
+### P-37 · The reader that decodes with whatever code page the machine has
+
+**Symptom.** The fault-injection harness reported
+`KORUMASIZ / ENJEKSIYON UYGULANAMADI` for exactly one injection, on
+`windows-latest` only, and only on the shard that contained it. Every Linux
+shard passed, the other three Windows shards passed, the test job passed on
+Windows. Because an injection that cannot be applied exits 1 by design (P-5),
+CI was red — correctly — for four days across seventeen runs, and the badge in
+the README said `failing` on a public repository.
+
+**Root cause.** `Path.read_text()` and `Path.write_text()` use
+`locale.getpreferredencoding()` when no `encoding=` is given. On the Windows
+runner that is cp1252, not UTF-8. One guarded file, `src/edgar_mcp/belge.py`,
+contains an en dash and an em dash inside a regular expression — the character
+class that lets a section heading start inside an HTML table cell. Read through
+cp1252 those two characters come back as different characters, so the
+injection's target string no longer occurred in the text and the harness could
+not apply it.
+
+Note what did *not* go wrong: the harness detected the condition, named it, and
+failed loudly. The reporting was right. The measuring instrument was reading
+the source through the wrong decoder — the defect was in the tool that checks
+the code, not in the code it checks.
+
+Two further consequences of the same omission, neither observed but both
+guarded now: `write_text()` re-encodes through the same code page, and text
+mode translates line endings, so on Windows the restore step would rewrite
+every guarded file with CRLF — a byte-level change to files the harness
+promises not to change.
+
+A third instance surfaced while reproducing this. One test function —
+`test_13f_ihracci_aramasi_ve_siralama`, since renamed — carried a Turkish
+dotless i in place of the last `i` of `aramasi`. pytest exports each
+test's name through `PYTEST_CURRENT_TEST`, and `os.putenv` encodes environment
+values with the local code page; under an ASCII locale that raises
+`UnicodeEncodeError` during collection, so the test neither runs nor skips.
+Same root: a name or a byte string that only survives on machines whose code
+page happens to be wide enough.
+
+**Detection.** Text I/O in this repository always names its encoding, and the
+harness reads and writes its guarded files as bytes with an explicit
+`.decode("utf-8")` / `.encode("utf-8")` — which fixes the code page and turns
+off newline translation in one move. Three tests hold it: a subprocess that
+runs the harness's reader under an ASCII locale with UTF-8 mode off, and
+reproduces the Windows failure on Linux; an AST scan that rejects any
+`read_text`/`write_text`/`open` call in text mode without `encoding=`; and an
+AST scan that rejects non-ASCII identifiers. The first one skips, loudly,
+rather than passing, on a platform where the locale is already UTF-8 and the
+failure cannot be produced.
+
+**Incident.** 18 Aug 2026, diagnosed from the public CI logs after the failure
+emails were noticed. The first failing run is CI #15 (commit `d90f98f`), the
+commit that added `belge.py` — the file that carries the two characters. The
+first version of the reproduction test was itself wrong in an instructive way:
+it asserted that every injection target string is present in its file, which
+turns red under *any* applied injection. The harness duly reported it as the
+catching test for an unrelated injection — that is, a universal catcher, which
+would have made a genuinely unprotected guard look protected. It was rewritten
+to measure the reader rather than the target list.
 
 ---
 

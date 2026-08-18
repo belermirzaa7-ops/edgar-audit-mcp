@@ -38,7 +38,7 @@ def depo(tmp_path: pathlib.Path) -> pathlib.Path:
 
 
 def _yaz_commit(kok: pathlib.Path, icerik: str, mesaj: str) -> None:
-    (kok / "app.py").write_text(f'ua = "{icerik}"\n')
+    (kok / "app.py").write_text(f'ua = "{icerik}"\n', encoding="utf-8")
     _git(kok, "add", "-A")
     _git(kok, "commit", "-qm", mesaj)
 

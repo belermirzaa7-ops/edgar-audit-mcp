@@ -11,7 +11,7 @@ belirli bir US-GAAP etiketine ve belirli bir sunulma tarihine kadar izlenebilir.
 
 **Buradan başlayın:** [başka araçların sessizce yanlış yaptığı şeyler](docs/case-study.md) ·
 [ölçüldü: bu sunucu olmadan %26 doğru, onunla %90](evaluation/benchmark.md) ·
-[bu depoda gerçekten yaşanmış 36 hata, her biri bir testle korunuyor](PATTERNS.md)
+[bu depoda gerçekten yaşanmış 37 hata, her biri bir testle korunuyor](PATTERNS.md)
 
 ---
 

@@ -1593,7 +1593,7 @@ def test_cekirdek_dotenv_bagimliligi_tasimaz():
 
     kok = pathlib.Path(__file__).resolve().parents[1] / "src" / "edgar_mcp"
     for f in kok.glob("*.py"):
-        assert "dotenv" not in f.read_text(), f"{f.name} dotenv'e bagimli olmus"
+        assert "dotenv" not in f.read_text(encoding="utf-8"), f"{f.name} dotenv'e bagimli olmus"
 
 
 def test_env_example_gercekten_okunan_degiskeni_belgeler():
@@ -1608,9 +1608,9 @@ def test_env_example_gercekten_okunan_degiskeni_belgeler():
     import re
 
     kok = pathlib.Path(__file__).resolve().parents[1]
-    ornek = (kok / ".env.example").read_text()
+    ornek = (kok / ".env.example").read_text(encoding="utf-8")
     kaynaklar = "\n".join(
-        (kok / "src" / "edgar_mcp" / ad).read_text()
+        (kok / "src" / "edgar_mcp" / ad).read_text(encoding="utf-8")
         for ad in ("client.py", "server.py")
     )
     belgelenen = set(re.findall(r"^#?([A-Z_]+)=", ornek, re.M))
@@ -3656,7 +3656,7 @@ async def test_13f_kapsam_notu_sinirlari_soyluyor(srv):
 
 
 @pytest.mark.anyio
-async def test_13f_ihracci_araması_ve_siralama(srv):
+async def test_13f_ihracci_aramasi_ve_siralama(srv):
     h = await srv.get_institutional_holdings(ticker="AAPL", search="ally")
     assert h.total_matching == 1 and h.positions[0].issuer == "ALLY FINL INC"
     tum = await srv.get_institutional_holdings(ticker="AAPL")

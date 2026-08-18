@@ -1717,3 +1717,99 @@ yani bicim tek basina hangi kolun hangisi oldugunu ele veriyor olabilir. Rapor
 "blind" diyor; dogrusu "hangi sistemin hangisi oldugu SOYLENMEDI" ve bu ikisi
 ayni sey degil. Bir sonraki olcum turunda cevaplar notlamadan once
 normalize edilecek. Bugun rapora yazildi, duzeltilmedi.
+
+### KK-49: CI dort gundur kirmiziydi - olcen aracin kendi encoding hatasi
+
+18 Agu 2026. Mirza CI'nin kirmizi oldugunu ve Carsambadan beri hata maili
+geldigini bildirdi. Ilk hatali kosu **CI #15** (commit `d90f98f`, "Add filing
+text reader with section extraction"); ondan sonraki **17 kosunun hepsi**
+kirmizi. README'de CI rozeti duruyor ve depo public - yani "failing" yazisi
+dort gundur potansiyel musterinin gordugu ilk seylerden biriydi.
+
+**Iki ayri sebep vardi ve karistirilmamali.**
+
+**1. `docker` isi (12 saniyede dusuyordu).** `Dockerfile` yalnizca
+`pyproject.toml README.md src/` kopyaliyordu, ama `pyproject.toml`
+`license = { file = "LICENSE" }` diyor: `pip install .` build aninda
+`OSError: License file does not exist: LICENSE` veriyor. **Bu zaten KK-48'de
+bulunmus ve v41'de duzeltilmisti**; CI #31'de `docker` isi yesil dondu, yani o
+taraf kapali.
+
+**2. `fault-injection (windows-latest, 1/4)` (54 dakikada 44/45).** Kalan tek
+satir:
+
+```
+Belge: satir basi isaretlerine izni kaldir (tablo yerlesi   KORUMASIZ   ENJEKSIYON UYGULANAMADI
+```
+
+Butun Linux parcalari ve Windows'un 2/3/4 parcalari yesildi.
+
+**Kok neden.** `arac/enjeksiyon.py` enjeksiyonu uygularken kaynagi
+`Path.read_text()` ile okuyordu - `encoding` verilmeden. O cagri yerel kod
+sayfasini kullanir; Windows runner'inda cp1252. `src/edgar_mcp/belge.py`
+icindeki `_ONEK` duzenli ifadesi bir **en dash** ve bir **em dash**
+tasiyor (bir bolum basligi HTML tablo hucresi icinde baslayabilsin diye -
+KK-27'nin dorduncu karari). cp1252 ile cozulunce o iki karakter baska
+karakterlere donuyor, enjeksiyon dizgisi metinde artik gecmiyor, harness
+uygulayamiyor.
+
+**Harness DOGRU davrandi.** Durumu tespit etti, adini koydu ve exit 1 dondu
+(KK-10). Yanlis olan raporlama degil, OLCEN ARACIN kaynagi yanlis decoder'dan
+okumasiydi. Hata korunan kodda degil, korumayi olcen aracta.
+
+**Ayni ihmalin iki sonucu daha** (gozlenmedi ama artik korunuyor):
+`write_text()` de ayni kod sayfasindan geri kodlar, ve metin modu satir sonu
+cevirisi yapar - yani Windows'ta geri yukleme adimi korunan dosyalarin hepsini
+CRLF ile yeniden yazardi. Harness'in "hicbir dosyayi degistirmedim" iddiasi
+bayt duzeyinde yanlis olurdu. Bu yuzden duzeltme `encoding="utf-8"` eklemek
+DEGIL, `oku`/`yaz` yardimcilariyla **bayt duzeyinde** okuyup yazmak oldu:
+`read_bytes().decode("utf-8")` ve `encode("utf-8")` hem kod sayfasini sabitler
+hem satir sonu cevrimini kapatir. `yedekle`/`geri_al` zaten boyle calisiyordu;
+enjeksiyon dongusu bu disiplinin disinda kalmisti.
+
+**Ucuncu ornek, tekrar uretim sirasinda cikti.** Bir test fonksiyonunun adinda
+Turkce `ı` vardi (`aramasi`'nin son `i`'si). pytest her testin adini
+`PYTEST_CURRENT_TEST` ortam degiskenine yaziyor ve `os.putenv` degeri yerel kod
+sayfasina ceviriyor; ASCII yerel ayarda bu `UnicodeEncodeError` ile TOPLAMA
+asamasinda patliyor - test ne kosuyor ne atlaniyor. KK-9 "disariya bakan yuzey
+Ingilizce" diyordu ama YORUMLAR icin; tanimlayicilar hic denetlenmemisti.
+
+**Hata Linux'ta URETILDI, varsayilmadi.** `LC_ALL=C PYTHONUTF8=0 python -X
+utf8=0` ile `locale.getpreferredencoding(False)` `ANSI_X3.4-1968` donuyor ve
+`read_text()` `belge.py`'de `UnicodeDecodeError` firlatiyor. Bu, Windows
+cp1252'sinin birebir ayni yolu (hata degil MOJIBAKE) degil ama ayni koku olcen
+en yakin yerel kosum. Uc dogrulama yapildi:
+- Duzeltme geri alinip test kirmiziya dondurulduу (iki yonde de: `oku` ve `yaz`).
+- Tum test paketi ASCII yerel ayar altinda yesil (289/289).
+- 1/4 parcasi (hatanin ciktigi parca) ASCII yerel ayar altinda kosuldu.
+
+**Kendi hatam, kayda geciyor.** Tekrar uretim testinin ilk yazimi "her
+enjeksiyon hedefi dosyasinda bulunuyor mu" diye soruyordu. O test HERHANGI bir
+enjeksiyon uygulanmisken kirmiziya doner - yani harness'in gozunde **evrensel
+bir yakalayici**. Nitekim ilk kosuda belge enjeksiyonunun "yakalayan test"i
+olarak kendisi gorundu. Boyle bir test, gercekten korumasiz bir enjeksiyonu
+"yakalandi" diye gosterir ve olcum makinesini korlestirir - KK-41'de `None` ile
+bos listeyi ayirma sebebinin aynisi. Test, hedef listesini degil OKUYUCUYU
+olcecek sekilde yeniden yazildi. Hedeflerin dosyada bulunmasi zaten harness'in
+kendi isi (KK-10) ve pytest'te tekrarlanmamali.
+
+**Uc test sabitliyor**, ucu de enjeksiyonla DEGIL dogrudan sinaniyor - KK-41'de
+oldugu gibi, harness'in kendisi enjeksiyon hedefi degil:
+- `test_harness_kaynagi_yerel_kod_sayfasindan_bagimsiz_okuyup_yaziyor` - ASCII
+  yerel ayarli alt surec; platformda kod sayfasi zaten UTF-8 ise SESSIZ
+  gecmiyor, `skip` ediyor.
+- `test_hicbir_metin_dosyasi_okumasi_yerel_kod_sayfasina_birakilmiyor` - AST
+  taramasi; `encoding`siz `read_text`/`write_text`/`open` yasak. On cagri
+  bulundu ve duzeltildi (dokuzu testlerde, biri harness'ta).
+- `test_hicbir_tanimlayici_ascii_disi_karakter_tasimiyor` - AST taramasi.
+
+**Kayda gecen, duzeltilmeyen bulgu.** KK-18 "enjeksiyon hedefi dosyada TEK
+gecmeli" diyor ama bunu hicbir test zorlamiyor ve iki hedef kurali ihlal
+ediyor: takma ad fallback'i (2 eslesme) ve `read_only_hint` (12 eslesme).
+Ikisi de su an GECERLI donuyor, cunku `replace(..., 1)` ilk eslesmeyi bozuyor
+ve dogru testi kirmiziya ceviriyor. Yani bugun yanlis bir sey olculmuyor;
+kirilganlik, kodun ilerideki bir duzenlemesinde ilk eslesmenin baska bir yere
+kaymasi. Bu turda DOKUNULMADI - CI'yi yesile dondurmek disinda bir degisiklik
+yapmamak icin. Ayri bir is olarak duruyor.
+
+P-37 olarak kayda gecti.

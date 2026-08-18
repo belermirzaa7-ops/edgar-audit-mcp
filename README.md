@@ -13,7 +13,7 @@ Built against the **2026-07-28 MCP specification** using the Python SDK `v2.0.0`
 
 [![CI](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml)
 
-**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured: 26% correct without this server, 90% with it](evaluation/benchmark.md) · [36 failures that shipped here, each with the test that guards it](PATTERNS.md)
+**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured: 26% correct without this server, 90% with it](evaluation/benchmark.md) · [37 failures that shipped here, each with the test that guards it](PATTERNS.md)
 
 ---
 

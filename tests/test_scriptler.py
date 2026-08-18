@@ -390,7 +390,7 @@ def test_enjeksiyon_kontrol_modu_yarim_kalan_kosuyu_goruyor(tmp_path, monkeypatc
     mod = importlib.import_module("arac.enjeksiyon")
     kok, yedek = tmp_path / "kok", tmp_path / "yedek"
     (kok / "src").mkdir(parents=True)
-    (kok / "src/a.py").write_text("x = 1\n")
+    (kok / "src/a.py").write_text("x = 1\n", encoding="utf-8")
     monkeypatch.setattr(mod, "KOK", kok)
     monkeypatch.setattr(mod, "YEDEK_DIZIN", yedek)
     monkeypatch.setattr(mod, "KILIT", tmp_path / "kilit")
@@ -404,15 +404,15 @@ def test_enjeksiyon_kontrol_modu_yarim_kalan_kosuyu_goruyor(tmp_path, monkeypatc
     yedek_var, _, farkli, _ = mod.artiklar()
     assert yedek_var and farkli == [], "enjeksiyon uygulanmadan cokme yanlis okundu"
 
-    mod.UYGULANAN.write_text("[32/163] gizli blok filtresi -> src/a.py")
-    (kok / "src/a.py").write_text("x = 2\n")
+    mod.UYGULANAN.write_text("[32/163] gizli blok filtresi -> src/a.py", encoding="utf-8")
+    (kok / "src/a.py").write_text("x = 2\n", encoding="utf-8")
     _, _, farkli, not_ = mod.artiklar()
     assert farkli == ["src/a.py"], "enjekte halde kalan dosya gorulmedi"
     assert "32/163" in not_, "hangi enjeksiyonun kaldigi kaydedilmemis"
     assert mod.kontrol() == 2
 
     mod.geri_al()
-    assert (kok / "src/a.py").read_text() == "x = 1\n"
+    assert (kok / "src/a.py").read_text(encoding="utf-8") == "x = 1\n"
     assert not mod.UYGULANAN.exists(), "geri alma sonrasi isaret dosyasi kaldi"
     assert mod.kontrol() == 2, "yedek dizini dururken temiz denemez"
     mod.temizle()
@@ -559,7 +559,7 @@ def test_enjeksiyon_kontrol_yedek_silinince_temiz_demiyor(tmp_path, monkeypatch)
     mod = importlib.import_module("arac.enjeksiyon")
     kok = tmp_path / "kok"
     (kok / "src").mkdir(parents=True)
-    (kok / "src/a.py").write_text("x = 1\n")
+    (kok / "src/a.py").write_text("x = 1\n", encoding="utf-8")
     monkeypatch.setattr(mod, "KOK", kok)
     monkeypatch.setattr(mod, "YEDEK_DIZIN", tmp_path / "yedek")   # YOK
     monkeypatch.setattr(mod, "KILIT", tmp_path / "kilit")         # YOK
@@ -592,3 +592,158 @@ def test_enjeksiyon_kontrol_yedek_silinince_temiz_demiyor(tmp_path, monkeypatch)
     with contextlib.redirect_stdout(tampon):
         assert mod.kontrol(sert=True) == 0
     assert "TEMIZ" in tampon.getvalue()
+
+
+def test_harness_kaynagi_yerel_kod_sayfasindan_bagimsiz_okuyup_yaziyor():
+    """18 Agu 2026, CI #15-#30 (KK-49): harness Windows'ta dort gun kirmiziydi.
+
+    `Path.read_text()` encoding verilmezse yerel kod sayfasini kullanir.
+    Windows runner'inda bu cp1252; `belge.py` icindeki `–`/`—` karakterleri
+    UTF-8'den yanlis cozuluyor ve o dosyayi hedefleyen enjeksiyon dizgisi artik
+    eslesmiyordu. Harness bunu dogru sekilde "ENJEKSIYON UYGULANAMADI" diye
+    raporlayip exit 1 dondu (KK-10): CI kirmizi, ama sebebi korunan kod degil,
+    OLCEN ARACIN kendisi.
+
+    Test hatayi Linux'ta da URETIR: alt surec ASCII yerel ayarla ve UTF-8 modu
+    KAPALI baslatilir, yani encoding'siz bir okuma ASCII'ye duser. Duzeltmeden
+    once `oku()` orada `UnicodeDecodeError` firliyordu.
+
+    Olculen sey HEDEF LISTESI DEGIL, OKUYUCUNUN KENDISI. Ilk yazimda test
+    "her enjeksiyon hedefi dosyasinda bulunuyor mu" diye soruyordu; o test
+    HERHANGI bir enjeksiyon uygulanmis haldeyken de kirmiziya doner, yani
+    harness'in gozunde EVRENSEL BIR YAKALAYICI olur ve gercekten korumasiz
+    bir enjeksiyonu "yakalandi" diye gosterirdi. Hedeflerin dosyada bulunmasi
+    zaten harness'in kendi isi (KK-10, "ENJEKSIYON UYGULANAMADI"); pytest'te
+    tekrarlanmamali.
+
+    Alt surec kendi cozdugu encoding'i bildiriyor: zaten UTF-8'e dusmusse test
+    hicbir sey olcmemis olur ve `skip` eder - sessizce yesil GECMEZ.
+    """
+    import json
+    import os
+    import subprocess
+    import sys
+
+    kod = """
+import json, locale, pathlib, sys, tempfile
+sys.path.insert(0, __KOK__)
+from arac.enjeksiyon import DOSYALAR, KOK, oku, yaz
+
+sonuc = {"encoding": locale.getpreferredencoding(False), "hata": None,
+         "ascii_disi": [], "cozum_farkli": [], "yazma_farkli": []}
+try:
+    with tempfile.TemporaryDirectory() as d:
+        for dosya in DOSYALAR:
+            ham = (KOK / dosya).read_bytes()
+            metin = oku(KOK / dosya)
+            if any(ord(c) > 127 for c in metin):
+                sonuc["ascii_disi"].append(dosya)
+            if metin != ham.decode("utf-8"):
+                sonuc["cozum_farkli"].append(dosya)
+            gecici = pathlib.Path(d) / "k"
+            yaz(gecici, metin)
+            if gecici.read_bytes() != ham:
+                sonuc["yazma_farkli"].append(dosya)
+except Exception as e:
+    sonuc["hata"] = type(e).__name__ + ": " + str(e)
+print(json.dumps(sonuc))
+""".replace("__KOK__", repr(str(KOK)))
+
+    ortam = {**os.environ, "PYTHONUTF8": "0", "PYTHONCOERCECLOCALE": "0"}
+    if os.name != "nt":
+        ortam.update(LC_ALL="C", LANG="C", LC_CTYPE="C")
+    r = subprocess.run([sys.executable, "-X", "utf8=0", "-c", kod],
+                       cwd=KOK, env=ortam, capture_output=True, encoding="utf-8",
+                       errors="replace", timeout=120)
+    assert r.returncode == 0, f"alt surec coktu:\n{r.stderr}"
+    d = json.loads(r.stdout.strip().splitlines()[-1])
+
+    if d["encoding"].lower().replace("-", "") in ("utf8", "cp65001"):
+        pytest.skip("bu platformda yerel kod sayfasi zaten UTF-8; hata "
+                    f"uretilemiyor ({d['encoding']})")
+
+    assert d["hata"] is None, (
+        f"yerel kod sayfasi {d['encoding']} iken kaynak okunamadi: {d['hata']}")
+    assert d["ascii_disi"], (
+        "korunan dosyalarin hicbirinde ASCII disi karakter kalmamis - bu test "
+        "artik gercek bir senaryoyu olcmuyor")
+    assert d["cozum_farkli"] == [], (
+        f"yerel kod sayfasi {d['encoding']} iken su dosyalar UTF-8'den farkli "
+        f"cozuldu: {d['cozum_farkli']}")
+    assert d["yazma_farkli"] == [], (
+        "geri yazma bayt bazinda ayni degil (encoding ya da satir sonu "
+        f"cevrimi): {d['yazma_farkli']}")
+
+
+def test_hicbir_metin_dosyasi_okumasi_yerel_kod_sayfasina_birakilmiyor():
+    """KK-14'un ucuncu tekrari, bu kez OLCEN ARACTA (KK-49).
+
+    Onceki iki tekrar `subprocess.run(text=True)` idi ve ikisi de tek tek
+    duzeltilmisti. Bu test sinifin kendisini kapatiyor: depodaki hicbir
+    `read_text`/`write_text`/`open` cagrisi metin modunda encoding'siz
+    olmamali. Encoding'siz bir cagri, gelistiricinin makinesinde calisir ve
+    baska bir yerel ayarda ya coker ya da SESSIZCE farkli metin dondurur -
+    ikincisi daha kotusu.
+    """
+    import ast
+
+    hedef = {"read_text", "write_text"}
+    bulgu = []
+    for yol in sorted(list(KOK.glob("src/**/*.py")) + list(KOK.glob("arac/*.py"))
+                      + list(KOK.glob("tests/*.py")) + list(KOK.glob("*.py"))):
+        agac = ast.parse(yol.read_text(encoding="utf-8"), filename=str(yol))
+        for d in ast.walk(agac):
+            if not isinstance(d, ast.Call):
+                continue
+            if isinstance(d.func, ast.Attribute) and d.func.attr in hedef:
+                if not any(k.arg == "encoding" for k in d.keywords):
+                    bulgu.append(f"{yol.relative_to(KOK)}:{d.lineno} {d.func.attr}")
+            elif isinstance(d.func, ast.Name) and d.func.id == "open":
+                kip = d.args[1].value if (
+                    len(d.args) > 1 and isinstance(d.args[1], ast.Constant)
+                    and isinstance(d.args[1].value, str)) else ""
+                anahtarlar = {k.arg for k in d.keywords}
+                if "b" not in kip and "encoding" not in anahtarlar:
+                    bulgu.append(f"{yol.relative_to(KOK)}:{d.lineno} open")
+    assert not bulgu, (
+        "encoding verilmeden metin modunda dosya acan cagrilar:\n  "
+        + "\n  ".join(bulgu))
+
+
+def test_hicbir_tanimlayici_ascii_disi_karakter_tasimiyor():
+    """18 Agu 2026, KK-49 duzeltilirken ASCII yerel ayarla kosarken bulundu:
+    `test_13f_ihracci_araması_ve_siralama` adinda Turkce `ı` vardi.
+
+    Python 3 tanimlayicilarda Unicode'a izin verir, ama ad oradan ORTAMA
+    tasiniyor: pytest her testin adini `PYTEST_CURRENT_TEST` degiskenine yazar
+    ve `os.putenv` onu yerel kod sayfasina cevirir. ASCII yerel ayarda bu
+    `UnicodeEncodeError` ile patliyor - test ne calisiyor ne de atlaniyor,
+    TOPLAMA asamasinda hata veriyor. Ayni ad ayrica `-k` ifadelerinde,
+    gunluklerde ve JUnit XML'inde de kirilgan.
+
+    Depo kurali zaten buydu (KK-9: disariya bakan yuzey Ingilizce, ic
+    belgelendirme Turkce) ama YORUMLAR icin; tanimlayicilar hicbir zaman
+    denetlenmiyordu. Bu test onu kapatiyor: metin Turkce kalabilir, AD kalamaz.
+    """
+    import ast
+
+    bulgu = []
+    for yol in sorted(list(KOK.glob("src/**/*.py")) + list(KOK.glob("arac/*.py"))
+                      + list(KOK.glob("tests/*.py")) + list(KOK.glob("*.py"))):
+        agac = ast.parse(yol.read_text(encoding="utf-8"), filename=str(yol))
+        for d in ast.walk(agac):
+            adlar = []
+            if isinstance(d, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                adlar = [d.name] + [a.arg for a in d.args.args + d.args.kwonlyargs]
+            elif isinstance(d, ast.ClassDef):
+                adlar = [d.name]
+            elif isinstance(d, ast.Name) and isinstance(d.ctx, ast.Store):
+                adlar = [d.id]
+            elif isinstance(d, ast.arg):
+                adlar = [d.arg]
+            for ad in adlar:
+                if any(ord(c) > 127 for c in ad):
+                    bulgu.append(f"{yol.relative_to(KOK)}:{d.lineno} {ad!r}")
+    assert not bulgu, (
+        "ASCII disi karakter iceren tanimlayicilar (yerel ayara bagli olarak "
+        "kirilir):\n  " + "\n  ".join(sorted(set(bulgu))))
