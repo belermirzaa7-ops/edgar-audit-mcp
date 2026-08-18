@@ -226,3 +226,62 @@ def test_server_json_tasimasi_imajin_gercekten_konustugu_tasima():
         beklenen = "stdio"
     assert tasima == beklenen, (
         f"server.json '{tasima}' diyor, Dockerfile '{beklenen}' calistiriyor")
+
+
+def test_benchmark_eslesmis_karsilastirmasi_ham_veriyle_ayni():
+    """Rapordaki esleşmis karsilastirma sayilari YAYINLANMIS NOTLARDAN yeniden
+    hesaplanir, elle kopyalanmaz.
+
+    19 Agu 2026'da README manseti "32 cevabi duzeltti, hicbirini bozmadi"
+    iddiasina cevrildi. O sayi o gune kadar yalnizca bir oturumun icinde
+    hesaplanmisti; `evaluation/benchmark.md` onu HIC yazmiyordu. Yani mansetin
+    dayandigi belge iddiayi tasimiyordu - P-14'un ta kendisi, ve bu kez
+    musteriye giden ilk cumlede.
+
+    18 Agu denetiminde ayni dosyada uc hucrenin ilk kosudan elle kopyalandigi
+    ve bayat kaldigi bulunmustu (KK-48). Ayni hatayi yeni sayilarla tekrar
+    etmemek icin bu test her sayiyi ham JSON'dan uretiyor.
+    """
+    import json
+
+    kok = KOK / "evaluation" / "benchmark"
+    anahtar = json.loads((kok / "anahtar.json").read_text(encoding="utf-8"))
+    notlar = json.loads((kok / "kesimli_notlar.json").read_text(encoding="utf-8"))
+
+    def alan(i: int, hangi: str) -> str:
+        a = anahtar[str(i)]
+        return "y1" if a["yanit_1"] == hangi else "y2"
+
+    dogru = lambda n: n == "dogru"          # noqa: E731
+    kutu = {"ikisi": 0, "yalniz_mcp": 0, "yalniz_yok": 0, "hicbiri": 0}
+    for n in notlar:
+        m = dogru(n[alan(n["id"], "mcp")]["not"])
+        y = dogru(n[alan(n["id"], "yok")]["not"])
+        kutu["ikisi" if (m and y) else
+             "yalniz_mcp" if m else
+             "yalniz_yok" if y else "hicbiri"] += 1
+
+    assert sum(kutu.values()) == 50, f"50 soru bekleniyordu: {kutu}"
+    metin = (KOK / "evaluation" / "benchmark.md").read_text(encoding="utf-8")
+
+    # 2x2 tablonun dort hucresi de raporda yazili olmali.
+    tablo = (f"| **with the server, correct** | {kutu['ikisi']} "
+             f"| **{kutu['yalniz_mcp']}** |")
+    assert tablo in metin, f"benchmark.md'deki 2x2 tablo ham veriyle ayni degil: {kutu}"
+    alt = (f"| **with the server, not correct** | **{kutu['yalniz_yok']}** "
+           f"| {kutu['hicbiri']} |")
+    assert alt in metin, f"benchmark.md'deki 2x2 tablo ham veriyle ayni degil: {kutu}"
+
+    # Govdedeki cumle de ayni sayiyi soylemeli.
+    assert "Thirty-two questions" in metin or str(kutu["yalniz_mcp"]) in metin, \
+        "esleşmis fark govdede gecmiyor"
+
+    # Toplam dogru sayilari da ayni dosyada duruyor.
+    mcp_dogru = kutu["ikisi"] + kutu["yalniz_mcp"]
+    yok_dogru = kutu["ikisi"] + kutu["yalniz_yok"]
+    assert f"{mcp_dogru} ({mcp_dogru * 2}%)" in (
+        KOK / "docs" / "case-study.md").read_text(encoding="utf-8"), (
+        f"vaka calismasi arac kolunu {mcp_dogru}/50 diye saymiyor")
+    assert f"{yok_dogru} ({yok_dogru * 2}%)" in (
+        KOK / "docs" / "case-study.md").read_text(encoding="utf-8"), (
+        f"vaka calismasi kontrol kolunu {yok_dogru}/50 diye saymiyor")

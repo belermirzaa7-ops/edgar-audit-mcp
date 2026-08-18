@@ -186,6 +186,13 @@ twice — once with no tools at all, once with only this server's tools:
 | **With the server** | **45 (90%)** | 4 | 0 | 1 |
 | Without tools | 13 (26%) | 17 | 3 | 17 |
 
+Both arms answered the same fifty questions, so the comparison can be read one
+question at a time: **32 the server got right and the control arm did not, and
+none the other way round** (exact two-sided McNemar p = 4.7e-10). That direction
+is the durable part. The 90% itself is a point estimate on fifty questions and
+carries a 95% interval of **79-96%**, plus about ±2 points of grader noise —
+both measured, both in the full report.
+
 The sharpest split is on questions asking whether a company beat the guidance it
 gave a quarter earlier: **6/7 with the server, 0/7 without**. Those need two
 8-K exhibits filed months apart. Without filing access the model could only
@@ -213,7 +220,7 @@ read every figure as carrying about ±2 points.
 
 ## How it is kept true
 
-- **289 tests**, no network access — SEC responses are mocked from real captured
+- **290 tests**, no network access — SEC responses are mocked from real captured
   payloads.
 - **199 fault injections.** Every guard above is deliberately broken by an
   automated harness, and the test that should catch it must turn red. A guard

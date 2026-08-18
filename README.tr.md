@@ -10,7 +10,7 @@ belirli bir US-GAAP etiketine ve belirli bir sunulma tarihine kadar izlenebilir.
 **2026-07-28 MCP spesifikasyonuna** göre, Python SDK `v2.0.0` ile yazıldı.
 
 **Buradan başlayın:** [başka araçların sessizce yanlış yaptığı şeyler](docs/case-study.md) ·
-[ölçüldü: bu sunucu olmadan %26 doğru, onunla %90](evaluation/benchmark.md) ·
+[ölçüldü: uzmanların yazdığı 50 soruda sunucu 32 cevabı düzeltti, hiçbirini bozmadı](evaluation/benchmark.md) ·
 [bu depoda gerçekten yaşanmış 37 hata, her biri bir testle korunuyor](PATTERNS.md)
 
 ---

@@ -10,6 +10,36 @@ metric the benchmark's own paper reports: **32.6% against 91.9%**. The tool arm
 stated no wrong figure at all; the control arm stated three, and refused 17 more
 questions outright. The tool arm failed to answer one.
 
+## The finding that does not depend on the score
+
+90% is a point estimate on fifty questions, and it should be read as one: the
+95% Wilson interval is **79-96%**, and the grader itself moves any figure by
+about ±2 points (measured below). So the number is soft.
+
+The comparison is not. Both arms answered the *same* fifty questions, so the
+result is paired and can be read question by question:
+
+| | control correct | control not correct |
+|---|---|---|
+| **with the server, correct** | 13 | **32** |
+| **with the server, not correct** | **0** | 5 |
+
+**Thirty-two questions the server got right and the control arm did not. Zero
+in the other direction.** Under the null hypothesis that the server is as likely
+to break an answer as to fix one, a 32-0 split has an exact two-sided McNemar
+probability of **4.7e-10**. That does not depend on the 90%, on the interval, or
+on where the grader draws the line between "correct" and "partial" — only on the
+direction of the disagreements, and every one of them points the same way.
+
+Two limits, stated rather than left implied. First, this says the server changed
+the answers on *these* questions; it says nothing about the size of the effect on
+any other set. Second, "broke none" is a property of this run, not a guarantee —
+five questions were wrong in both arms, and one answer did move downward between
+the two tool runs (id 49, below), so the tools can and do lose ground.
+
+The numbers above are recomputed from the published grades by
+`test_benchmark_eslesmis_karsilastirmasi_ham_veriyle_ayni`, not copied by hand.
+
 ## Two runs, and why there are two
 
 The first run (16 Aug 2026) scored **82%**. Five of its answers were graded
