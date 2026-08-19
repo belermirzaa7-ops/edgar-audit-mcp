@@ -51,8 +51,9 @@ can verify rather than remember.
 | [P-36](#p-36) | Does my detector's only evidence live somewhere the cleanup deletes? | `test_enjeksiyon_kontrol_yedek_silinince_temiz_demiyor` |
 | [P-37](#p-37) | Does this read or write text without naming an encoding — and would another machine's code page change what it reads? | `test_harness_kaynagi_yerel_kod_sayfasindan_bagimsiz_okuyup_yaziyor`, `test_hicbir_metin_dosyasi_okumasi_yerel_kod_sayfasina_birakilmiyor`, `test_hicbir_tanimlayici_ascii_disi_karakter_tasimiyor` |
 | [P-38](#p-38) | Is the tree I am working in the tree that is committed — or an older one that is internally consistent? | **none — manual step** |
+| [P-39](#p-39) | Does this mirroring command verify its SOURCE, or only its destination — and what does it do when the source is empty? | **none — manual step** |
 
-Four of these — **P-1**, **P-9**, **P-18** and **P-38** — have no automated guard
+Five of these — **P-1**, **P-9**, **P-18**, **P-38** and **P-39** — have no automated guard
 and are marked `none` in the table and `Guard: none` in the entry. Each is
 a step in a procedure or a property of the environment rather than of the code,
 so nothing in the test suite can enforce it — P-38 in particular is invisible to
@@ -1218,6 +1219,48 @@ it was remembered — which is not a control, and is why this entry exists.
 
 Related to P-19: an empty success and a *stale* success are both
 indistinguishable from the real thing by the check that is looking.
+
+---
+
+<a id="p-39"></a>
+### P-39 · The mirror that checks the wrong side
+
+**Guard: none.** This is a property of an operator command, not of the code, so
+no test in the suite can enforce it.
+
+**Symptom.** Every tracked file disappears from the working tree. The command
+that did it reports success. What remains is exactly the set of paths that were
+listed as exclusions — which reads like a partial copy rather than a deletion,
+so the shape of the damage disguises its cause.
+
+**Root cause.** `robocopy SOURCE DEST /MIR` makes the destination identical to
+the source. An empty source therefore means *delete everything in the
+destination*. The command was guarded, but the guard tested the **destination**
+— "does the target look like the right repository?" — and never tested that the
+source contained anything. When an unpack step left the source directory empty,
+the guard passed and the mirror ran as a delete.
+
+The same asymmetry applies to any mirroring flag: `rsync --delete`, `aws s3 sync
+--delete`, `git push --force`. In each, the destructive power lives on the source
+side, and a destination check gives a false sense of safety precisely because it
+looks like a safety check.
+
+**Detection.** Verify the source before any mirror, not just the destination:
+assert that a file which must exist in the source actually does. Two independent
+assertions are cheap — one that the source carries a known file, one that the
+destination is the repository it claims to be — and either alone is not enough.
+
+**Incident.** 19 Aug 2026, during the `edgar-audit-mcp` rename. The unpack step
+that filled the staging directory did not produce it on one run; the following
+`/MIR` wiped every tracked file in the working tree. Recovery cost nothing:
+`.git` was in the exclusion list so history survived untouched, the previous
+release was already pushed, and `git restore .` brought the tree back. Two
+independent protections held at once, which is the only reason a mis-aimed
+delete was a five-minute event.
+
+The command came from this assistant, not from the operator. Recording it here
+rather than in a chat message is the point: a lesson that lives only in a
+conversation is not a guard.
 
 ---
 

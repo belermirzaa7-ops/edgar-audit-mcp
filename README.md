@@ -16,7 +16,7 @@ Built against the **2026-07-28 MCP specification** using the Python SDK `v2.0.0`
 
 [![CI](https://github.com/belermirzaa7-ops/edgar-audit-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/edgar-audit-mcp/actions/workflows/ci.yml)
 
-**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured on 50 expert-written questions: the server corrected 32 answers and broke none](evaluation/benchmark.md) · [38 failures that shipped here, each with the test that guards it](PATTERNS.md)
+**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured on 50 expert-written questions: the server corrected 32 answers and broke none](evaluation/benchmark.md) · [39 failures that shipped here, each with the test that guards it](PATTERNS.md)
 
 > **An independent project.** This server was written without reading the code
 > of [`stefanoamorelli/sec-edgar-mcp`](https://github.com/stefanoamorelli/sec-edgar-mcp),

@@ -14,7 +14,7 @@ belirli bir US-GAAP etiketine ve belirli bir sunulma tarihine kadar izlenebilir.
 
 **Buradan başlayın:** [başka araçların sessizce yanlış yaptığı şeyler](docs/case-study.md) ·
 [ölçüldü: uzmanların yazdığı 50 soruda sunucu 32 cevabı düzeltti, hiçbirini bozmadı](evaluation/benchmark.md) ·
-[bu depoda gerçekten yaşanmış 38 hata, her biri bir testle korunuyor](PATTERNS.md)
+[bu depoda gerçekten yaşanmış 39 hata, her biri bir testle korunuyor](PATTERNS.md)
 
 > **Bağımsız bir proje.** Bu sunucu, bu nişin en büyük projesi olan
 > [`stefanoamorelli/sec-edgar-mcp`](https://github.com/stefanoamorelli/sec-edgar-mcp)

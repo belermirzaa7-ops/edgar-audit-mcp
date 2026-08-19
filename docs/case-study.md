@@ -230,7 +230,7 @@ read every figure as carrying about ±2 points.
 - **A 22-question evaluation set**, every answer produced by running the tools
   against live SEC data with the exact calls recorded, so any answer can be
   re-measured rather than trusted.
-- **[`PATTERNS.md`](../PATTERNS.md)** — 38 failures that actually shipped in
+- **[`PATTERNS.md`](../PATTERNS.md)** — 39 failures that actually shipped in
   this repository, each with symptom, root cause, how it is detected now, and
   the test that guards it. A separate test suite keeps that document from
   drifting: every test it names must exist.
