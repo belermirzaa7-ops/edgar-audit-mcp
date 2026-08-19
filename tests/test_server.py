@@ -4113,3 +4113,42 @@ async def test_etiketler_celistiginde_celiski_bildiriliyor(srv):
     # uyari olmaktan cikar.
     n = await srv.get_concept_series(ticker="AAPL", concept="net_income")
     assert n.tag_conflicts == []
+
+
+@pytest.mark.anyio
+async def test_hiz_sinirlayici_her_http_yolunda_gercekten_cagriliyor(srv, monkeypatch):
+    """19 Agu 2026, denetimde bulundu ve uretildi: `RateLimiter`in KENDISI
+    sinaniyordu (`test_hiz_sinirlayici_gercekten_bekletir`) ama istemcinin onu
+    KULLANDIGI hicbir yerde sinanmiyordu. Iki `await self._limiter.acquire()`
+    cagrisi da silindiginde 290 test yesil kaliyordu.
+
+    Bu, SEC'in 10 istek/sn kuralini ihlal edip IP bloguna girmenin tek yolu ve
+    testlerin gormedigi yol. Sinirlayicinin kendi birim testi burada hicbir sey
+    korumuyor: bir yaprak sinifin dogru calismasi, ona hic ugranmadiginda
+    anlamsiz.
+
+    Iki ayri kod yolu var ve ikisi de sayiliyor: JSON uclarina giden `_get` ve
+    `www.sec.gov/Archives`e giden `filing_document`. Ikincisi ayri bir metot ve
+    daha once tam bu sebeple bir duzeltmeyi atlamisti (KK-34 §2)."""
+    from edgar_mcp import client as istemci_modulu
+
+    sayac = {"n": 0}
+    gercek = istemci_modulu.RateLimiter.acquire
+
+    async def sayan(self: object) -> None:
+        sayac["n"] += 1
+        await gercek(self)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(istemci_modulu.RateLimiter, "acquire", sayan)
+
+    sayac["n"] = 0
+    await srv.get_company_profile(ticker="AAPL")
+    assert sayac["n"] > 0, (
+        "JSON uclarina giden yol hiz sinirlayiciyi HIC cagirmadi - SEC'in "
+        "10 istek/sn siniri korunmuyor")
+
+    sayac["n"] = 0
+    await srv.read_filing_text(ticker="AAPL", form_type="10-K")
+    assert sayac["n"] > 0, (
+        "dosyalama belgesi indiren yol hiz sinirlayiciyi HIC cagirmadi "
+        "(ayri metot, KK-34 §2'deki gibi atlanmis olabilir)")

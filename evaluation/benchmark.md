@@ -97,11 +97,18 @@ in this repository.
   the second run every call carried `as_of="2025-05-16"`.
 - **Neither answering arm ever saw the expected answers.**
 - **Grading** was done by a separate agent that saw the question, the expected
-  answer, and two candidate answers in randomised order, without being told
-  which system produced which. Grades: correct / partial / wrong / no answer,
-  plus two flags — *period mismatch* and *invented figure*. Arm order was
-  assigned by the same deterministic rule in both runs, so the two are
-  comparable.
+  answer, and two candidate answers **without being told which system produced
+  which**. Grades: correct / partial / wrong / no answer, plus two flags —
+  *period mismatch* and *invented figure*.
+
+  The order the two answers were shown in was **not random**: for even question
+  ids the tool arm was first, for odd ids second, in both runs. That makes the
+  runs comparable to each other, and it means the position of an answer carries
+  one bit that a grader could in principle exploit. Nothing suggests it did —
+  but "deterministic and undisclosed" is not "randomised", and this document
+  said the latter until 19 Aug 2026. Read together with the blinding limit
+  below: the tool arm's answers carry accession numbers and the control arm's
+  do not, so format already distinguishes them more than order does.
 - Runs on 16 and 17 Aug 2026. Every artifact is in `evaluation/benchmark/`.
 
 ## Was the cutoff actually respected?

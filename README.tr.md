@@ -14,7 +14,7 @@ belirli bir US-GAAP etiketine ve belirli bir sunulma tarihine kadar izlenebilir.
 
 **Buradan başlayın:** [başka araçların sessizce yanlış yaptığı şeyler](docs/case-study.md) ·
 [ölçüldü: uzmanların yazdığı 50 soruda sunucu 32 cevabı düzeltti, hiçbirini bozmadı](evaluation/benchmark.md) ·
-[bu depoda gerçekten yaşanmış 39 hata, her biri bir testle korunuyor](PATTERNS.md)
+[bu depoda gerçekten yaşanmış 40 hata, her biri bir testle korunuyor](PATTERNS.md)
 
 > **Bağımsız bir proje.** Bu sunucu, bu nişin en büyük projesi olan
 > [`stefanoamorelli/sec-edgar-mcp`](https://github.com/stefanoamorelli/sec-edgar-mcp)
@@ -92,9 +92,12 @@ tuzak barındırıyor. Bu projenin asıl kısmı o tuzakları ele alması.
 | `sec_edgar_get_institutional_holdings` | 13F — bir yatırım yöneticisinin çeyrek sonu pozisyonları, 2023 birim değişimi ele alınmış |
 
 Her araç Pydantic modeli döndürür; MCP `outputSchema` otomatik üretilir ve
-istemci sonuçları tip güvenli tüketir. Liste döndüren araçlar
-`total_matching` / `returned` / `has_more` bildirir; böylece model tam bir
-cevapla kırpılmış bir cevabı ayırt edebilir.
+istemci sonuçları tip güvenli tüketir. Liste döndüren her araç
+neyi döndürmediğini bildirir; böylece model tam bir cevapla kırpılmış bir
+cevabı ayırt edebilir. Alan adı tek bir kalıbı değil birimi izliyor —
+dosyalamalar için `total_matching`, seri için `total_periods`, karşılaştırma
+için `total_companies`, dosyalama metni için `total_characters` — ve her biri
+`returned` / `has_more` ile birlikte geliyor.
 
 Kalemler takma adla (`revenue`, `net_income`, `public_float`, ...) ya da ham
 etiketle çağrılır. Etiket taksonomisiyle nitelenebilir — `dei:EntityPublicFloat`
@@ -122,7 +125,7 @@ XBRL rakamı taşır, gerekçeyi taşımaz. `sec_edgar_read_filing_text` dosyala
 kendisini okuyup adlandırılmış bir bölümü döndürür — MD&A, risk faktörleri,
 gelir vergisi dipnotu.
 
-Bunu göründüğünden zorlaştıran iki şey var ve ikisi de testle korunuyor:
+Bunu göründüğünden zorlaştıran üç şey var ve üçü de testle korunuyor:
 
 - **İçindekiler tablosu bölümle aynı şeyi yazar.** "Item 7. Management's
   Discussion and Analysis" bir 10-K'da en az iki kez geçer: bir kez içindekiler
@@ -449,11 +452,23 @@ biten mali yılı **FY2025**. Aynı bitiş tarihi, farklı etiket — Walmart ma
 yılı bittiği takvim yılıyla, Target başladığı yılla adlandırıyor. Hiçbir sabit
 kural ikisini birden doğru yapamaz.
 
-O yüzden kural kullanılmıyor. `_fy_kaymasi()` kaymayı her şirket için SEC'in
-kendi verisinden türetiyor: her `fy` grubunda en geç biten yıllık dönem, o
-dosyalamanın kendi dönemidir ve `kayma = fy − bitiş_yılı` çapasını verir. Çapa
-bulunamazsa yanıt sessizce tahmin etmek yerine `fiscal_year_derived: false`
-döndürür.
+O yüzden kural kullanılmıyor. `Takvim`, şirketin kendi 10-K satırlarından
+`(dönem sonu, mali yıl)` çapalarından oluşan bir liste kuruyor — SEC'in `fy`
+alanı bir dosyalamanın *kendi* dönemi için doğru, yalnızca taşıdığı
+karşılaştırma yılları için yanlış — ve bir dönem, kendisinden sonraki ilk
+çapanın mali yılına ait sayılıyor.
+
+Önce tek bir global kayma denendi ve 18 Ağustos 2026'da yanlış olduğu ölçüldü:
+US Foods'ta iki ayrı mali yılı 2016 diye etiketliyor, FY2015 ve FY2020'yi
+seriden tümüyle düşürüyordu; yıl sonunu değiştiren bir şirkette (Perrigo,
+Haziran'dan Aralık'a) bir rejimin bütün etiketlerini bir yıl kaydırıyordu.
+Çapayı şirket başına değil dönem başına bağlamak rejim değişikliğini özel bir
+kural olmadan çözüyor, çünkü her dönem kendi rejimindeki çapaya bakıyor.
+
+Her nokta etiketinin nereden geldiğini söylüyor: `fiscal_year_source`, SEC o
+yılı söylediyse `reported`, bu sunucu saydıysa `derived` ya da `extrapolated`.
+Hiç çapa yoksa yanıt sessizce tahmin etmek yerine `fiscal_year_derived: false`
+döndürüyor.
 
 ### 3. Etiket değişimi geçmişi kırpar
 
@@ -486,7 +501,7 @@ yazıldı.
 ## Kurulum
 
 ```bash
-uv sync                      # veya: pip install -e ".[dev]"
+uv sync --extra dev          # veya: pip install -e ".[dev]"
 cp .env.example .env         # SEC_USER_AGENT'a adını ve e-postanı yaz
 ```
 
@@ -601,8 +616,8 @@ erişim numarası sonradan SEC'e karşı denetlendi: **hiçbiri kesimden sonra
 değil**, kullanılan en geç dosyalama 2025-05-09 tarihli.
 
 Cevaplayan kolların hiçbiri beklenen cevabı görmedi; notlandırmayı, iki cevabı
-rastgele sırayla ve hangisinin hangi koldan geldiğini bilmeden gören ayrı bir
-değerlendirici yaptı. Bütün ham veri — iki koşunun cevapları, notlandırma
+hangisinin hangi koldan geldiği söylenmeden gören ayrı bir değerlendirici yaptı
+— ama sıra rastgele değildi, rapor bunu ve bedelini yazıyor. Bütün ham veri — iki koşunun cevapları, notlandırma
 girdileri, notlar, kol anahtarı, uyum denetimi — `evaluation/benchmark/`
 altında. Sayının sınırları raporun içinde yazılı; buna notlandırıcının kendisinin
 sayıyı ne kadar oynattığının ölçümü de dahil (iki değerlendirici aynı elli

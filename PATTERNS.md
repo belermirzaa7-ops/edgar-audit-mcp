@@ -52,6 +52,7 @@ can verify rather than remember.
 | [P-37](#p-37) | Does this read or write text without naming an encoding — and would another machine's code page change what it reads? | `test_harness_kaynagi_yerel_kod_sayfasindan_bagimsiz_okuyup_yaziyor`, `test_hicbir_metin_dosyasi_okumasi_yerel_kod_sayfasina_birakilmiyor`, `test_hicbir_tanimlayici_ascii_disi_karakter_tasimiyor` |
 | [P-38](#p-38) | Is the tree I am working in the tree that is committed — or an older one that is internally consistent? | **none — manual step** |
 | [P-39](#p-39) | Does this mirroring command verify its SOURCE, or only its destination — and what does it do when the source is empty? | **none — manual step** |
+| [P-40](#p-40) | When a second entry point was added, did the guard move with it — or did it stay on the first one? | `test_konteyner_giris_noktasi_da_user_agent_olmadan_baslamiyor`, `test_hiz_sinirlayici_her_http_yolunda_gercekten_cagriliyor` |
 
 Five of these — **P-1**, **P-9**, **P-18**, **P-38** and **P-39** — have no automated guard
 and are marked `none` in the table and `Guard: none` in the entry. Each is
@@ -1261,6 +1262,50 @@ delete was a five-minute event.
 The command came from this assistant, not from the operator. Recording it here
 rather than in a chat message is the point: a lesson that lives only in a
 conversation is not a guard.
+
+---
+
+<a id="p-40"></a>
+### P-40 · The guard that stayed on the first entry point
+
+**Symptom.** A promise the documentation makes — "refuses to start without
+`SEC_USER_AGENT`" — is true on one path and false on the path the documentation
+tells you to use. The container starts happily with no credentials configured,
+advertises all twelve tools, and passes every liveness check. It only fails
+later, on a real call, in front of a user.
+
+**Root cause.** The check lived inside `main()`, the stdio entry point, and it
+was put there specifically to fix this exact defect once before. When a second
+transport was added, the container's `CMD` called the SDK's `run` directly
+instead of going through `main()` — so the new path never inherited the guard.
+Nothing was removed; a door was added next to the one with the lock on it.
+
+The same shape produced the second finding in this round. `RateLimiter` had a
+unit test proving the class waits correctly, and no test anywhere proving the
+client ever calls it: both `acquire()` calls could be deleted and the suite
+stayed green. A leaf that works perfectly is worth nothing if control never
+reaches it — and the second call site, `filing_document`, is a separate method
+that had already missed one fix for this reason.
+
+This is P-27 and P-33 again — a fix that skips a sibling call site — but the
+consequence is different in kind. There the sibling produced a wrong number.
+Here the sibling produced no protection at all, while the documentation kept
+promising it.
+
+**Detection.** Test the *property*, not the location: assert that **every**
+entry point refuses to start, and that **every** HTTP path increments the
+limiter, rather than testing the one you were thinking about. Two details
+matter. First, follow the indirection — a test that greps `Dockerfile` for a
+transport string measures nothing the moment the entry point becomes a function
+call, which is precisely what happened to a sibling test in the same change.
+Second, an unguarded entry point makes a naive test **hang** rather than fail,
+because the server actually starts; the transport is stubbed so the failure is
+red instead of infinite. A hanging test is an unmeasured test.
+
+**Incident.** 19 Aug 2026, both found by hostile review before launch, both
+reproduced before being fixed. The `SEC_USER_AGENT` gap was first found and
+"fixed" on 15 Aug 2026 (KK-32 §7); the fix covered one transport, and the second
+transport was added the same week.
 
 ---
 

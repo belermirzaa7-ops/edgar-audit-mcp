@@ -25,4 +25,4 @@ RUN pip install --no-cache-dir .
 # stateless_http=True: 2026-07-28 spesifikasyonunun durumsuz cekirdegi;
 # initialize/Mcp-Session-Id el sikismasi olmadan tools/list cevaplanir.
 EXPOSE 8000
-CMD ["python", "-c", "from edgar_mcp.server import mcp; mcp.run(transport='streamable-http', host='0.0.0.0', stateless_http=True)"]
+CMD ["python", "-c", "from edgar_mcp.server import main_http; main_http()"]

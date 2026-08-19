@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Evaluation set for the sec-edgar-mcp tools.
+  Evaluation set for the edgar-audit-mcp tools.
 
   How this file was produced: every question below was answered by calling the
   tools against the live SEC API - the first ten on 13 Aug 2026, the next five

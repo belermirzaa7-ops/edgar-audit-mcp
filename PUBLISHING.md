@@ -1,7 +1,8 @@
 # Publishing
 
 Three channels, none of them required to use this server — a clone and
-`uv sync` works — but each changes how easily someone else can reach it.
+`uv sync --extra dev` works — but each changes how easily someone else can
+reach it.
 
 Everything below was measured on 16 Aug 2026 against the registries' own
 endpoints and documentation. Where something could **not** be checked from the
@@ -55,8 +56,9 @@ break every client for no gain in accuracy — these tools really do read SEC
 EDGAR.
 
 The Python import package stays `edgar_mcp`. Distribution name and import name
-are allowed to differ, the import name is invisible from outside, and 199 fault
-injections are keyed to paths under `src/edgar_mcp/`. Churning those paths for a
+are allowed to differ, the import name is invisible from outside, and 191 of the 201 fault
+injections are keyed to paths under `src/edgar_mcp/` (the other ten target
+`arac/sir_tarama.py`, `arac/ortam.py` and the `Dockerfile`). Churning those paths for a
 cosmetic symmetry would put the measurement machinery at risk to change
 something no user ever sees.
 

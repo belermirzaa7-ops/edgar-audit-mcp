@@ -21,6 +21,8 @@ import time
 import urllib.error
 import urllib.request
 
+import pytest
+
 KOK = pathlib.Path(__file__).resolve().parents[1]
 
 
@@ -86,13 +88,69 @@ def test_http_tasimasi_araclari_el_sikismasiz_listeler():
 
 def test_dockerfile_loopback_disina_baglaniyor():
     """SDK varsayilani 127.0.0.1. Konteynerde bu, yayinlanan portu olu birakir.
-    Dockerfile bu yuzden host'u ACIKCA vermek zorunda; bu test o satirin
-    sessizce geri alinmasini engeller."""
+    Dockerfile bu yuzden host'u ACIKCA vermek zorunda.
+
+    Test dolayli cagriyi TAKIP EDER (19 Agu 2026): `CMD` artik `main_http()`
+    calistiriyor, yani host ve durumsuzluk bilgisi Dockerfile satirinda degil
+    kaynakta duruyor. Yalnizca `CMD` satirini grepleyen bir test, giris noktasi
+    bir fonksiyona tasindigi anda hicbir sey olcmezdi."""
+    import inspect
+
+    from edgar_mcp import server as sunucu
+
     docker = (KOK / "Dockerfile").read_text(encoding="utf-8")
     cmd = [s for s in docker.splitlines() if s.startswith("CMD")]
     assert cmd, "Dockerfile'da CMD yok"
-    assert "host='0.0.0.0'" in cmd[0], f"CMD loopback'e baglanir: {cmd[0]}"
-    assert "stateless_http=True" in cmd[0], f"CMD durumsuz degil: {cmd[0]}"
+    assert "main_http" in cmd[0], (
+        f"CMD dogrulanan giris noktasini cagirmiyor: {cmd[0]}")
+
+    kaynak = inspect.getsource(sunucu.main_http)
+    assert 'host="0.0.0.0"' in kaynak or "host='0.0.0.0'" in kaynak, (
+        "main_http loopback'e baglanir")
+    assert "stateless_http=True" in kaynak, "main_http durumsuz degil"
+    assert 'transport="streamable-http"' in kaynak, (
+        "main_http streamable-HTTP calistirmiyor")
+
+
+def test_konteyner_giris_noktasi_da_user_agent_olmadan_baslamiyor():
+    """19 Agu 2026, denetimde bulundu: iki README, `server.json` ve arac
+    aciklamalari "refuses to start without SEC_USER_AGENT" diyordu, ama koruma
+    YALNIZCA `main()` icindeydi - stdio yolu. `Dockerfile`'in `CMD`'si `main()`i
+    hic cagirmiyordu, dolayisiyla ortam degiskeni olmadan konteyner aciliyor,
+    on iki araci ilan ediyor ve her canlilik kontrolunu geciyordu.
+
+    15 Agu 2026'da (KK-32 §7) ayni hata bulunup duzeltilmisti; duzeltme tek
+    tasimayi kapsiyordu ve ikinci tasima (KK-24) eklendiginde onunla birlikte
+    tasinmadi. Bu test ikisini birden sabitliyor: hangi giris noktasi olursa
+    olsun, ortam degiskeni yoksa surec ACILMAZ."""
+    import edgar_mcp.server as sunucu
+
+    # `mcp.run` degistiriliyor: koruma kaldirilmis olsaydi gercek sunucu
+    # ayaga kalkar ve test ASILIRDI - kirmizi degil, sonsuz. Asilan bir test
+    # de olcmeyen bir testtir (KK-41'in "olculemedi" ayrimi).
+    calisti: list[str] = []
+
+    def sahte_run(*a: object, **k: object) -> None:
+        calisti.append("run")
+
+    for ad in ("main", "main_http"):
+        giris = getattr(sunucu, ad)
+        onceki = os.environ.pop("SEC_USER_AGENT", None)
+        gercek_run = sunucu.mcp.run
+        sunucu.mcp.run = sahte_run          # type: ignore[method-assign]
+        calisti.clear()
+        try:
+            with pytest.raises(RuntimeError) as hata:
+                giris()
+        finally:
+            sunucu.mcp.run = gercek_run     # type: ignore[method-assign]
+            if onceki is not None:
+                os.environ["SEC_USER_AGENT"] = onceki
+        assert "SEC_USER_AGENT" in str(hata.value), (
+            f"{ad}() eksik ortam degiskenini eyleme donusturulebilir sekilde "
+            f"bildirmiyor: {hata.value}")
+        assert calisti == [], (
+            f"{ad}() ortam degiskeni yokken tasimayi YINE DE baslatti")
 
 
 def test_sdk_varsayilani_hala_loopback():

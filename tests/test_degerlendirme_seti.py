@@ -8,6 +8,7 @@ kirmiziya dondurur.
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import xml.etree.ElementTree as ET
@@ -219,11 +220,25 @@ def test_server_json_tasimasi_imajin_gercekten_konustugu_tasima():
     assert oci, "server.json bir OCI paketi ilan etmiyor"
     tasima = oci[0]["transport"]["type"]
 
+    # Dolayli cagriyi TAKIP EDER (19 Agu 2026): `CMD` artik `main_http()`
+    # calistiriyor, yani tasima Dockerfile satirinda degil kaynakta. Yalnizca
+    # Dockerfile metnini grepleyen bir test, giris noktasi bir fonksiyona
+    # tasindigi anda `stdio` bekleyip yanlis yere kirmizi donerdi.
+    import inspect
+    import sys
+
+    sys.path.insert(0, str(KOK / "src"))
+    os.environ.setdefault("SEC_USER_AGENT", "Test Runner test@example.com")
+    from edgar_mcp import server as sunucu
+
     docker = (KOK / "Dockerfile").read_text(encoding="utf-8")
-    if "transport='streamable-http'" in docker or 'transport="streamable-http"' in docker:
-        beklenen = "streamable-http"
-    else:
-        beklenen = "stdio"
+    cmd = next((r for r in docker.splitlines() if r.startswith("CMD")), "")
+    calisan = cmd
+    for ad in ("main_http", "main"):
+        if ad in cmd:
+            calisan = inspect.getsource(getattr(sunucu, ad))
+            break
+    beklenen = "streamable-http" if "streamable-http" in calisan else "stdio"
     assert tasima == beklenen, (
         f"server.json '{tasima}' diyor, Dockerfile '{beklenen}' calistiriyor")
 

@@ -1904,3 +1904,110 @@ kontrol gercekten calisiyor.
 **Bu bir P-19 akrabasi:** eski ama kendi icinde tutarli bir durum, "her sey
 yolunda" gibi gorunur. Fark, bos bir basari degil ESKI bir basari olmasi -
 ikisi de gercek durumdan ayirt edilemez oldugu icin tehlikeli.
+
+### KK-52: Son denetim turu - "duzeltildi" denen bir hata ikinci tasimada duruyordu
+
+19 Agu 2026, piyasaya cikmadan onceki son bakim turu. Iki bagimsiz salt-okunur
+denetim: biri musteriye bakan yuzeye (README/vaka calismasi/benchmark), oteki
+olcum makinesine (testler, mock'lar, enjeksiyon harness'i). Her bulguyu
+duzeltmeden once kendim yeniden urettim.
+
+**KRITIK 1 - "refuses to start without SEC_USER_AGENT" belgelenen dagitim
+yolunda YANLISTI.** Koruma (`_c()`) yalnizca `main()` icindeydi, yani stdio
+yolunda. `Dockerfile`'in `CMD`'si `main()`i hic cagirmiyor, dogrudan
+`mcp.run(transport="streamable-http", ...)` calistiriyordu. Olculdu: ortam
+degiskeni olmadan modul import edilip `mcp.list_tools()` cagriliyor ve **on iki
+arac** donuyor - konteyner aciliyor, ilan ediyor, her canlilik kontrolunu
+geciyor. Iki README, `server.json` ve arac aciklamalari bu vaadi tasiyordu.
+
+**Bu tam olarak 15 Agu 2026'da (KK-32 §7) bulunup "duzeltildi" denen hata.**
+Duzeltme tek tasimayi kapsiyordu; ikinci tasima (KK-24) eklendiginde koruma
+onunla birlikte tasinmadi. P-27/P-33'teki "kardes cagri yerini atlayan
+duzeltme" sinifinin dorduncu tekrari - ve en pahalisi, cunku bu sefer atlanan
+sey bir hesaplama degil bir GUVENLIK KAPISIYDI.
+
+Duzeltme `main_http()`: once dogrula, sonra tasimayi baslat. `CMD` artik onu
+cagiriyor. Iki test sabitliyor ve ikisi de dolayli cagriyi TAKIP EDIYOR -
+yalnizca `Dockerfile` metnini grepleyen eski test, giris noktasi bir fonksiyona
+tasindigi anda hicbir sey olcmez hale gelirdi (nitekim `server.json` tasima
+testi tam bu sebeple kirmiziya dondu ve o da duzeltildi).
+
+**Testin ASILMASI da bir kusurdur.** Ilk yazimda koruma kaldirildiginda test
+kirmiziya donmuyor, gercek sunucuyu ayaga kaldirip **asiliyordu**. Asilan bir
+test olcmeyen bir testtir - KK-41'deki "bos liste mi, olculemedi mi" ayriminin
+aynisi. `mcp.run` sahtelenip cagrilip cagrilmadigi ayrica sayiliyor.
+
+**KRITIK 2 - hiz sinirlayici hicbir yere bagli olmayabilirdi.** `RateLimiter`in
+KENDISI sinaniyordu ama istemcinin onu KULLANDIGI hicbir yerde sinanmiyordu.
+Denetci olctu: iki `await self._limiter.acquire()` cagrisi da silindiginde
+**290 test yesil kaliyor** ve hicbir enjeksiyon o satirlari hedeflemiyordu.
+SEC'in 10 istek/sn kurali, IP bloguna girmenin tek yolu; bir yaprak sinifin
+dogru calismasi, ona hic ugranmadiginda anlamsiz. Yeni test iki kod yolunu da
+sayiyor (`_get` ve `filing_document`) - ikincisi ayri bir metot ve daha once
+tam bu sebeple bir duzeltmeyi atlamisti (KK-34 §2).
+
+**KK-18 dort gundur yaziliydi ve hicbir sey onu zorlamiyordu.** Iki ihlal:
+- `read_only_hint=True,` dosyada **on iki kez** geciyordu. Zarari yoktu (beklenen
+  test tum araclar uzerinde niceleme yapiyor) ama rapor satiri TEK bir
+  dogrulanmis koruma ima ediyordu.
+- **`adaylar = CONCEPT_ALIASES.get(...)` iki kez geciyordu** ve bu zararliydi:
+  `replace(..., 1)` her zaman ilkini bozuyor, yani `compare_companies`
+  icindeki ayni koruma **hic olculmemisti**. Denetci ikinci siteye elle
+  uygulayip gosterdi: beklenen test YESIL kaliyor, on bes ilgisiz test kirmizi
+  donuyor. Iki fonksiyonun sirasi degisseydi harness calisan bir korumayi
+  KORUMASIZ diye raporlardi.
+
+Hedefler izleyen satirlariyla birlikte benzersiz hale getirildi, cerceve yolu
+icin AYRI bir enjeksiyon eklendi (artik olculuyor), ve kural teste baglandi.
+Test evrensel yakalayici DEGIL: enjeksiyon uygulandiginda sayi 1'den 0'a duser,
+`!= 1` degil `> 1` araniyor.
+
+**Harness'ta iki sessiz delik daha:**
+1. `git_temiz_mi()` `git diff --quiet -- ...` calistiriyordu - argumansiz
+   `git diff` calisma agacini **INDEKS** ile karsilastirir, HEAD ile degil.
+   Denetci uretti: enjekte kalmis bir dosya `git add` edilirse kontrol "TEMIZ"
+   der. Sert oldurmeden sonraki en dogal refleks `git add -A`, ve CI'nin kapisi
+   tam da bu kontrol. Bir kelime: `git diff --quiet HEAD -- ...`.
+2. `testler()` yalnizca `FAILED` satirlarini sayiyordu. Sozdizimi gecerli ama
+   import'u bozan bir enjeksiyon `27 failed, 184 errors` uretiyor ve beklenen
+   test ERROR olarak listeleniyor - yani **calisan bir koruma KORUMASIZ** diye
+   raporlanirdi. Ters yonu daha kotu: yalnizca-hata biten bir kosuyu temiz
+   durum kontrolu de kapanis regresyonu da YESIL sayardi. Artik `ERROR` da
+   sayiliyor.
+
+**Dokuman tarafinda dogrulanan ve duzeltilen iddialar:**
+- Iki README `_fy_kaymasi()` fonksiyonunu ve **18 Agu'da YANLIS oldugu olculup
+  degistirilen** algoritmayi anlatiyordu (KK-47). Fonksiyon repoda hic yok.
+  Yazarin tahmin etmedigini kanitlamak icin var olan bolum, iki surum eski bir
+  tasarimi anlatiyordu. `Takvim` ile yeniden yazildi, elenen tasarim ve neden
+  elendigi de yazildi.
+- **"randomised order" YANLISTI.** `anahtar.json`'in ellisi de tek kural:
+  cift id -> arac kolu once. Sapma sifir. Rapor kendi icinde celisiyordu (bir
+  yerde "randomised", baska yerde "deterministically") ve iki README ile vaka
+  calismasi yalnizca ilkini tasiyordu. Duzeltildi ve **neye mal oldugu** da
+  yazildi: sira bir bit tasiyor, ve zaten bilinen korluk siniriyla (arac kolu
+  erisim numarasi tasiyor, kontrol kolu tasimiyor) birlikte okunmali.
+- `uv sync` dev bagimliliklarini kurmuyor (`[project.optional-dependencies]`,
+  `[dependency-groups]` yok) - yani belgelenen kurulumdan sonra belgelenen test
+  komutu calismiyordu. `uv sync --extra dev`.
+- Vaka calismasi "second smallest" diyordu, kendi tablosunda **en kucuk**.
+- "Two things" deyip uc madde siralaniyordu (iki dilde de).
+- Sayfalama iddiasi fazla genisti: dort yanit modeli `total_matching`
+  tasimiyor (`total_periods`, `total_companies`, `total_characters`). Alan adi
+  birimi izliyor; metin artik bunu soyluyor.
+- `evaluation/questions.xml` basligi eski adi TASIYAN tek yerdi.
+
+**Kapatilmayan, bilerek kayda gecen bulgular** (hepsi denetci tarafindan
+uretildi, hicbiri yanlis cevap vermiyor - hepsi OLCULMEYEN koruma):
+- Dort modul ici onbellek siniri (`_BELGE_METNI`, `_CERCEVE`, `_INSTANCE`,
+  `_ETIKET`) silinebiliyor ve paket yesil kaliyor.
+- `EdgarClient.__init__`'teki `User-Agent`, `follow_redirects`, `timeout`
+  silinebiliyor: fixture'lar transport'u VE basliklari degistirdigi icin mock'un
+  denetledigi baslik, testin az once koydugu baslik.
+- 13F ad alani yedegi fixture'da hic calismiyor (`T13F_TABLO` varsayilan ad
+  alanini bildiriyor), yani ciftin yarisi olculemez.
+- Duz metin (`.txt`) dosyalama ve bozuk sahiplik XML'i icin fixture yok.
+- `max_characters` sinirlari (`ge=500, le=40000`) olculmuyor.
+
+Bunlar bir sonraki turun listesi. Yazili olmayan bilinen kusur, bilinen kusur
+degildir.

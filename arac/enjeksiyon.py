@@ -177,10 +177,16 @@ def testler() -> list[str] | None:
         )
     except subprocess.TimeoutExpired:
         return None
+    # HEM `FAILED` HEM `ERROR` sayilir. 19 Agu 2026 denetiminde olculdu:
+    # sozdizimi gecerli ama import'u ya da bir fixture'i bozan bir enjeksiyon
+    # `27 failed, 184 errors` uretiyor ve yalnizca `FAILED` okuyan bir ayirici
+    # beklenen testi GORMUYOR - calisan bir koruma KORUMASIZ diye raporlaniyor.
+    # Ters yonu daha kotu: temiz durum kontrolu ve kapanis regresyonu da
+    # yalnizca-hata biten bir kosuyu YESIL sayardi.
     return [
         satir.split("::")[1].split()[0]
         for satir in (r.stdout or "").splitlines()
-        if satir.startswith("FAILED")
+        if satir.startswith(("FAILED", "ERROR")) and "::" in satir
     ]
 
 
@@ -227,11 +233,21 @@ ENJEKSIYONLAR = [
   '"revenue": [\n        "YOK_OLAN_ETIKET",',
   "test_takma_ad_gercek_etikete_cozulur"),
 
- ("Takma ad fallback'ini kaldir (sadece ilk adayi dene)",
+ # Bu iki hedef 19 Agu 2026'ya kadar TEK bir girdiydi ve dizgi dosyada IKI
+ # kez geciyordu (KK-18 ihlali). `replace(..., 1)` her zaman ilkini bozuyordu,
+ # yani `compare_companies` icindeki ayni koruma HIC olculmemisti - ve iki
+ # fonksiyonun sirasi degisseydi harness calisan bir korumayi KORUMASIZ diye
+ # raporlardi. Hedefler artik izleyen satirlariyla birlikte, tek gecisli.
+ ("Takma ad fallback'ini kaldir - seri yolu (sadece son adayi dene)",
   "src/edgar_mcp/server.py",
-  "adaylar = CONCEPT_ALIASES.get(anahtar, [concept.strip()])",
-  "adaylar = [CONCEPT_ALIASES.get(anahtar, [concept.strip()])[-1]]",
+  "adaylar = CONCEPT_ALIASES.get(anahtar, [concept.strip()])\n\n    # H-2 (KK-8)",
+  "adaylar = [CONCEPT_ALIASES.get(anahtar, [concept.strip()])[-1]]\n\n    # H-2 (KK-8)",
   "test_takma_ad_gercek_etikete_cozulur"),
+ ("Takma ad fallback'ini kaldir - cerceve yolu (sadece son adayi dene)",
+  "src/edgar_mcp/server.py",
+  "adaylar = CONCEPT_ALIASES.get(anahtar, [concept.strip()])\n\n    bulunan = None",
+  "adaylar = [CONCEPT_ALIASES.get(anahtar, [concept.strip()])[-1]]\n\n    bulunan = None",
+  "test_cerceve_degere_gore_siraliyor_ve_kirpmayi_bildiriyor"),
 
  ("Hata mesajindan takma ad listesini cikar (§18)",
   "src/edgar_mcp/server.py",
@@ -324,10 +340,16 @@ ENJEKSIYONLAR = [
   'test_eklenip_silinen_sir_gecmiste_yakalanir'),
 
 
+ # Hedef 19 Agu 2026'ya kadar duz `read_only_hint=True,` idi ve dosyada ON IKI
+ # kez geciyordu (KK-18 ihlali). Zarari yoktu - beklenen test tum araclar
+ # uzerinde niceleme yaptigi icin hangi site bozulursa bozulsun kirmizi
+ # doniyordu - ama harness'in rapor satiri TEK bir dogrulanmis koruma ima
+ # ediyordu, oysa on bir arac hic tek tek bozulmamisti. Hedef ilk aracin
+ # benzersiz baglamina baglandi.
  ("Annotations: read_only_hint'i kaldir (§19 ipucu)",
   'src/edgar_mcp/server.py',
-  '        read_only_hint=True,',
-  '        read_only_hint=False,',
+  '    name="sec_edgar_get_company_profile",\n    annotations=ToolAnnotations(\n        read_only_hint=True,',
+  '    name="sec_edgar_get_company_profile",\n    annotations=ToolAnnotations(\n        read_only_hint=False,',
   'test_tum_araclar_salt_okunur_ilan_ediyor'),
 
  ("list_filings: has_more'u sabit False yap",
@@ -354,11 +376,20 @@ ENJEKSIYONLAR = [
   '        has_more=False,',
   'test_seri_sayfalama_bilgisi_verir'),
 
- ("Dockerfile: acik host'u kaldir (konteynerde loopback'e baglanir)",
-  "Dockerfile",
-  "mcp.run(transport='streamable-http', host='0.0.0.0', stateless_http=True)",
-  "mcp.run(transport='streamable-http')",
+ # 19 Agu 2026: `CMD` artik `main_http()` cagiriyor (ortam degiskeni kontrolu
+ # oraya tasindi), yani acik host bilgisi Dockerfile satirinda degil kaynakta.
+ # Hedef onunla birlikte tasindi - bayat kalsaydi harness "UYGULANAMADI" der ve
+ # CI kirmiziya donerdi (KK-10), yani sessiz gecmezdi.
+ ("Konteyner girisi: acik host'u kaldir (konteynerde loopback'e baglanir)",
+  "src/edgar_mcp/server.py",
+  'mcp.run(transport="streamable-http", host="0.0.0.0", stateless_http=True)',
+  'mcp.run(transport="streamable-http")',
   "test_dockerfile_loopback_disina_baglaniyor"),
+ ("Konteyner girisi: SEC_USER_AGENT kontrolunu atla (stdio'daki gibi)",
+  "src/edgar_mcp/server.py",
+  '    _c()\n    mcp.run(transport="streamable-http"',
+  '    mcp.run(transport="streamable-http"',
+  "test_konteyner_giris_noktasi_da_user_agent_olmadan_baslamiyor"),
 
  ("Belge: satir basi isaretlerine izni kaldir (tablo yerlesimi kaybolsun)",
   "src/edgar_mcp/belge.py",
@@ -1480,7 +1511,12 @@ def git_temiz_mi() -> bool | None:
     """
     try:
         r = subprocess.run(
-            ["git", "diff", "--quiet", "--", *DOSYALAR],
+            # `HEAD` SART: argumansiz `git diff` calisma agacini INDEKS ile
+            # karsilastirir. 19 Agu 2026 denetiminde uretildi: enjekte kalmis
+            # bir dosya `git add` edilirse indeks onunla ayni olur ve kontrol
+            # "TEMIZ" der - hem de sert oldurmeden sonraki en dogal refleks
+            # `git add -A`. Kapatilmaya calisilan bosluk tam buydu (P-36).
+            ["git", "diff", "--quiet", "HEAD", "--", *DOSYALAR],
             cwd=KOK, capture_output=True, timeout=60,
             encoding="utf-8", errors="replace",
         )

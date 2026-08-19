@@ -3821,5 +3821,28 @@ def main() -> None:
     mcp.run(transport="stdio")
 
 
+def main_http() -> None:
+    """Konteynerin giris noktasi: once dogrula, sonra streamable-HTTP baslat.
+
+    Neden ayri bir fonksiyon (19 Agu 2026, denetimde bulundu): `main()` icindeki
+    `_c()` yalnizca STDIO yolunu koruyordu. `Dockerfile`'in `CMD`'si `main()`i
+    hic cagirmiyor - dogrudan `mcp.run(transport="streamable-http", ...)`
+    calistiriyordu. Yani "refuses to start without SEC_USER_AGENT" iddiasi,
+    README'nin BELGELEDIGI dagitim yolunda yanlisti: ortam degiskeni olmadan
+    konteyner aciliyor, on iki araci ilan ediyor ve her canlilik kontrolunu
+    geciyordu.
+
+    15 Agu 2026'da (KK-32 §7) tam olarak bu hata bulunup "duzeltildi" denmisti;
+    duzeltme yalnizca bir tasimayi kapsiyordu. Ikinci tasima eklendiginde
+    (KK-24) koruma onunla birlikte tasinmadi - P-27/P-33'teki "kardes cagri
+    yerini atlayan duzeltme" sinifinin dorduncu tekrari.
+
+    `host="0.0.0.0"` ZORUNLU: SDK varsayilani 127.0.0.1 ve konteyner icinde
+    yayinlanan portu olu birakir (P-20).
+    """
+    _c()
+    mcp.run(transport="streamable-http", host="0.0.0.0", stateless_http=True)
+
+
 if __name__ == "__main__":
     main()

@@ -747,3 +747,61 @@ def test_hicbir_tanimlayici_ascii_disi_karakter_tasimiyor():
     assert not bulgu, (
         "ASCII disi karakter iceren tanimlayicilar (yerel ayara bagli olarak "
         "kirilir):\n  " + "\n  ".join(sorted(set(bulgu))))
+
+
+def test_enjeksiyon_hedefleri_dosyada_tam_bir_kez_geciyor():
+    """KK-18, 13 Agu 2026'da yazildi ve 19 Agu 2026'ya kadar HICBIR SEY onu
+    zorlamadi. Denetimde iki ihlal bulundu.
+
+    Kural: her enjeksiyonun hedef dizgisi, hedef dosyada TAM BIR KEZ gecmeli.
+    Sebebi `replace(..., 1)`: dizgi iki yerde geciyorsa harness her zaman
+    ILKINI bozar. Sonucu iki turlu ve ikisi de kotu:
+
+    - Beklenen test yine kirmiziya donerse koruma DOGRULANMIS GORUNUR, oysa
+      ikinci sitedeki ayni koruma hic olculmemistir. 19 Agu'da olculdu: takma
+      ad fallback'i `compare_companies` icinde de var ve hic sinanmamisti.
+    - Iki fonksiyonun sirasi degisirse harness yanlis siteyi bozar, beklenen
+      test yesil kalir ve CALISAN bir koruma KORUMASIZ diye raporlanir.
+
+    Bu test EVRENSEL YAKALAYICI DEGIL (bkz. yukaridaki
+    `test_harness_kaynagi_...` girdisinin gerekcesi): bir enjeksiyon
+    uygulandiginda hedef sayisi 1'den 0'a duser, `!= 1` degil `> 1` araniyor,
+    dolayisiyla enjeksiyon altinda kirmizi donmez.
+    """
+    import importlib
+
+    mod = importlib.import_module("arac.enjeksiyon")
+    icerik = {d: mod.oku(mod.KOK / d) for d in mod.DOSYALAR}
+
+    coklu = []
+    for ad, dosya, eski, _yeni, _bek in mod.ENJEKSIYONLAR:
+        n = icerik[dosya].count(eski)
+        if n > 1:
+            coklu.append(f"{ad!r} -> {dosya} icinde {n} kez")
+    assert not coklu, (
+        "KK-18: enjeksiyon hedefi dosyada birden fazla geciyor; harness her "
+        "zaman ILKINI bozar, ikinci site hic olculmez:\n  " + "\n  ".join(coklu))
+
+
+def test_enjeksiyon_beklenen_testleri_gercekten_var():
+    """Bayat bir `expected_tests` adi, korumayi sessizce olculemez yapar:
+    enjeksiyon uygulanir, bir seyler kirmiziya doner, ama `yakandi()` aradigi
+    adi bulamaz ve KORUMASIZ raporlanir. Ters yonde de kotu - var olmayan bir
+    ada bakan bir kayit, hicbir zaman dogrulanmayacak bir koruma demektir."""
+    import importlib
+    import re
+
+    mod = importlib.import_module("arac.enjeksiyon")
+    mevcut = set()
+    for yol in (KOK / "tests").glob("test_*.py"):
+        mevcut |= set(re.findall(r"^(?:async )?def (test_\w+)",
+                                 yol.read_text(encoding="utf-8"), re.M))
+    assert len(mevcut) > 200, f"test taramasi coktu: {len(mevcut)} test bulundu"
+
+    eksik = []
+    for ad, _d, _e, _y, beklenen in mod.ENJEKSIYONLAR:
+        for t in [x.strip() for x in beklenen.split(",") if x.strip()]:
+            if t not in mevcut:
+                eksik.append(f"{ad!r} -> {t}")
+    assert not eksik, (
+        "enjeksiyon var olmayan bir teste atif yapiyor:\n  " + "\n  ".join(eksik))

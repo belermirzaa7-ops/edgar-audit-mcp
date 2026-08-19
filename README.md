@@ -16,7 +16,7 @@ Built against the **2026-07-28 MCP specification** using the Python SDK `v2.0.0`
 
 [![CI](https://github.com/belermirzaa7-ops/edgar-audit-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/edgar-audit-mcp/actions/workflows/ci.yml)
 
-**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured on 50 expert-written questions: the server corrected 32 answers and broke none](evaluation/benchmark.md) · [39 failures that shipped here, each with the test that guards it](PATTERNS.md)
+**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured on 50 expert-written questions: the server corrected 32 answers and broke none](evaluation/benchmark.md) · [40 failures that shipped here, each with the test that guards it](PATTERNS.md)
 
 > **An independent project.** This server was written without reading the code
 > of [`stefanoamorelli/sec-edgar-mcp`](https://github.com/stefanoamorelli/sec-edgar-mcp),
@@ -95,9 +95,12 @@ answers. The interesting part of this project is handling them.
 | `sec_edgar_get_institutional_holdings` | 13F — an investment manager's quarter-end positions, with the 2023 unit change handled |
 
 Every tool returns a Pydantic model, so MCP `outputSchema` is generated
-automatically and clients consume the results type-safely. List-returning tools
-report `total_matching` / `returned` / `has_more` so the model can tell a
-complete answer from a truncated one.
+automatically and clients consume the results type-safely. Every list-returning
+tool reports how much it did not return, so the model can tell a complete
+answer from a truncated one. The field name follows the unit rather than a
+single convention — `total_matching` for filings, `total_periods` for a series,
+`total_companies` for a comparison, `total_characters` for filing text — and
+each is paired with `returned` / `has_more`.
 
 Concepts are addressed by alias (`revenue`, `net_income`, `public_float`, ...)
 or by raw tag. A tag may be qualified with its taxonomy — `dei:EntityPublicFloat`
@@ -125,7 +128,7 @@ XBRL carries the numbers, not the reasons. `sec_edgar_read_filing_text` reads
 the filing itself and hands back a named section — MD&A, risk factors, the
 income-tax note.
 
-Two things make that harder than it sounds, and both are guarded by tests:
+Three things make that harder than it sounds, and each is guarded by tests:
 
 - **The table of contents says the same thing as the section.** "Item 7.
   Management's Discussion and Analysis" appears at least twice in a 10-K: once
@@ -457,11 +460,22 @@ ending 2026-01-31 is **FY2025**. Same end date, different label — Walmart name
 a fiscal year after the calendar year it ends in, Target after the year it
 starts in. No fixed rule gets both right.
 
-So no rule is used. `_fy_kaymasi()` derives the offset per company from SEC's
-own data: within each `fy` group, the latest-ending annual period is the
-filing's own period, which anchors `offset = fy − end_year`. If no anchor
-exists, the response sets `fiscal_year_derived: false` rather than guessing
-silently.
+So no rule is used. `Takvim` builds a list of `(period end, fiscal year)`
+anchors from the company's own 10-K rows — SEC's `fy` field is correct for a
+filing's *own* period, wrong only for the comparative years it carries — and a
+period belongs to the fiscal year of the first anchor at or after it.
+
+A single global offset was tried first and measured wrong on 18 Aug 2026: on
+US Foods it labelled two different fiscal years 2016 and dropped FY2015 and
+FY2020 from the series entirely, and on a company that moved its year end
+(Perrigo, June to December) it shifted every label in one regime by a year.
+Anchoring per period rather than per company handles a regime change without
+a special case, because each period looks at the anchor in its own regime.
+
+Each point says where its label came from: `fiscal_year_source` is `reported`
+when SEC stated that year, `derived` or `extrapolated` when this server counted
+it. When no anchor exists at all the response sets `fiscal_year_derived: false`
+rather than guessing silently.
 
 ### 3. Tag changes truncate history
 
@@ -490,7 +504,7 @@ written for the model to act on, not just to report failure.
 ## Install
 
 ```bash
-uv sync                      # or: pip install -e ".[dev]"
+uv sync --extra dev          # or: pip install -e ".[dev]"
 cp .env.example .env         # set SEC_USER_AGENT to your name and email
 ```
 
@@ -602,7 +616,8 @@ afterwards: **none postdates the cutoff**, and the latest one used was filed
 2025-05-09.
 
 Neither answering arm saw the expected answers; a separate grader saw the two
-answers in randomised order without being told which produced which. Every
+answers without being told which produced which — though not in random order,
+and the report says so and says what that costs. Every
 artifact — both runs' raw answers, the grading inputs, the grades, the arm key,
 the compliance audit — is in `evaluation/benchmark/`, and the limits of the
 number are written out in the report rather than left for the reader to find,

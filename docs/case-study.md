@@ -112,8 +112,8 @@ Worse, the obvious heuristic fails. Measured on Tesla's Q2 2026 delivery filing:
 | `R1.htm` | 38,047 bytes | a rendering SEC generated, not a filed document |
 
 "Read the largest file" gets you SEC's own rendering. "Read the primary
-document" gets you a cover page. The correct answer is the *second smallest*
-file in that directory.
+document" gets you a cover page. The correct answer is the *smallest* of the
+three.
 
 **Now:** every text response lists the readable documents in the filing with an
 `is_primary` flag, SEC's generated renderings are filtered out, and any document
@@ -209,9 +209,9 @@ cutoff. An earlier run without the cutoff scored 82%, and both runs are
 published.
 
 Neither answering side ever saw the expected answers, and a separate grader saw
-the two answers in randomised order without being told which system produced
-which — though it was not told rather than unable to tell, since the two arms'
-answers do not look alike. The full method, the raw answers from both runs, the grades and the
+the two answers without being told which system produced which — though it was
+not told rather than unable to tell, since the two arms' answers do not look
+alike and the order they were shown in was deterministic rather than random. The full method, the raw answers from both runs, the grades and the
 limits of the number are in
 [`evaluation/benchmark.md`](../evaluation/benchmark.md) — including the three
 period mismatches that survive, and a direct measurement of how much the grader
@@ -220,9 +220,9 @@ read every figure as carrying about ±2 points.
 
 ## How it is kept true
 
-- **290 tests**, no network access — SEC responses are mocked from real captured
+- **294 tests**, no network access — SEC responses are mocked from real captured
   payloads.
-- **199 fault injections.** Every guard above is deliberately broken by an
+- **201 fault injections.** Every guard above is deliberately broken by an
   automated harness, and the test that should catch it must turn red. A guard
   that nothing catches is reported as `KORUMASIZ` — unprotected — and the run
   fails. This has caught guards that looked protected and were not, including
@@ -230,7 +230,7 @@ read every figure as carrying about ±2 points.
 - **A 22-question evaluation set**, every answer produced by running the tools
   against live SEC data with the exact calls recorded, so any answer can be
   re-measured rather than trusted.
-- **[`PATTERNS.md`](../PATTERNS.md)** — 39 failures that actually shipped in
+- **[`PATTERNS.md`](../PATTERNS.md)** — 40 failures that actually shipped in
   this repository, each with symptom, root cause, how it is detected now, and
   the test that guards it. A separate test suite keeps that document from
   drifting: every test it names must exist.
