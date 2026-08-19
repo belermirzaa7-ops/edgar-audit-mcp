@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.belermirzaa7-ops/sec-edgar-mcp",
+  "name": "io.github.belermirzaa7-ops/edgar-audit-mcp",
   "title": "SEC EDGAR",
   "description": "Read-only MCP server for SEC EDGAR: XBRL financials, filing text and tables, segment breakdowns, full-text search, insider and institutional ownership",
   "version": "0.1.0",
   "repository": {
-    "url": "https://github.com/belermirzaa7-ops/sec-edgar-mcp",
+    "url": "https://github.com/belermirzaa7-ops/edgar-audit-mcp",
     "source": "github"
   },
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/belermirzaa7-ops/sec-edgar-mcp:0.1.0",
+      "identifier": "ghcr.io/belermirzaa7-ops/edgar-audit-mcp:0.1.0",
       "transport": {
         "type": "streamable-http",
         "url": "http://localhost:8000/mcp"

@@ -1,6 +1,9 @@
-<!-- mcp-name: io.github.belermirzaa7-ops/sec-edgar-mcp -->
+<!-- mcp-name: io.github.belermirzaa7-ops/edgar-audit-mcp -->
 
-# SEC EDGAR MCP Server
+# edgar-audit-mcp
+
+*A Model Context Protocol server for SEC EDGAR: XBRL financials, filing
+text and tables, ownership — with the provenance of every figure attached.*
 
 *[Türkçe README](README.tr.md)*
 
@@ -11,9 +14,56 @@ specific SEC filing, a specific US-GAAP tag and a specific filing date.
 
 Built against the **2026-07-28 MCP specification** using the Python SDK `v2.0.0`.
 
-[![CI](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/sec-edgar-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/belermirzaa7-ops/edgar-audit-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/edgar-audit-mcp/actions/workflows/ci.yml)
 
-**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured on 50 expert-written questions: the server corrected 32 answers and broke none](evaluation/benchmark.md) · [37 failures that shipped here, each with the test that guards it](PATTERNS.md)
+**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured on 50 expert-written questions: the server corrected 32 answers and broke none](evaluation/benchmark.md) · [38 failures that shipped here, each with the test that guards it](PATTERNS.md)
+
+> **An independent project.** This server was written without reading the code
+> of [`stefanoamorelli/sec-edgar-mcp`](https://github.com/stefanoamorelli/sec-edgar-mcp),
+> the largest project in this niche, and shares no code with it. It carried the
+> name `sec-edgar-mcp` until 19 August 2026 and was renamed because that project
+> holds the name on PyPI. Every design decision here is recorded in
+> [`CLAUDE.md`](CLAUDE.md) with the live measurement that produced it.
+>
+> What is different is not coverage. It is that every figure carries the filing,
+> the US-GAAP tag and the filing date it came from; that a point-in-time cutoff
+> (`as_of`) is available on every tool that selects by recency, so a question
+> about the past is answered from what was actually filed by then; and that the
+> effect of the server on an agent's answers has been measured against a
+> third-party benchmark and published with its raw data.
+
+**Before quoting the benchmark number.** The questions and the expected answers
+are not ours — they are the public fifty of the
+[Vals AI Finance Agent Benchmark](https://huggingface.co/datasets/vals-ai/finance_agent_benchmark)
+(CC BY 4.0), written by domain experts with no connection to this project. The
+run and the grading *are* ours: the grader is a language model, and no one
+outside this project has audited the result. Both arms' raw answers, the grader
+input, the grades, a measurement of how much two graders disagree (±2 points),
+and every known weakness are in
+[`evaluation/benchmark.md`](evaluation/benchmark.md). The durable finding there
+is the paired one — 32 questions the server got right and the control arm did
+not, none the other way round — not the 90%, which is a point estimate on fifty
+questions with a 95% interval of 79–96%.
+
+---
+
+## What this does not do
+
+Stated here rather than discovered later:
+
+- **No price or market data.** It is not in SEC filings.
+- **No write access of any kind.** Read-only by design, and a test asserts that
+  no write path exists in the source.
+- **US registrants only.**
+- **No XBRL before 2009** — tagged data does not exist for those filings. The
+  answer for older periods is entirely in the text tools.
+- **Full-text search is practically limited to 2001 onward.** Measured, not
+  assumed: a 1996–2000 search for a word as common as "revenue" returns 14
+  filings, so an empty result for older periods proves nothing. Responses that
+  reach before 2001 carry a `coverage_note` saying so.
+- **Nested breakdown levels on one axis are not resolved.** Which member is the
+  parent of which lives in the definition linkbase, and this server does not
+  read it. Rather than guess, the response shows every member separately.
 
 ---
 
@@ -460,8 +510,8 @@ scripts (`dene.py`, `dogrula.py`) do read `.env`, via `python-dotenv` from the
 
 ```bash
 uv run mcp dev src/edgar_mcp/server.py    # MCP Inspector
-uv run sec-edgar-mcp                      # stdio, for Claude Desktop etc.
-docker build -t sec-edgar-mcp . && docker run --env-file .env -p 8000:8000 sec-edgar-mcp
+uv run edgar-audit-mcp                      # stdio, for Claude Desktop etc.
+docker build -t edgar-audit-mcp . && docker run --env-file .env -p 8000:8000 edgar-audit-mcp
 ```
 
 Claude Desktop config:

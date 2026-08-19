@@ -9,9 +9,12 @@ build environment, it says so instead of implying it was.
 
 ---
 
-## 0. The name is taken — decide this first
+## 0. The name — decided 19 Aug 2026
 
-`sec-edgar-mcp` **is not available on PyPI.** Measured:
+This server is published as **`edgar-audit-mcp`**. It was called
+`sec-edgar-mcp` until 19 August 2026, and that name could not be kept.
+
+**Why it had to change.** `sec-edgar-mcp` is taken on PyPI. Measured 16 Aug 2026:
 
 ```
 $ pip index versions sec-edgar-mcp
@@ -19,33 +22,57 @@ sec-edgar-mcp (1.0.8)
 Available versions: 1.0.8, 1.0.7, 1.0.6, 1.0.5, 1.0.4, 1.0.3, 1.0.2, 1.0.1, 0.1.0
 ```
 
-It belongs to `stefanoamorelli/sec-edgar-mcp` — a different SEC EDGAR MCP
-server, AGPL-3.0, 310 GitHub stars at the time of the check. So the collision is
-not with an abandoned placeholder; it is with the most visible project in this
-exact niche.
+It belongs to `stefanoamorelli/sec-edgar-mcp`, a different SEC EDGAR MCP server,
+AGPL-3.0, and the most visible project in this niche — 350 GitHub stars when
+re-checked on 19 Aug 2026, up from 310 three days earlier. The collision was not
+with an abandoned placeholder, and it was not going to age out.
 
-Three things are affected, and they are **independent**:
+**This project was written without reading that one.** The collision is on the
+name only. Every design decision here is recorded in `CLAUDE.md` with the live
+measurement that produced it, and the competitor scan that first surfaced the
+overlap was run on 16 Aug 2026 — after most of this architecture already existed.
 
-| What | Collides? | Cost of changing |
+**Why this name.** The tools are not the differentiator; every server in this
+niche reads EDGAR. What is different is that each figure carries the filing, the
+tag and the filing date it came from, and that the traps which return a
+plausible wrong number are handled rather than passed through. `audit` says that
+in one word, and it is the word this server's buyers already use.
+
+**Checked free before adopting** (19 Aug 2026):
+
+| Registry | `edgar-audit-mcp` |
+|---|---|
+| PyPI | free — `/pypi/edgar-audit-mcp/json` returns 404 |
+| npm | free — `registry.npmjs.org` returns 404 |
+| GitHub repository name | free — `in:name` search returns 0 repositories |
+| MCP registry | free by construction — namespaced under the GitHub account |
+
+**What did NOT change, and why.** The tool names keep the `sec_edgar_` prefix
+(`sec_edgar_get_concept_series`, …). That prefix names the *data source*, not
+the product, and it is what stops a model from calling another server's
+`get_company_profile` when several are loaded at once (KK-5). Renaming it would
+break every client for no gain in accuracy — these tools really do read SEC
+EDGAR.
+
+The Python import package stays `edgar_mcp`. Distribution name and import name
+are allowed to differ, the import name is invisible from outside, and 199 fault
+injections are keyed to paths under `src/edgar_mcp/`. Churning those paths for a
+cosmetic symmetry would put the measurement machinery at risk to change
+something no user ever sees.
+
+**Four names, and they are independent** — worth keeping straight, because only
+one of them was a hard block:
+
+| What | Collided? | Cost of changing |
 |---|---|---|
-| PyPI distribution name (`pyproject.toml` → `name`) | Yes, hard block | One line, nothing published yet |
-| Console script name (`[project.scripts]`) | Yes, soft: two packages both installing `sec-edgar-mcp` means whichever was installed last wins, silently | One line + README/Docker references |
+| PyPI distribution name (`pyproject.toml` → `name`) | **Yes, hard block** | One line, nothing published yet |
+| Console script name (`[project.scripts]`) | Yes, soft: two packages installing the same command means whichever was installed last wins, silently | One line + README/Docker references |
 | Registry server name (`io.github.belermirzaa7-ops/...`) | **No** — namespaced by GitHub account | — |
-| GitHub repository name | No technical collision; a discovery and perception problem | Rename redirects old URLs, but every link already sent out changes meaning |
+| GitHub repository name | No technical collision; a discovery and perception problem | GitHub redirects old URLs, but every link already sent out changes meaning |
 
-Names checked and free at the time of the check (`pip index versions` returned
-`No matching distribution found` for each): `edgar-facts-mcp`,
-`sec-edgar-facts-mcp`, `sec-filings-mcp`, `edgar-xbrl-mcp`,
-`sec-edgar-audit-mcp`, `sec-edgar-verified`.
-
-**Not decided here.** The distribution name is forced to change, but which name
-is a positioning question, and the repository name is a branding one. Both are
-cheapest now and get more expensive after the first link is sent to a client.
-
-Whatever is chosen, one test already enforces consistency of the *registry*
-identity across the three files that carry it
-(`test_kayit_defteri_kimligi_uc_dosyada_da_ayni`), and one fault injection
-proves that test fails when the identity drifts.
+One test enforces consistency of the *registry* identity across the three files
+that carry it (`test_kayit_defteri_kimligi_uc_dosyada_da_ayni`), and one fault
+injection proves that test fails when the identity drifts.
 
 ---
 
@@ -55,10 +82,10 @@ The package builds today. Measured, not assumed:
 
 ```
 $ python -m build
-Successfully built sec_edgar_mcp-0.1.0.tar.gz and sec_edgar_mcp-0.1.0-py3-none-any.whl
+Successfully built edgar_audit_mcp-0.1.0.tar.gz and edgar_audit_mcp-0.1.0-py3-none-any.whl
 $ python -m twine check dist/*
-Checking dist/sec_edgar_mcp-0.1.0-py3-none-any.whl: PASSED
-Checking dist/sec_edgar_mcp-0.1.0.tar.gz: PASSED
+Checking dist/edgar_audit_mcp-0.1.0-py3-none-any.whl: PASSED
+Checking dist/edgar_audit_mcp-0.1.0.tar.gz: PASSED
 ```
 
 ```bash
@@ -127,14 +154,14 @@ mcp-publisher login github
 mcp-publisher publish
 
 # 4) confirm it is listed
-curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.belermirzaa7-ops/sec-edgar-mcp"
+curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.belermirzaa7-ops/edgar-audit-mcp"
 ```
 
 `server.json` in the repository root declares the OCI package, because that name
 is namespaced by the GitHub account and therefore does not collide. **A `pypi`
-entry has to be added once the distribution name is settled and uploaded** —
-publishing a `pypi` entry that points at someone else's package would be worse
-than having no entry at all.
+entry has to be added once `edgar-audit-mcp` is actually uploaded** — the name
+is settled, but an entry pointing at a distribution that does not exist yet
+would be worse than having no entry at all.
 
 **Not verified here, and it matters:** `server.json` was written against the
 documented required fields and the published example, but it was **not**
@@ -165,9 +192,9 @@ shares the GitHub account that already namespaces the registry entry, and it is
 one of the registries the MCP registry accepts.
 
 ```bash
-docker build -t ghcr.io/belermirzaa7-ops/sec-edgar-mcp:0.1.0 .
-docker run --env-file .env -p 8000:8000 ghcr.io/belermirzaa7-ops/sec-edgar-mcp:0.1.0
-docker push ghcr.io/belermirzaa7-ops/sec-edgar-mcp:0.1.0
+docker build -t ghcr.io/belermirzaa7-ops/edgar-audit-mcp:0.1.0 .
+docker run --env-file .env -p 8000:8000 ghcr.io/belermirzaa7-ops/edgar-audit-mcp:0.1.0
+docker push ghcr.io/belermirzaa7-ops/edgar-audit-mcp:0.1.0
 ```
 
 The image tag in `server.json` must match what was actually pushed, including

@@ -6,7 +6,7 @@ WORKDIR /app
 # MCP registry ownership check for an OCI package: the annotation must equal the
 # `name` field of server.json. Measured against the registry's own package-type
 # documentation (16 Aug 2026), not recalled.
-LABEL io.modelcontextprotocol.server.name="io.github.belermirzaa7-ops/sec-edgar-mcp"
+LABEL io.modelcontextprotocol.server.name="io.github.belermirzaa7-ops/edgar-audit-mcp"
 
 # LICENSE de kopyalaniyor: `pyproject.toml` `license = { file = "LICENSE" }`
 # diyor ve hatchling onu build aninda ARIYOR. Eksikken imaj hic derlenmiyordu

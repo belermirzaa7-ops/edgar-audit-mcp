@@ -1,5 +1,5 @@
 [project]
-name = "sec-edgar-mcp"
+name = "edgar-audit-mcp"
 version = "0.1.0"
 description = "Read-only MCP server for SEC EDGAR: XBRL financials, filing text, segments, insider and institutional ownership"
 readme = "README.md"
@@ -26,12 +26,12 @@ dev = ["pytest>=8", "anyio>=4", "ruff>=0.6", "mypy>=1.11",
        "python-dotenv>=1.0,<2.0", "pyyaml>=6.0,<7.0"]
 
 [project.urls]
-Homepage = "https://github.com/belermirzaa7-ops/sec-edgar-mcp"
-Repository = "https://github.com/belermirzaa7-ops/sec-edgar-mcp"
-Issues = "https://github.com/belermirzaa7-ops/sec-edgar-mcp/issues"
+Homepage = "https://github.com/belermirzaa7-ops/edgar-audit-mcp"
+Repository = "https://github.com/belermirzaa7-ops/edgar-audit-mcp"
+Issues = "https://github.com/belermirzaa7-ops/edgar-audit-mcp/issues"
 
 [project.scripts]
-sec-edgar-mcp = "edgar_mcp.server:main"
+edgar-audit-mcp = "edgar_mcp.server:main"
 
 [build-system]
 requires = ["hatchling"]

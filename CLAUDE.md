@@ -1,4 +1,4 @@
-# CLAUDE.md — sec-edgar-mcp
+# CLAUDE.md — edgar-audit-mcp
 
 > **Ise baslamadan once `PATTERNS.md` oku.** Bu depoda gercekten yasanmis her
 > hata ve her birinin hangi testle korundugu orada. Bitirmeden once de oradaki
@@ -15,7 +15,7 @@ uv sync                        # bagimliliklar
 uv run pytest -q               # testler (SEC'e canli cikmaz, HTTP mock'lanir)
 uv run mcp dev src/edgar_mcp/server.py   # MCP Inspector ile elle test
 uv run ruff check . && uv run mypy src
-docker build -t sec-edgar-mcp . && docker run --env-file .env -p 8000:8000 sec-edgar-mcp
+docker build -t edgar-audit-mcp . && docker run --env-file .env -p 8000:8000 edgar-audit-mcp
 ```
 
 ## Kritik mimari kararlar
@@ -1813,3 +1813,94 @@ kaymasi. Bu turda DOKUNULMADI - CI'yi yesile dondurmek disinda bir degisiklik
 yapmamak icin. Ayri bir is olarak duruyor.
 
 P-37 olarak kayda gecti.
+
+### KK-50: Yeniden adlandirma - `sec-edgar-mcp` -> `edgar-audit-mcp`
+
+19 Agu 2026. KK-42'de "dagitim adi degismek ZORUNDA ama hangisi olacagi
+konumlandirma sorusu; karar verilmedi, bilerek" yaziyordu. Karar bugun verildi.
+
+**Tetikleyen sey yeni bir olcum degil, disaridan bir gozlem oldu.** Depoya bakan
+biri sunu sordu: ayni isimde, ayni isi yapan, cok daha gorunur bir proje var;
+bir musteri "bu bir kopya mi" diye dusunebilir. Teknik blok (PyPI adi alinmis)
+uc gundur biliniyordu; ALGI boyutu yazili degildi.
+
+**Once lisans sorusu kapatildi.** Yorum AGPL-3.0 uyumlulugunu da soruyordu.
+Cevap Mirza'dan alindi: o depoya hic bakilmadi. AGPL kod kopyalamayla bulasir,
+rakibin varligini bilmekle degil - dolayisiyla MIT lisansi gecerli ve konu
+kapandi. Bu cumle artik iki README'de de yaziyor; daha once hicbir yerde
+yazmiyordu ve "yazili olmayan dogru", bakan icin yok hukmunde.
+
+**Isim ADAYLAR ARASINDAN degil, IDDIADAN secildi.** `edgar-audit-mcp`: bu
+sunucunun sattigi sey veri erisimi degil - "bu rakam dogru mu" sorusuna verilen
+cevap. `audit` bunu tek kelimede soyluyor ve hedef kitlenin gunluk kelimesi.
+Elenen adaylar ve gerekceleri: `xbrl-fact-mcp` dar kaliyor (araclarin yarisi
+XBRL'de OLMAYANI okuyor), `sec-filing-mcp` jenerik, `edgar-pit-mcp` anlasilmiyor.
+
+**Musaitlik OLCULDU, varsayilmadi** (19 Agu 2026): PyPI 404, npm 404, GitHub
+`in:name` aramasi 0 depo, MCP kayit defteri yapisi geregi serbest (hesapla ad
+alanina aliniyor). Ayrica rakibin yildiz sayisi yeniden olculdu: **350** - bizim
+16 Agu kaydimiz 310, disaridan gelen yorum 260 diyordu. Yani sayi buyuyor ve
+cakisma zamanla hafiflemiyor.
+
+**Neyin DEGISMEDIGI, bu kararin en onemli yarisi:**
+
+1. **Arac adlari `sec_edgar_` onekli kaliyor.** O onek URUNU degil VERI
+   KAYNAGINI adlandiriyor ve birden fazla sunucu ayni anda yuklendiginde modelin
+   yanlis araca gitmesini engelliyor (KK-5). Degistirmek her istemciyi kirar ve
+   dogrulukta hicbir sey kazandirmaz - araclar gercekten SEC EDGAR okuyor.
+2. **Python import paketi `edgar_mcp` kaliyor.** Dagitim adi ile import adi
+   farkli olabilir, import adi disaridan gorunmez, ve **199 enjeksiyon
+   `src/edgar_mcp/` altindaki YOLLARA bagli**. Kimsenin gormedigi bir simetri
+   icin olcum makinesini riske atmak yanlis takas olurdu.
+
+**Tarihsel kayitlara DOKUNULMADI.** Kor bir arama-degistirme, KK-42'yi ve
+PUBLISHING.md'nin "isim alinmis" bolumunu **yanlis** hale getiriyordu: "PyPI'da
+`edgar-audit-mcp` alinmis" diye okunuyordu ve bu dogru degil. Yakalandi ve geri
+alindi. Ders: bir yeniden adlandirma, GUNCEL iddialari degistirir; GECMISI
+anlatan cumleler eski adi tasimaya devam etmeli, yoksa dokuman kendi tarihi
+hakkinda yalan soyler. PUBLISHING.md'nin ilgili bolumu "karar verilmedi"den
+"karar verildi, gerekcesi su" haline yeniden yazildi.
+
+**Yapilmasi Mirza'ya kalan tek adim:** GitHub deposunun adini degistirmek.
+GitHub eski URL'leri yonlendiriyor, yani gonderilmis linkler kirilmiyor.
+
+### KK-51: Konteyner calisma kopyasi iki gun geriye dondu - GitHub tek dogru kaynak
+
+19 Agu 2026, yeniden adlandirma sirasinda fark edildi. `README.md` icinde
+"24% correct ... 82% with it" ve "32 failures" yaziyordu - oysa o iddialar iki
+surum once degismisti.
+
+**Olculen durum:** konteynerdeki calisma kopyasi **17 Agustos** haline donmustu.
+32 pattern (37 olmali), son karar kaydi KK-44 (KK-49 olmali), 175 enjeksiyon
+(199 olmali), 265 test (290 olmali), `class Takvim` yok, harness'in
+`oku`/`yaz` duzeltmesi yok. Yani v41, v42 ve v43'un tamami eksikti.
+
+**Sebep bilinmiyor.** Konteyner ephemeral; oturum sirasinda bir noktada eski bir
+anlik goruntuden geri yuklendigi anlasiliyor ama bunu dogrudan gosteren bir kayit
+yok. Tahminle doldurmak yerine boyle yaziliyor.
+
+**Tehlike geri donusun kendisi degil, SESSIZ olmasiydi.** O anda uzerine
+yeniden adlandirma uygulanmisti. Paketlenip kurulsaydi, v41-v43'un tamami
+(mali yil takvimi, ortak Form 4 duzeltmesi, turev cift sayimi, harness encoding
+duzeltmesi, esleşmis karsilastirma) **sessizce geri alinmis** olurdu - ve
+testler kendi icinde tutarli oldugu icin yesil kalirdi.
+
+**Yakalayan sey:** yeniden adlandirma icin README okunurken bir metnin
+hatirlanandan farkli olmasi. Yani otomatik bir kontrol degil, insan/ajan
+dikkati. Bu yeterli degil.
+
+**Karar:** **yetkili kaynak GitHub deposudur, konteynerdeki kopya degil.** Yeni
+bir oturum ya da uzun bir aradan sonra ilk is, calisma kopyasinin HEAD ile ayni
+oldugunu dogrulamaktir. Ucuz ve kesin kontrol: klonla ve dogrula. Bu turda
+kurtarma tam olarak boyle yapildi - depo GitHub'dan yeniden klonlandi
+(`c5f2822`), bozuk kopya bir kenara alindi, yeniden adlandirma TEMIZ agac
+uzerinde bastan uygulandi.
+
+Ek olarak: calisma kopyasi artik `.git` tasiyor. Onceki kopyada `git` yoktu, bu
+yuzden `enjeksiyon.py --kontrol --sert` ikinci kaynagini (git diff) hic
+kullanamiyordu ve her seferinde "DOGRULANAMADI" donuyordu (KK-48). Simdi o
+kontrol gercekten calisiyor.
+
+**Bu bir P-19 akrabasi:** eski ama kendi icinde tutarli bir durum, "her sey
+yolunda" gibi gorunur. Fark, bos bir basari degil ESKI bir basari olmasi -
+ikisi de gercek durumdan ayirt edilemez oldugu icin tehlikeli.

@@ -1387,8 +1387,8 @@ ENJEKSIYONLAR = [
 
  ("L: OCI sahiplik etiketini baska bir ada cevir",
   "Dockerfile",
-  'LABEL io.modelcontextprotocol.server.name="io.github.belermirzaa7-ops/sec-edgar-mcp"',
-  'LABEL io.modelcontextprotocol.server.name="io.github.baskasi/sec-edgar-mcp"',
+  'LABEL io.modelcontextprotocol.server.name="io.github.belermirzaa7-ops/edgar-audit-mcp"',
+  'LABEL io.modelcontextprotocol.server.name="io.github.baskasi/edgar-audit-mcp"',
   "test_kayit_defteri_kimligi_uc_dosyada_da_ayni"),
 ]
 

@@ -1,4 +1,7 @@
-# SEC EDGAR MCP Sunucusu
+# edgar-audit-mcp
+
+*SEC EDGAR için bir Model Context Protocol sunucusu: XBRL finansalları,
+dosyalama metni ve tabloları, sahiplik — her rakam kaynağıyla birlikte.*
 
 *[English README](README.md)*
 
@@ -11,7 +14,53 @@ belirli bir US-GAAP etiketine ve belirli bir sunulma tarihine kadar izlenebilir.
 
 **Buradan başlayın:** [başka araçların sessizce yanlış yaptığı şeyler](docs/case-study.md) ·
 [ölçüldü: uzmanların yazdığı 50 soruda sunucu 32 cevabı düzeltti, hiçbirini bozmadı](evaluation/benchmark.md) ·
-[bu depoda gerçekten yaşanmış 37 hata, her biri bir testle korunuyor](PATTERNS.md)
+[bu depoda gerçekten yaşanmış 38 hata, her biri bir testle korunuyor](PATTERNS.md)
+
+> **Bağımsız bir proje.** Bu sunucu, bu nişin en büyük projesi olan
+> [`stefanoamorelli/sec-edgar-mcp`](https://github.com/stefanoamorelli/sec-edgar-mcp)
+> deposunun koduna hiç bakılmadan yazıldı ve onunla ortak kod taşımıyor.
+> 19 Ağustos 2026'ya kadar adı `sec-edgar-mcp` idi; PyPI'da o adı söz konusu
+> proje tuttuğu için değiştirildi. Buradaki her tasarım kararı, onu üreten canlı
+> ölçümle birlikte [`CLAUDE.md`](CLAUDE.md) içinde kayıtlı.
+>
+> Fark kapsamda değil. Fark şu: dönen her rakam hangi dosyalamadan, hangi
+> US-GAAP etiketinden ve hangi sunulma tarihinden geldiğini taşıyor; güncelliğe
+> göre seçim yapan her araçta bir kesim tarihi (`as_of`) var, yani geçmişe
+> dönük bir soru o tarihte fiilen sunulmuş olanla cevaplanıyor; ve sunucunun bir
+> ajanın cevaplarına etkisi üçüncü taraf bir benchmark'la ölçülüp ham verisiyle
+> yayınlandı.
+
+**Benchmark rakamını aktarmadan önce.** Sorular ve beklenen cevaplar bize ait
+değil — bu projeyle hiçbir bağlantısı olmayan uzmanların yazdığı
+[Vals AI Finance Agent Benchmark](https://huggingface.co/datasets/vals-ai/finance_agent_benchmark)
+setinin açık elli sorusu (CC BY 4.0). Koşu ve puanlama *bize* ait: puanlayıcı
+bir dil modeli ve sonucu bu projenin dışından kimse denetlemedi. İki kolun ham
+cevapları, puanlayıcıya verilen girdi, notlar, iki puanlayıcının ne kadar
+ayrıştığının ölçümü (±2 puan) ve bilinen bütün zayıflıklar
+[`evaluation/benchmark.md`](evaluation/benchmark.md) içinde. Oradaki sağlam
+bulgu eşleşmiş olan — sunucunun doğru bildiği ve kontrol kolunun bilemediği 32
+soru, tersi yönde sıfır — %90 değil; o, elli soruluk bir nokta tahmini ve %95
+aralığı %79–96.
+
+---
+
+## Bunu yapmaz
+
+Sonradan keşfedilmesin diye burada yazıyor:
+
+- **Fiyat/piyasa verisi yok.** SEC dosyalamalarında bulunmuyor.
+- **Hiçbir yazma erişimi yok.** Tasarım gereği salt-okunur, ve kaynakta hiçbir
+  yazma yolu olmadığını bir test sabitliyor.
+- **Yalnızca ABD'de kayıtlı şirketler.**
+- **2009 öncesi XBRL yok** — o dosyalamalar için etiketli veri mevcut değil.
+  Eski dönemlerin cevabı tümüyle metin araçlarında.
+- **Tam metin arama pratikte 2001 sonrası.** Ölçüldü, varsayılmadı: 1996–2000
+  aralığında "revenue" kadar yaygın bir kelime 14 sonuç veriyor, yani eski
+  dönemde boş sonuç hiçbir şey kanıtlamıyor. 2001 öncesine uzanan yanıtlar bunu
+  `coverage_note` ile söylüyor.
+- **Aynı eksendeki iç içe kırılım düzeyleri çözülmüyor.** Hangi üyenin
+  hangisinin üstü olduğu tanım linkbase'inde duruyor ve bu sunucu onu okumuyor.
+  Tahmin etmek yerine her üye tek tek gösteriliyor.
 
 ---
 
@@ -459,8 +508,8 @@ değişkeni elle vermek gerekmez.
 
 ```bash
 uv run mcp dev src/edgar_mcp/server.py    # MCP Inspector
-uv run sec-edgar-mcp                      # stdio, Claude Desktop vb. için
-docker build -t sec-edgar-mcp . && docker run --env-file .env -p 8000:8000 sec-edgar-mcp
+uv run edgar-audit-mcp                      # stdio, Claude Desktop vb. için
+docker build -t edgar-audit-mcp . && docker run --env-file .env -p 8000:8000 edgar-audit-mcp
 ```
 
 Claude Desktop yapılandırması:

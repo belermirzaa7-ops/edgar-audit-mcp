@@ -50,12 +50,15 @@ can verify rather than remember.
 | [P-35](#p-35) | Does the heuristic that filters noise also filter the signal — and does the tool then deny the thing exists? | `test_bitisik_gercek_basliklar_bulunamadi_diye_reddedilmiyor` |
 | [P-36](#p-36) | Does my detector's only evidence live somewhere the cleanup deletes? | `test_enjeksiyon_kontrol_yedek_silinince_temiz_demiyor` |
 | [P-37](#p-37) | Does this read or write text without naming an encoding — and would another machine's code page change what it reads? | `test_harness_kaynagi_yerel_kod_sayfasindan_bagimsiz_okuyup_yaziyor`, `test_hicbir_metin_dosyasi_okumasi_yerel_kod_sayfasina_birakilmiyor`, `test_hicbir_tanimlayici_ascii_disi_karakter_tasimiyor` |
+| [P-38](#p-38) | Is the tree I am working in the tree that is committed — or an older one that is internally consistent? | **none — manual step** |
 
-Three of these — **P-1**, **P-9** and **P-18** — have no automated guard and
-are marked `none` in the table and `Guard: none` in the entry. All three are
-manual steps in a procedure, not properties of the code, so nothing in the test
-suite can enforce them. Saying so is better than implying coverage that does not exist; a test
-asserts that this marking stays consistent.
+Four of these — **P-1**, **P-9**, **P-18** and **P-38** — have no automated guard
+and are marked `none` in the table and `Guard: none` in the entry. Each is
+a step in a procedure or a property of the environment rather than of the code,
+so nothing in the test suite can enforce it — P-38 in particular is invisible to
+every check that compares the tree only against itself. Saying so is better than
+implying coverage that does not exist; a test asserts that this marking stays
+consistent.
 
 ---
 
@@ -1168,6 +1171,53 @@ turns red under *any* applied injection. The harness duly reported it as the
 catching test for an unrelated injection — that is, a universal catcher, which
 would have made a genuinely unprotected guard look protected. It was rewritten
 to measure the reader rather than the target list.
+
+---
+
+<a id="p-38"></a>
+### P-38 · The stale working copy that agrees with itself
+
+**Guard: none.** This is a property of the environment, not of the code, so no
+test in the suite can enforce it.
+
+**Symptom.** Every check passes. The suite is green, the linter is clean, the
+fault-injection sweep verifies every guard, and the documentation numbers match
+the code — because they are all the *same old version*. Nothing is broken. The
+tree is simply two releases behind, and it is internally consistent enough that
+no automated signal fires.
+
+**Root cause.** The working copy lives in an ephemeral container. At some point
+during a long session it was restored from an earlier snapshot: the tree fell
+back to the state of two days before, losing three releases' worth of fixes. The
+test suite that shipped with that older tree naturally passed against it, and the
+document-number tests compared the older docs against the older code and agreed.
+
+Every self-consistency check the repository has was satisfied. That is the whole
+danger: this class of failure is invisible to any check that only compares the
+tree against itself.
+
+**Detection.** The authoritative copy is the remote repository, not the
+container. After a session restart, a long gap, or anything that looks like the
+environment was rebuilt, the first action is to confirm the working copy matches
+the remote — cheapest by cloning fresh and comparing, which is exactly how it was
+recovered here.
+
+Keeping the working copy a real git clone helps twice: `git status` answers the
+question directly, and `enjeksiyon.py --kontrol --sert` regains its second,
+independent evidence source (P-36), which a `.git`-less copy could never use.
+
+**Incident.** 19 Aug 2026, found while renaming the project. A README line read
+"24% correct without this server, 82% with it" — a claim that had been replaced
+two releases earlier. Measured: 32 patterns instead of 37, KK-44 as the last
+decision record instead of KK-49, 175 fault injections instead of 199, 265 tests
+instead of 290, and neither the fiscal-year `Takvim` class nor the harness
+encoding fix present. The rename had already been applied on top of that tree;
+packaging it would have silently reverted three releases while every test stayed
+green. What caught it was a human noticing that a sentence did not read the way
+it was remembered — which is not a control, and is why this entry exists.
+
+Related to P-19: an empty success and a *stale* success are both
+indistinguishable from the real thing by the check that is looking.
 
 ---
 

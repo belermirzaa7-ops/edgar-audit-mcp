@@ -1,6 +1,6 @@
 # Eight ways SEC data answers your question wrongly, and nobody notices
 
-*A case study from building `sec-edgar-mcp`, a read-only MCP server over SEC
+*A case study from building `edgar-audit-mcp`, a read-only MCP server over SEC
 EDGAR. Every number below was measured against live filings, and every behaviour
 described is pinned by a test in the repository. Where a figure shows what the
 tool did **before** a fix, it says so — those are recorded, not reproducible.*
@@ -230,7 +230,7 @@ read every figure as carrying about ±2 points.
 - **A 22-question evaluation set**, every answer produced by running the tools
   against live SEC data with the exact calls recorded, so any answer can be
   re-measured rather than trusted.
-- **[`PATTERNS.md`](../PATTERNS.md)** — 37 failures that actually shipped in
+- **[`PATTERNS.md`](../PATTERNS.md)** — 38 failures that actually shipped in
   this repository, each with symptom, root cause, how it is detected now, and
   the test that guards it. A separate test suite keeps that document from
   drifting: every test it names must exist.
@@ -248,7 +248,7 @@ older periods proves nothing.
 
 ---
 
-**Repository:** https://github.com/belermirzaa7-ops/sec-edgar-mcp
+**Repository:** https://github.com/belermirzaa7-ops/edgar-audit-mcp
 
 If you are building an agent on financial filings — or on any regulated data
 source where a plausible wrong number is worse than no number — this is the

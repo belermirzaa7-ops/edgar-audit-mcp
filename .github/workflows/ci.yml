@@ -98,11 +98,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build image
-        run: docker build -t sec-edgar-mcp .
+        run: docker build -t edgar-audit-mcp .
       - name: Answer tools/list from outside the container
         run: |
           docker run -d --name mcp -p 8000:8000 \
-            -e SEC_USER_AGENT="CI Runner ci@example.com" sec-edgar-mcp
+            -e SEC_USER_AGENT="CI Runner ci@example.com" edgar-audit-mcp
           for i in $(seq 1 30); do
             if curl -sf -X POST http://127.0.0.1:8000/mcp \
                  -H 'Content-Type: application/json' \
