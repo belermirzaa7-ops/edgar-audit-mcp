@@ -5,6 +5,16 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Weekly, with no push. A green run on the last commit says nothing about
+  # today: `httpx`, `pydantic` and the Python runtime float within their
+  # declared ranges, and a release can break the suite without a line of this
+  # repository changing. Between 19 Aug and 28 Sep 2026 CI did not run once;
+  # the only way to learn the state was to reinstall by hand. This run is the
+  # canary for that drift. GitHub disables scheduled workflows in a public
+  # repository after 60 days without activity, so a quiet repository still
+  # needs an occasional push (or a manual re-enable) to keep it alive.
+  schedule:
+    - cron: "17 4 * * 1"
 
 jobs:
   test:

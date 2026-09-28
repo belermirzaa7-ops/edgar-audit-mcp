@@ -16,7 +16,7 @@ Built against the **2026-07-28 MCP specification** using the Python SDK `v2.0.0`
 
 [![CI](https://github.com/belermirzaa7-ops/edgar-audit-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/edgar-audit-mcp/actions/workflows/ci.yml)
 
-**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured on 50 expert-written questions: the server corrected 32 answers and broke none](evaluation/benchmark.md) · [40 failures that shipped here, each with the test that guards it](PATTERNS.md)
+**Start here:** [what this gets wrong that other tools get wrong silently](docs/case-study.md) · [measured on 50 expert-written questions: the server corrected 32 answers and broke none](evaluation/benchmark.md) · [42 failures that shipped here: 37 guarded by a test, 5 by a stated manual step](PATTERNS.md)
 
 > **An independent project.** This server was written without reading the code
 > of [`stefanoamorelli/sec-edgar-mcp`](https://github.com/stefanoamorelli/sec-edgar-mcp),
@@ -100,7 +100,8 @@ tool reports how much it did not return, so the model can tell a complete
 answer from a truncated one. The field name follows the unit rather than a
 single convention — `total_matching` for filings, `total_periods` for a series,
 `total_companies` for a comparison, `total_characters` for filing text — and
-each is paired with `returned` / `has_more`.
+each is paired with a count of what came back (`returned`, or
+`returned_characters` for text) and `has_more`.
 
 Concepts are addressed by alias (`revenue`, `net_income`, `public_float`, ...)
 or by raw tag. A tag may be qualified with its taxonomy — `dei:EntityPublicFloat`
@@ -462,8 +463,11 @@ starts in. No fixed rule gets both right.
 
 So no rule is used. `Takvim` builds a list of `(period end, fiscal year)`
 anchors from the company's own 10-K rows — SEC's `fy` field is correct for a
-filing's *own* period, wrong only for the comparative years it carries — and a
-period belongs to the fiscal year of the first anchor at or after it.
+filing's *own* period, wrong only for the comparative years it carries. A
+period that ends within ten days of an anchor takes that anchor's year
+(`reported`). Otherwise it counts from the next anchor after it — the same year
+if that anchor is less than a year away, one year earlier per year of distance
+beyond that — and a period after the last anchor counts forward from it.
 
 A single global offset was tried first and measured wrong on 18 Aug 2026: on
 US Foods it labelled two different fiscal years 2016 and dropped FY2015 and
@@ -474,8 +478,8 @@ a special case, because each period looks at the anchor in its own regime.
 
 Each point says where its label came from: `fiscal_year_source` is `reported`
 when SEC stated that year, `derived` or `extrapolated` when this server counted
-it. When no anchor exists at all the response sets `fiscal_year_derived: false`
-rather than guessing silently.
+it, and `none` when there was no anchor to count from. In that last case the
+response also sets `fiscal_year_derived: false` rather than guessing silently.
 
 ### 3. Tag changes truncate history
 
@@ -523,7 +527,7 @@ scripts (`dene.py`, `dogrula.py`) do read `.env`, via `python-dotenv` from the
 ## Run
 
 ```bash
-uv run mcp dev src/edgar_mcp/server.py    # MCP Inspector
+uv run mcp dev inspector.py               # MCP Inspector (needs Node.js)
 uv run edgar-audit-mcp                      # stdio, for Claude Desktop etc.
 docker build -t edgar-audit-mcp . && docker run --env-file .env -p 8000:8000 edgar-audit-mcp
 ```
@@ -655,6 +659,9 @@ dated. Rename a test and the document fails CI rather than quietly lying.
 ```
 src/edgar_mcp/server.py   MCP tools and schemas
 src/edgar_mcp/client.py   SEC HTTP client, rate limiter, caching
+src/edgar_mcp/belge.py    filing HTML/text to text and table rows
+src/edgar_mcp/xbrl.py     XBRL instance and label linkbase parsing
+src/edgar_mcp/sahiplik.py Form 4 and 13F parsing
 tests/                    mocked unit tests
 tests/dil.py              language gate for the outward-facing surface
 tests/test_http_tasima.py runs the documented HTTP and stdio transports
@@ -662,6 +669,8 @@ evaluation/questions.xml  twenty-two measured questions with their tool calls
 arac/enjeksiyon.py        fault-injection harness
 arac/sir_tarama.py        secret scanner
 arac/tani.py              raw single-response diagnostic for one SEC concept
+arac/ortam.py             .env loader shared by the scripts
+inspector.py              entry point for `mcp dev` (MCP Inspector)
 dogrula.py                live verification against SEC
 CLAUDE.md                 decision records - why things are the way they are (Turkish)
 PATTERNS.md               failure patterns - what to watch out for

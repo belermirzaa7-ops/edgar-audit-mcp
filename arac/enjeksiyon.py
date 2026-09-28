@@ -28,6 +28,7 @@ DOSYALAR = [
     "src/edgar_mcp/xbrl.py",
     "src/edgar_mcp/sahiplik.py",
     "Dockerfile",
+    "inspector.py",
 ]
 
 ORTAM = {**os.environ, "SEC_RATE_LIMIT_PER_SEC": "1000"}
@@ -227,7 +228,7 @@ ENJEKSIYONLAR = [
   "        filings=dosyalamalar,",
   "test_filings_limit_uygulanir"),
 
- ("Takma ad haritasini bosalt (ISS-1 korumasi)",
+ ("Gelir takma adinin ilk adayini var olmayan bir etikete cevir (ISS-1 korumasi)",
   "src/edgar_mcp/server.py",
   '"revenue": [\n        "RevenueFromContractWithCustomerExcludingAssessedTax",',
   '"revenue": [\n        "YOK_OLAN_ETIKET",',
@@ -293,7 +294,7 @@ ENJEKSIYONLAR = [
 
  ("H-1: ceyreklik satirlari da capa say",
   "src/edgar_mcp/server.py",
-  "        if start and not (300 <= _gun_farki(start, end) <= 400):\n            continue",
+  "        if start and not (300 <= _donem_gunu(start, end) <= 400):\n            continue",
   "        if False:\n            continue",
   "test_takvim_ceyreklik_satirlari_capa_saymaz"),
 
@@ -1400,15 +1401,147 @@ ENJEKSIYONLAR = [
 
  ("T: etiket celiskisini bildirme",
   "src/edgar_mcp/server.py",
-  "            catismalar.append(TagConflict(",
-  "            [] .append(TagConflict(",
+  "                catismalar.append(TagConflict(",
+  "                [] .append(TagConflict(",
   "test_etiketler_celistiginde_celiski_bildiriliyor"),
 
  ("T: celiskiyi ayni etiketin iki dosyalamasinda da bildir",
   "src/edgar_mcp/server.py",
-  "        if (kazanan.source_tag != kaybeden.source_tag\n                and kazanan.value != kaybeden.value):",
-  "        if kazanan.value != kaybeden.value:",
+  "            if (kazanan.source_tag != kaybeden.source_tag\n                    and kazanan.value != kaybeden.value):",
+  "            if kazanan.value != kaybeden.value:",
   "test_etiketler_celistiginde_celiski_bildiriliyor"),
+
+ ("V: donem uzunlugunu bitis-eksi-baslangic say (bir gun kisa)",
+  "src/edgar_mcp/server.py",
+  "    return _gun_farki(start, end) + 1",
+  "    return _gun_farki(start, end)",
+  "test_donem_uzunlugu_iki_ucu_da_sayiyor"),
+
+ ("V: ayni celiskiyi her karsilastirmali dosyalamada yeniden yaz",
+  "src/edgar_mcp/server.py",
+  "                if imza in yazilan:\n                    continue",
+  "                if False:\n                    continue",
+  "test_celiski_son_kazanana_gore_ve_bir_kez_bildiriliyor"),
+
+ ("V: celiskiyi son kazanana degil bir kaybedene gore yaz",
+  "src/edgar_mcp/server.py",
+  "        kazanan = dedup[k]\n        yazilan",
+  "        kazanan = kaybeden_listesi[-1]\n        yazilan",
+  "test_celiski_son_kazanana_gore_ve_bir_kez_bildiriliyor"),
+
+ ("W: belge metni onbellegini sinirsiz birak",
+  "src/edgar_mcp/server.py",
+  "        _BELGE_METNI.pop(next(iter(_BELGE_METNI)))",
+  "        pass",
+  "test_modul_onbellekleri_sinirli_kaliyor"),
+
+ ("W: cerceve onbellegini sinirsiz birak",
+  "src/edgar_mcp/server.py",
+  "                _CERCEVE.pop(next(iter(_CERCEVE)))",
+  "                pass",
+  "test_modul_onbellekleri_sinirli_kaliyor"),
+
+ ("W: instance onbellegini sinirsiz birak",
+  "src/edgar_mcp/server.py",
+  "            _INSTANCE.pop(next(iter(_INSTANCE)))",
+  "            pass",
+  "test_modul_onbellekleri_sinirli_kaliyor"),
+
+ ("W: etiket onbellegini sinirsiz birak",
+  "src/edgar_mcp/server.py",
+  "                _ETIKET.pop(next(iter(_ETIKET)))",
+  "                pass",
+  "test_modul_onbellekleri_sinirli_kaliyor"),
+
+ ("W: istemcinin kendi baglantisindan User-Agent'i cikar",
+  "src/edgar_mcp/client.py",
+  "headers={\"User-Agent\": ua, \"Accept-Encoding\": \"gzip, deflate\"},",
+  "headers={\"Accept-Encoding\": \"gzip, deflate\"},",
+  "test_istemci_kendi_kurdugu_baglantida_basliklari_ve_ayarlari_tasiyor"),
+
+ ("W: istemci zaman asimini httpx varsayilanina birak",
+  "src/edgar_mcp/client.py",
+  "            timeout=httpx.Timeout(30.0),\n",
+  "",
+  "test_istemci_kendi_kurdugu_baglantida_basliklari_ve_ayarlari_tasiyor"),
+
+ ("W: istemci yonlendirmeyi izlemesin",
+  "src/edgar_mcp/client.py",
+  "            follow_redirects=True,\n",
+  "            follow_redirects=False,\n",
+  "test_istemci_kendi_kurdugu_baglantida_basliklari_ve_ayarlari_tasiyor"),
+
+ ("W: 13F yaprak alanlarinda ad alani yedegini kaldir",
+  "src/edgar_mcp/sahiplik.py",
+  "        if c is None:\n            c = e.find(ad)\n",
+  "",
+  "test_13f_ad_alani_bildirilmemis_tablo_da_okunuyor"),
+
+ ("W: 13F kapsayicilarinda ad alani yedegini kaldir",
+  "src/edgar_mcp/sahiplik.py",
+  "        if k is None:\n            k = e.find(kapsayici)\n",
+  "",
+  "test_13f_ad_alani_bildirilmemis_tablo_da_okunuyor"),
+
+ ("W: bozuk Form 4 XML'i cig ParseError olarak gecsin",
+  "src/edgar_mcp/sahiplik.py",
+  "    except ET.ParseError as e:\n        bas = govde.lstrip()[:60].replace(\"\\n\", \" \")\n        raise ValueError(\n            f\"This Form 4",
+  "    except ZeroDivisionError as e:\n        bas = govde.lstrip()[:60].replace(\"\\n\", \" \")\n        raise ValueError(\n            f\"This Form 4",
+  "test_bozuk_sahiplik_xmli_eyleme_donusturulebilir_hata_veriyor"),
+
+ ("W: bozuk 13F tablosu cig ParseError olarak gecsin",
+  "src/edgar_mcp/sahiplik.py",
+  "    except ET.ParseError as e:\n        bas = govde.lstrip()[:60].replace(\"\\n\", \" \")\n        raise ValueError(\n            f\"This 13F",
+  "    except ZeroDivisionError as e:\n        bas = govde.lstrip()[:60].replace(\"\\n\", \" \")\n        raise ValueError(\n            f\"This 13F",
+  "test_bozuk_sahiplik_xmli_eyleme_donusturulebilir_hata_veriyor"),
+
+ ("W: bozuk 13F kapak sayfasi hata firlatsin",
+  "src/edgar_mcp/sahiplik.py",
+  "    except ET.ParseError:\n        return KapakSayfasi()",
+  "    except ZeroDivisionError:\n        return KapakSayfasi()",
+  "test_bozuk_sahiplik_xmli_eyleme_donusturulebilir_hata_veriyor"),
+
+ ("W: .txt belgeleri okunabilir sayma (duz metin gecmis kaybolsun)",
+  "src/edgar_mcp/server.py",
+  "OKUNABILIR_UZANTILAR = (\".htm\", \".html\", \".txt\")",
+  "OKUNABILIR_UZANTILAR = (\".htm\", \".html\")",
+  "test_eski_duz_metin_dosyalamasi_okunuyor"),
+
+ ("W: max_characters alt sinirini kaldir",
+  "src/edgar_mcp/server.py",
+  "        Field(default=6000, ge=500, le=40000,",
+  "        Field(default=6000, le=40000,",
+  "test_max_characters_sinirlari_ilan_ediliyor_ve_uygulaniyor"),
+
+ ("W: max_characters ust sinirini kaldir",
+  "src/edgar_mcp/server.py",
+  "        Field(default=6000, ge=500, le=40000,",
+  "        Field(default=6000, ge=500,",
+  "test_max_characters_sinirlari_ilan_ediliyor_ve_uygulaniyor"),
+
+ ("X: celiski kirpmasi en eski yirmiyi tutsun",
+  "src/edgar_mcp/server.py",
+  "        tag_conflicts=catismalar[-20:],",
+  "        tag_conflicts=catismalar[:20],",
+  "test_celiski_listesi_kirpilinca_en_yenileri_tutuyor_ve_toplami_soyluyor"),
+
+ ("X: celiski toplamini kirpilmis listeden say",
+  "src/edgar_mcp/server.py",
+  "        total_tag_conflicts=len(catismalar),",
+  "        total_tag_conflicts=len(catismalar[-20:]),",
+  "test_celiski_listesi_kirpilinca_en_yenileri_tutuyor_ve_toplami_soyluyor"),
+
+ ("X: onbellek en yeni kaydi atsin",
+  "src/edgar_mcp/server.py",
+  "        _BELGE_METNI.pop(next(iter(_BELGE_METNI)))",
+  "        _BELGE_METNI.pop(next(reversed(_BELGE_METNI)))",
+  "test_modul_onbellekleri_sinirli_kaliyor"),
+
+ ("X: Inspector giris noktasinda User-Agent korumasini kaldir",
+  "inspector.py",
+  "from edgar_mcp.server import _c, mcp\n\n_c()\n",
+  "from edgar_mcp.server import _c, mcp\n",
+  "test_inspector_giris_noktasi_da_user_agent_olmadan_baslamiyor"),
 
  ("U: Dockerfile'dan LICENSE kopyalamayi kaldir (imaj derlenmesin)",
   "Dockerfile",
@@ -1475,7 +1608,8 @@ def bol(liste: list[tuple], ifade: str) -> list[tuple]:
     """`--parca k/n`: listeyi n bitisik parcaya bol, k'inciyi dondur.
 
     Neden (16 Agu 2026 - KK-41): her enjeksiyon tum test setini kosturuyor ve
-    set 163 enjeksiyon tasiyor. Sure makinenin yuku ile cok degisiyor - bos bir
+    set o gun 163 enjeksiyon tasiyordu (sayi o zamandan beri buyudu;
+    guncel sayi `len(ENJEKSIYONLAR)`). Sure makinenin yuku ile cok degisiyor - bos bir
     konteynerde tek kosu 14 sn olculdu (~40 dk toplam), ama ayni gun cokerek
     biten kosuda enjeksiyon basina ~80 sn dusmustu (3 saatin uzerine cikan bir
     projeksiyon). Bu degiskenligin kendisi parcalamanin gerekcesi: surec ne

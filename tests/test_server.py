@@ -3829,7 +3829,10 @@ async def test_ayni_gun_biten_farkli_uzunluktaki_donemler_birbirini_dusurmuyor(s
     ayni_bitis = [p for p in s.points if p.period_end == "2023-07-01"]
     assert len(ayni_bitis) == 2, f"donemlerden biri sessizce dustu: {ayni_bitis}"
     assert {p.value for p in ayni_bitis} == {81_797_000_000, 293_787_000_000}
-    assert {p.days for p in ayni_bitis} == {90, 279}
+    # Iki uc dahil: 13 hafta = 91, 40 hafta = 280. 28 Eyl 2026'ya kadar bu
+    # satir {90, 279} bekliyordu - test hatayi kodla birlikte sabitlemisti
+    # (KK-53).
+    assert {p.days for p in ayni_bitis} == {91, 280}
 
 
 @pytest.mark.anyio
@@ -4116,6 +4119,123 @@ async def test_etiketler_celistiginde_celiski_bildiriliyor(srv):
 
 
 @pytest.mark.anyio
+async def test_donem_uzunlugu_iki_ucu_da_sayiyor(srv):
+    """28 Eyl 2026, canli US Foods cevabinda bulundu: `days` alaninin
+    aciklamasi "Period length in days" ama deger `bitis - baslangic` idi.
+    SEC'in `start`/`end` alanlari donemin ILK ve SON gunudur; 52 haftalik bir
+    yil 364 gun, sunucu 363 diyordu, 53 haftalik yil icin 371 yerine 370.
+
+    Apple 52/53 haftalik takvim kullanir; fixture'daki donemler gercek Apple
+    donemleri: FY2022 52 hafta, FY2023 53 hafta, bir ceyrek 13 hafta. Dogru
+    uzunluk her birinde 7'nin kati olmak ZORUNDA - bir gun eksik sayan kod bu
+    ozelligi hicbir donemde tutturamaz."""
+    s = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=40)
+    gun = {p.period_end: p.days for p in s.points}
+    assert gun["2022-09-24"] == 364, gun      # 2021-09-26 .. 2022-09-24, 52 hafta
+    assert gun["2023-09-30"] == 371, gun      # 2022-09-25 .. 2023-09-30, 53 hafta
+
+    q = await srv.get_concept_series(ticker="AAPL", concept="revenue",
+                                     period="quarterly")
+    ceyrek = [p for p in q.points if p.period_end == "2023-07-01"]
+    assert [p.days for p in ceyrek] == [91], ceyrek   # 2023-04-02 .. 2023-07-01
+
+    # Revizyon araci ayni alani ayri bir yoldan dolduruyor; ikisini de olc.
+    r = await srv.get_fact_revisions(ticker="AAPL", concept="revenue")
+    rev = {(x.source_tag, x.period_end): x for x in r.revisions}
+    assert rev[(GERCEK_GELIR_ETIKETI, "2023-09-30")].days == 371
+
+
+@pytest.mark.anyio
+async def test_celiski_son_kazanana_gore_ve_bir_kez_bildiriliyor(srv, monkeypatch):
+    """28 Eyl 2026, canli US Foods cevabinda bulundu: 2016-12-31 icin ayni
+    celiski `tag_conflicts` listesinde IKI KEZ. Sebep: karsilastirma dedup
+    dongusunun icindeydi, yani o ANKI kazanana gore yapiliyordu.
+
+    Bu iki ayri yanlis uretiyordu, fixture ikisini de kuruyor:
+      (1) Kazanan etiket once islenip kaybeden etiket BIRDEN FAZLA
+          dosyalamada gecince, her dosyalama ayni celiskiyi bir kez daha
+          yaziyordu. US Foods'un sekli tam bu: ASC 606 etiketi kazaniyor,
+          `SalesRevenueNet` iki karsilastirmali 10-K'da. Burada 2021-09-25:
+          modern etiket kazaniyor, eski etiket iki dosyalamada.
+      (2) Sonradan yerinden edilen ARA kazanan `chosen_tag` diye raporlaniyordu
+          (2016-09-24: RFC -> Revenues -> SalesRevenueNet sirasiyla kazaniyor).
+          Alanin tanimi "the series carries one of them"; seride `Revenues`
+          degeri yokken "secilen Revenues" demek yalandi. Ayni sebeple son
+          kazananla ILK etiket arasindaki gercek celiski hic yazilmiyordu.
+
+    Eklenen degerler ELLE kuruldu (gercek bir dosyalamadan kopyalanmadi);
+    olculen sey siralama ve tekrar davranisi, rakamlar degil."""
+    monkeypatch.setitem(REVENUES_TEK["units"], "USD", REVENUES_TEK["units"]["USD"] + [
+        {"start": "2015-09-27", "end": "2016-09-24", "val": 215_000_000_000,
+         "fy": 2017, "fp": "FY", "form": "10-K", "filed": "2017-11-03"},
+    ])
+    monkeypatch.setitem(CONCEPT["units"], "USD", CONCEPT["units"]["USD"] + [
+        {"start": "2015-09-27", "end": "2016-09-24", "val": 215_639_000_000,
+         "fy": 2016, "fp": "FY", "form": "10-K", "filed": "2016-10-26",
+         "accn": "0000320193-16-000070"},
+    ])
+    monkeypatch.setitem(SALES_REVENUE["units"], "USD", SALES_REVENUE["units"]["USD"] + [
+        {"start": "2015-09-27", "end": "2016-09-24", "val": 215_640_000_000,
+         "fy": 2019, "fp": "FY", "form": "10-K", "filed": "2019-10-31"},
+        # (1): ayni eski deger ikinci bir dosyalamada
+        {"start": "2020-09-27", "end": "2021-09-25", "val": 999_000_000_000,
+         "fy": 2022, "fp": "FY", "form": "10-K", "filed": "2022-10-28"},
+    ])
+    s = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=40)
+
+    imzalar = [(c.period_start, c.period_end, c.unit, c.other_tag, c.other_value)
+               for c in s.tag_conflicts]
+    assert len(imzalar) == len(set(imzalar)), f"ayni celiski tekrar: {imzalar}"
+    assert len([c for c in s.tag_conflicts if c.period_end == "2021-09-25"]) == 1
+
+    # Her celiskinin "secilen" tarafi, seride GERCEKTEN duran nokta olmali.
+    seri = {(p.period_start, p.period_end): p for p in s.points}
+    for c in s.tag_conflicts:
+        pt = seri[(c.period_start, c.period_end)]
+        assert (pt.source_tag, pt.value) == (c.chosen_tag, c.chosen_value), \
+            f"seride olmayan bir deger 'secilen' diye raporlandi: {c}"
+
+    p16 = [c for c in s.tag_conflicts if c.period_end == "2016-09-24"]
+    assert {c.chosen_tag for c in p16} == {"SalesRevenueNet"}
+    assert {c.other_period_start for c in p16} == {"2015-09-27"}
+    assert {(c.other_tag, c.other_value) for c in p16} == {
+        (GERCEK_GELIR_ETIKETI, 215_639_000_000),
+        ("Revenues", 215_000_000_000),
+    }
+
+
+@pytest.mark.anyio
+async def test_celiski_listesi_kirpilinca_en_yenileri_tutuyor_ve_toplami_soyluyor(
+        srv, monkeypatch):
+    """28 Eyl 2026, bagimsiz denetimde bulundu: liste `[:20]` ile EN ESKI
+    yirmi celiskiyi tutuyordu, seri ise EN YENI donemleri donduruyor - yani
+    yirmiden fazla celiskisi olan bir sirkette tam da donen donemlerin
+    celiskileri dusuyordu, ve kac tane oldugu hicbir yerde yazmiyordu.
+
+    Degerler ELLE kuruldu: iki etiketin 25 yil boyunca farkli deger vermesi
+    gercek bir dosyalayicidan kopyalanmadi; olculen sey kirpmanin yonu."""
+    once = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=60)
+    taban = [c.period_end for c in once.tag_conflicts]
+    assert once.total_tag_conflicts == len(taban) <= 20
+
+    yillar = range(1990, 2015)
+
+    def satir(y: int, v: int) -> dict:
+        return {"start": f"{y - 1}-10-01", "end": f"{y}-09-30", "val": v,
+                "fy": y, "fp": "FY", "form": "10-K", "filed": f"{y}-11-01"}
+
+    monkeypatch.setitem(REVENUES_TEK["units"], "USD", REVENUES_TEK["units"]["USD"]
+                        + [satir(y, 1_000 + y) for y in yillar])
+    monkeypatch.setitem(SALES_REVENUE["units"], "USD", SALES_REVENUE["units"]["USD"]
+                        + [satir(y, 2_000 + y) for y in yillar])
+    s = await srv.get_concept_series(ticker="AAPL", concept="revenue", limit=60)
+
+    hepsi = sorted(taban + [f"{y}-09-30" for y in yillar])
+    assert s.total_tag_conflicts == len(hepsi), (s.total_tag_conflicts, len(hepsi))
+    assert [c.period_end for c in s.tag_conflicts] == hepsi[-20:]
+
+
+@pytest.mark.anyio
 async def test_hiz_sinirlayici_her_http_yolunda_gercekten_cagriliyor(srv, monkeypatch):
     """19 Agu 2026, denetimde bulundu ve uretildi: `RateLimiter`in KENDISI
     sinaniyordu (`test_hiz_sinirlayici_gercekten_bekletir`) ama istemcinin onu
@@ -4152,3 +4272,229 @@ async def test_hiz_sinirlayici_her_http_yolunda_gercekten_cagriliyor(srv, monkey
     assert sayac["n"] > 0, (
         "dosyalama belgesi indiren yol hiz sinirlayiciyi HIC cagirmadi "
         "(ayri metot, KK-34 §2'deki gibi atlanmis olabilir)")
+
+
+# ============ KK-52'de "olculmeyen koruma" diye kayda gecen bes bulgu (28 Eyl 2026)
+# 19 Agu denetiminde denetci her birini uretti: koruma silinebiliyor ve paket
+# yesil kaliyordu. Hicbiri yanlis cevap vermiyordu; hepsi OLCULMEYEN bir
+# korumaydi. Asagidaki testler her birini kendi enjeksiyonuyla birlikte
+# baglar (arac/enjeksiyon.py, "W:" onekli satirlar).
+
+
+class _SahteIstemci:
+    """Onbellek fonksiyonlarinin arkasindaki indirmeleri sifir maliyetle
+    taklit eder. Olculen sey onbellegin SINIRI; indirilen icerik degil."""
+
+    async def filing_document(self, url: str) -> str:
+        return f"<p>{url}</p>"
+
+    async def frame(self, taxonomy: str, tag: str, unit: str, cerceve: str) -> dict:
+        return {"tag": tag, "data": []}
+
+    async def filing_index(self, dizin: str) -> dict:
+        return {"directory": {"item": [{"name": "x_htm.xml"}, {"name": "x_lab.xml"}]}}
+
+
+async def _belge_doldur(s, i):
+    await s._belge_metni(f"https://www.sec.gov/Archives/belge-{i}.htm")
+    return f"https://www.sec.gov/Archives/belge-{i}.htm"
+
+
+async def _cerceve_doldur(s, i):
+    await s._cerceve_verisi("us-gaap", f"Etiket{i}", "USD", "CY2025")
+    return f"us-gaap/Etiket{i}/USD/CY2025"
+
+
+async def _instance_doldur(s, i):
+    await s._instance(f"https://www.sec.gov/Archives/dizin-{i}", [])
+    return f"https://www.sec.gov/Archives/dizin-{i}/x_htm.xml"
+
+
+async def _etiket_doldur(s, i):
+    await s._etiketler(f"https://www.sec.gov/Archives/dizin-{i}")
+    return f"https://www.sec.gov/Archives/dizin-{i}/x_lab.xml"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("onbellek,sinir,doldur", [
+    ("_BELGE_METNI", "BELGE_METNI_SINIRI", _belge_doldur),
+    ("_CERCEVE", "CERCEVE_SINIRI", _cerceve_doldur),
+    ("_INSTANCE", "INSTANCE_SINIRI", _instance_doldur),
+    ("_ETIKET", "ETIKET_SINIRI", _etiket_doldur),
+], ids=["belge", "cerceve", "instance", "etiket"])
+async def test_modul_onbellekleri_sinirli_kaliyor(srv, monkeypatch, onbellek, sinir, doldur):
+    """Stdio sureci masaustu istemci acik kaldigi surece yasiyor; sinirsiz bir
+    onbellek her okunan dosyalamayi sonsuza dek tutar. Olculdu (15 Agu 2026):
+    TSLA FY2025 instance'i 2,68 MB, etiket linkbase'i 1,21 MB. Dort onbellegin
+    dordu de ayni kalipla sinirli ve dordunun de sinir satiri 19 Agu'da
+    silinebiliyordu - paket yesil kaliyordu (KK-52).
+
+    Sinirin yaninda HANGI kaydin kaldigi da olculuyor: en yenisi kalmali. En
+    yeniyi atan bir onbellek, sayfalama ayni belgeyi arka arkaya istediginde
+    her seferinde yeniden indirir."""
+    monkeypatch.setattr(srv, "_client", _SahteIstemci())
+    monkeypatch.setattr(srv, "cevir", lambda govde: govde)
+    monkeypatch.setattr(srv, "ayristir", lambda govde: govde)
+    monkeypatch.setattr(srv, "etiketleri_ayristir", lambda govde: govde)
+    depo, azami = getattr(srv, onbellek), getattr(srv, sinir)
+    depo.clear()
+    eklenen = []
+    for i in range(azami + 3):
+        eklenen.append(await doldur(srv, i))
+        assert len(depo) <= azami, f"{onbellek}: {len(depo)} kayit, sinir {azami}"
+    # Anahtarlarin KENDISI karsilastiriliyor. Ilk yazimda "en yeninin numarasi
+    # anahtarda geciyor mu" diye bakiyordu; bagimsiz denetim gosterdi ki bu
+    # yanlis kaydi atan bir politikayi da geciriyor ("5" her cerceve
+    # anahtarinda "CY2025" icinden geciyordu). Beklenen: en yeni `azami` kayit,
+    # eklenme sirasiyla.
+    assert list(depo) == eklenen[-azami:], f"{onbellek}: {list(depo)}"
+
+
+def test_istemci_kendi_kurdugu_baglantida_basliklari_ve_ayarlari_tasiyor(monkeypatch):
+    """19 Agu denetimi: `EdgarClient.__init__`'teki `User-Agent`,
+    `follow_redirects` ve `timeout` silinebiliyordu ve paket yesil kaliyordu.
+    Sebep: fixture'lar `_http`'yi TAMAMEN degistiriyor, yani mock'un gordugu
+    baslik testin az once kendi koydugu baslik. Burada istemcinin KENDI
+    kurdugu baglanti olculuyor.
+
+    Neden uc ayar da onemli: SEC User-Agent'siz istegi 403 ile reddeder ve
+    IP'yi isaretleyebilir; arsiv adresleri yonlendirme dondurebilir; httpx'in
+    varsayilan 5 saniyesi 11 MB'lik companyfacts icin yetmez (olculdu 15 Agu
+    2026: 11 MB JSON)."""
+    monkeypatch.delenv("SEC_USER_AGENT", raising=False)
+    from edgar_mcp.client import EdgarClient
+    c = EdgarClient(user_agent="Jane Doe jane@example.com")
+    assert c._http.headers.get("User-Agent") == "Jane Doe jane@example.com"
+    assert c._http.follow_redirects is True
+    assert c._http.timeout.read == 30.0 and c._http.timeout.connect == 30.0
+
+
+def test_13f_ad_alani_bildirilmemis_tablo_da_okunuyor():
+    """19 Agu denetimi: 13F okuyucusunun ad alani YEDEGI hic calismiyordu,
+    cunku tek fixture (`T13F_TABLO`) varsayilan ad alanini bildiriyor. Yani
+    ciftin yarisi silinebiliyordu ve paket yesil kaliyordu.
+
+    Bu fixture GERCEK bir dosyalamadan kopyalanmadi - ad alani bildirmeyen
+    bir bilgi tablosunu canli olarak gormedim. Varligi kodun kendi yorumuna
+    dayaniyor ("eski dosyalamalarda onek kullanimi degisiyor"). Olculen sey
+    yedegin CALISTIGI, ne kadar sik gerektigi degil."""
+    from edgar_mcp.sahiplik import bilgi_tablosu_ayristir
+    xml = ("<?xml version=\"1.0\"?><informationTable>"
+           "<infoTable><nameOfIssuer>ALLY FINL INC</nameOfIssuer>"
+           "<titleOfClass>COM</titleOfClass><cusip>02005N100</cusip>"
+           "<value>577211815</value><shrsOrPrnAmt><sshPrnamt>12561737</sshPrnamt>"
+           "<sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>"
+           "<investmentDiscretion>SOLE</investmentDiscretion>"
+           "<votingAuthority><Sole>12561737</Sole><Shared>0</Shared><None>0</None>"
+           "</votingAuthority></infoTable></informationTable>")
+    [p] = bilgi_tablosu_ayristir(xml)
+    assert p.issuer == "ALLY FINL INC" and p.cusip == "02005N100"
+    assert p.value_as_filed == 577_211_815
+    # `ic()` yolu: ic ice kapsayicilar da yedege dusmeli.
+    assert p.shares_or_principal == 12_561_737 and p.share_type == "SH"
+    assert p.voting_sole == 12_561_737
+
+
+def test_bozuk_sahiplik_xmli_eyleme_donusturulebilir_hata_veriyor():
+    """19 Agu denetimi: bozuk Form 4 / 13F XML'i icin fixture yoktu. SEC bazen
+    XML yerine HTML hata sayfasi donduruyor (KK-26'daki instance olayi); cig
+    bir `ParseError` cagirana ne yapacagini soylemez.
+
+    Kapak sayfasi BILEREK farkli: bozuksa bos doner, hata vermez - kapak
+    olmadan da pozisyonlar okunabiliyor (fonksiyonun kendi sozlesmesi)."""
+    from edgar_mcp.sahiplik import (
+        KapakSayfasi,
+        bilgi_tablosu_ayristir,
+        form4_ayristir,
+        kapak_ayristir,
+    )
+    bozuk = "<html><body>Service temporarily unavailable</body>"
+    for ayristir, ad in ((form4_ayristir, "Form 4"),
+                         (bilgi_tablosu_ayristir, "13F information table")):
+        with pytest.raises(ValueError) as e:
+            ayristir(bozuk)
+        mesaj = str(e.value)
+        assert "could not be parsed as XML" in mesaj and ad in mesaj, mesaj
+        assert "<html>" in mesaj, "hata mesaji ne geldigini gostermiyor"
+        assert "xsl" in mesaj, "hata mesaji ham XML'e nasil ulasilacagini soylemiyor"
+    assert kapak_ayristir(bozuk) == KapakSayfasi()
+
+
+# Eski dosyalamalarin buyuk kismi DUZ METIN (.txt); ornegin Apple'in 2000'e
+# kadarki 10-K'lari yalnizca .txt. HTML belgeler 2000 civarinda gorunmeye
+# basliyor (canli: MSFT'nin 2000 tarihli DEF 14A'si .htm) - yani ".txt
+# 2001 oncesinin tamami" DEGIL, bir kismi. Bicim EDGAR'in eski tam
+# gonderim dosyalarinin sekli: SGML zarfi (<DOCUMENT>, <TYPE>, <TEXT>) ve sabit
+# genislikli tablolar (<TABLE>, <S>, <C>). Bu fixture ELLE yazildi, canli bir
+# dosyalamadan kopyalanmadi; sekli 28 Eyl 2026'da canli okunan Apple 2000
+# 10-K'si (0000912057-00-053623, a2032880z10-k.txt) ile karsilastirildi.
+ESKI_ERISIM = "0000320193-99-000010"
+ESKI_DIZIN_JSON = {"directory": {"item": [
+    {"name": f"{ESKI_ERISIM}.txt", "type": "text.gif", "size": "304522"},
+]}}
+ESKI_ISARET = "NET SALES DECLINED IN FISCAL 1999 IN THE AMERICAS"
+ESKI_METIN = f"""<DOCUMENT>
+<TYPE>10-K
+<SEQUENCE>1
+<TEXT>
+ITEM 7. MANAGEMENT'S DISCUSSION AND ANALYSIS
+
+{ESKI_ISARET}.
+
+<TABLE>
+<CAPTION>
+                                        1999        1998
+<S>                                   <C>         <C>
+Net sales                             $6,134      $5,941
+</TABLE>
+</TEXT>
+</DOCUMENT>
+"""
+
+
+@pytest.mark.anyio
+async def test_eski_duz_metin_dosyalamasi_okunuyor(srv, monkeypatch):
+    """19 Agu denetimi: `.txt` dosyalama icin fixture yoktu; `.txt`
+    uzantisini okunabilir listesinden silmek paketi yesil birakiyordu.
+    `include_older` ile ulasilan eski gecmisin onemli bir kismi yalnizca
+    `.txt` (Apple'in 2000'e kadarki 10-K'lari dahil) ve bu yoldan okunuyor."""
+    def ozel(request: httpx.Request) -> httpx.Response:
+        u = str(request.url)
+        if ESKI_ERISIM.replace("-", "") in u:
+            if u.endswith("/index.json"):
+                return httpx.Response(200, json=ESKI_DIZIN_JSON)
+            if u.endswith(".txt"):
+                return httpx.Response(200, text=ESKI_METIN,
+                                      headers={"Content-Type": "text/plain"})
+        return handler(request)
+    srv._client._http = httpx.AsyncClient(
+        transport=httpx.MockTransport(ozel),
+        headers={"User-Agent": "Test Runner test@ornek.com"})
+    r = await srv.read_filing_text(ticker="AAPL", accession_number=ESKI_ERISIM,
+                                   max_characters=40000)
+    assert r.document_name == f"{ESKI_ERISIM}.txt", r.document_name
+    assert ESKI_ISARET in r.text
+    assert "$6,134" in r.text and "$5,941" in r.text
+
+
+@pytest.mark.anyio
+async def test_max_characters_sinirlari_ilan_ediliyor_ve_uygulaniyor(srv):
+    """19 Agu denetimi: `max_characters`'in `ge=500, le=40000` sinirlari
+    olculmuyordu. Alt sinir, modelin sayfayi 10 karakterlik parcalarla
+    okuyup yuzlerce cagri yakmasini; ust sinir tek cagrida bir 10-K'nin
+    yarisini baglama doldurmasini engelliyor.
+
+    Iki katman olculuyor: SEMA (modelin gordugu sozlesme) ve CAGRI (SDK'nin
+    sinir disi degeri araca ulasmadan reddetmesi)."""
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    from edgar_mcp.server import mcp
+    arac = [t for t in await mcp.list_tools()
+            if t.name == "sec_edgar_read_filing_text"][0]
+    ozellik = arac.input_schema["properties"]["max_characters"]
+    assert (ozellik["minimum"], ozellik["maximum"]) == (500, 40000), ozellik
+    for deger in (499, 40001):
+        with pytest.raises(ToolError) as e:
+            await mcp.call_tool("sec_edgar_read_filing_text",
+                                {"ticker": "AAPL", "max_characters": deger})
+        assert "max_characters" in str(e.value)

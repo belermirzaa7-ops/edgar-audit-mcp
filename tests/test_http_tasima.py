@@ -244,3 +244,62 @@ def test_dockerfile_pyprojectin_istedigi_dosyalari_kopyaliyor():
     assert not eksik, (
         f"pyproject.toml bu dosyalari istiyor ama Dockerfile kopyalamiyor: "
         f"{eksik}. Imaj build aninda patlar.")
+
+
+def test_sunucunun_bildirdigi_ad_dagitim_adiyla_ayni():
+    """19 Agu yeniden adlandirmasi (KK-50) el sikismada bildirilen adi atlamisti:
+    sunucu kendini `sec-edgar` diye tanitiyordu. 28 Eyl 2026'da duzeltildi
+    (KK-55). Ad `pyproject.toml`'dan okunuyor - iki yerde elle tutulan bir
+    ad, bir sonraki yeniden adlandirmada yine ayrisir."""
+    import tomllib
+
+    from edgar_mcp.server import mcp
+    ad = tomllib.loads((KOK / "pyproject.toml").read_text(encoding="utf-8"))["project"]["name"]
+    assert mcp.name == ad, (mcp.name, ad)
+
+
+def test_inspector_giris_noktasi_da_user_agent_olmadan_baslamiyor(monkeypatch):
+    """`mcp dev` Inspector'i `mcp run inspector.py` ile baslatiyor; bu yol
+    `main()`'i hic cagirmiyor. 28 Eyl 2026 bagimsiz denetimi: `initialize` ve
+    `tools/list` User-Agent olmadan basariliydi, hata ancak ilk arac
+    cagrisinda geliyordu. Ucuncu giris noktasi, P-40'in ucuncu hali."""
+    import runpy
+
+    monkeypatch.delenv("SEC_USER_AGENT", raising=False)
+    from edgar_mcp import server
+    monkeypatch.setattr(server, "_client", None)
+    with pytest.raises(RuntimeError, match="SEC_USER_AGENT"):
+        runpy.run_path(str(KOK / "inspector.py"))
+
+
+def test_belgelenen_mcp_dev_komutu_sunucuyu_gercekten_yukluyor(monkeypatch):
+    """28 Eyl 2026, denetimde uretildi: iki README ve CLAUDE.md
+    `uv run mcp dev src/edgar_mcp/server.py` yaziyordu. SDK verilen dosyayi
+    paket DISINDA `server_module` adiyla yukluyor ve `server.py`'nin goreli
+    import'u `ImportError` veriyordu - belgelenen gelistirme komutu hic
+    calismamisti (P-14, P-20).
+
+    Belgelerde yazan HER `mcp dev` hedefi, SDK'nin kendi yukleyicisiyle
+    yukleniyor. Yalnizca `inspector.py`'yi sinamak yetmez: belge baska bir
+    dosyayi gosterirse test onu yuklemeli."""
+    monkeypatch.setenv("SEC_USER_AGENT", "Test Runner test@ornek.com")
+    # SDK'nin yukleyicisi dosyanin dizinini sys.path'e kalici olarak ekliyor;
+    # test bittiginde geri alinmali.
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    from mcp.cli.cli import _import_server
+    from mcp.server import MCPServer
+
+    # Yalnizca KOD BLOKLARI taraniyor: karar kayitlari eski, bozuk komutu
+    # tarihce olarak alintiliyor (KK-55) ve o metin bir komut degil.
+    hedefler: set[str] = set()
+    for ad in ("README.md", "README.tr.md", "CLAUDE.md"):
+        metin = (KOK / ad).read_text(encoding="utf-8")
+        for blok in re.findall(r"```[a-z]*\n(.*?)```", metin, re.DOTALL):
+            hedefler |= set(re.findall(r"mcp dev (\S+\.py)", blok))
+    assert hedefler, "belgelerde `mcp dev` komutu bulunamadi"
+    for yol in sorted(hedefler):
+        try:
+            sunucu = _import_server((KOK / yol).resolve(), None)
+        except (ImportError, SystemExit) as e:
+            pytest.fail(f"belgelenen `mcp dev {yol}` yuklenemiyor: {e!r}")
+        assert isinstance(sunucu, MCPServer), (yol, type(sunucu))

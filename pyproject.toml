@@ -1,7 +1,7 @@
 [project]
 name = "edgar-audit-mcp"
 version = "0.1.0"
-description = "Read-only MCP server for SEC EDGAR: XBRL financials, filing text, segments, insider and institutional ownership"
+description = "Read-only MCP server for SEC EDGAR: XBRL financials, filing text and tables, segment breakdowns, full-text search, insider and institutional ownership"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
@@ -13,6 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Office/Business :: Financial :: Investment",
 ]
 dependencies = [
@@ -22,7 +23,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "anyio>=4", "ruff>=0.6", "mypy>=1.11",
+# Dogrulama araclarinin UST siniri var, calisma zamani bagimliliklarinin
+# bildirilen araliktan fazlasi yok (KK-55, 28 Eyl 2026). Sebep: `ruff`'in
+# sectigimiz kural ailelerine (E, F, W, I, UP, B, SIM) yeni surumler yeni
+# kurallar ekliyor, `mypy` ara surumlerde yeni hata buluyor, `pytest`'in ara
+# surum kullanimdan kaldirma uyarilari CI'da `-W error::DeprecationWarning` ile
+# hataya donuyor - ucu de koda dokunmadan bir push'u kirmiziya cevirebilir.
+# Bu yuzden ucu de BUGUNKU ara surumlerinde tutuluyor; yukseltmek bilincli
+# bir adim (sinirlari yukselt, CI'yi gor). Calisma zamani kaymasini haftalik
+# zamanlanmis CI kosusu izliyor (.github/workflows/ci.yml).
+dev = ["pytest>=8,<9.2", "anyio>=4,<5", "ruff>=0.6,<0.17", "mypy>=1.11,<2.4",
        "python-dotenv>=1.0,<2.0", "pyyaml>=6.0,<7.0"]
 
 [project.urls]

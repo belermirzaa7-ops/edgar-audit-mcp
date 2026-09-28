@@ -4,8 +4,9 @@ Three channels, none of them required to use this server — a clone and
 `uv sync --extra dev` works — but each changes how easily someone else can
 reach it.
 
-Everything below was measured on 16 Aug 2026 against the registries' own
-endpoints and documentation. Where something could **not** be checked from the
+The registry and package measurements below were made on 16 Aug 2026 against
+the registries' own endpoints and documentation. Later decisions and counts
+carry their own dates. Where something could **not** be checked from the
 build environment, it says so instead of implying it was.
 
 ---
@@ -56,9 +57,10 @@ break every client for no gain in accuracy — these tools really do read SEC
 EDGAR.
 
 The Python import package stays `edgar_mcp`. Distribution name and import name
-are allowed to differ, the import name is invisible from outside, and 191 of the 201 fault
+are allowed to differ, the import name is invisible from outside, and 213 of the 223 fault
 injections are keyed to paths under `src/edgar_mcp/` (the other ten target
-`arac/sir_tarama.py`, `arac/ortam.py` and the `Dockerfile`). Churning those paths for a
+`arac/sir_tarama.py`, `arac/ortam.py`, the `Dockerfile` and `inspector.py`;
+counted 28 Sep 2026). Churning those paths for a
 cosmetic symmetry would put the measurement machinery at risk to change
 something no user ever sees.
 
@@ -92,7 +94,7 @@ Checking dist/edgar_audit_mcp-0.1.0.tar.gz: PASSED
 
 ```bash
 # 0) is the name free? "No matching distribution found" means yes.
-pip index versions <candidate-name>
+pip index versions edgar-audit-mcp
 
 # 1) clean build
 rm -rf dist build
@@ -104,7 +106,7 @@ python -m twine check dist/*
 
 # 3) TestPyPI first: upload, install from it, run the server once
 python -m twine upload --repository testpypi dist/*
-pipx run --index-url https://test.pypi.org/simple/ --spec <name> <script-name>
+pipx run --index-url https://test.pypi.org/simple/ --spec edgar-audit-mcp edgar-audit-mcp
 
 # 4) the real thing
 python -m twine upload dist/*
@@ -116,7 +118,7 @@ Notes worth having before step 4:
   for every upload; a failed upload still burns the number.
 - **`SEC_USER_AGENT` is required at startup**, so a smoke test of the installed
   command must set it:
-  `SEC_USER_AGENT="Your Name you@example.com" <script-name>` should start and
+  `SEC_USER_AGENT="Your Name you@example.com" edgar-audit-mcp` should start and
   wait on stdio rather than exit.
 - Use an API token (`__token__` as the username), scoped to this project once it
   exists.
@@ -204,7 +206,7 @@ the version.
 
 ## Order
 
-1. **Name decision** — blocks everything else, costs a minute now and grows.
+1. **Name decision** — done 19 Aug 2026 (section 0): `edgar-audit-mcp`.
 2. **Container image** — the only artifact that can be published under a name
    nobody else holds, and it satisfies the registry's package requirement.
 3. **Registry** — discovery, and the reason the two ownership markers exist.

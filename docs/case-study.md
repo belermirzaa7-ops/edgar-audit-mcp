@@ -52,9 +52,14 @@ picks either rule is silently wrong for a large minority of the market — and i
 is wrong exactly when a user compares two retailers, which is the reason they
 asked.
 
-**Now:** the offset between a company's own label and its period-end year is
-derived per company from its own filings. When there is no anchor to derive it
-from, the response says `fiscal_year_derived: false` rather than guessing.
+**Now:** each period is labelled from the company's own annual reports. SEC's
+`fy` field is right for a 10-K's *own* period, so every 10-K contributes one
+anchor — a period end and the fiscal year the company gave it. A period ending
+within ten days of an anchor takes its year; any other period counts from the
+next anchor after it, one year back per year of distance. A single offset
+per company was tried first and measured wrong: it labelled two US Foods years
+2016. When there is no anchor at all, the response says
+`fiscal_year_derived: false` rather than guessing.
 
 ## 3. An accounting standard change truncates ten years of history
 
@@ -220,9 +225,10 @@ read every figure as carrying about ±2 points.
 
 ## How it is kept true
 
-- **294 tests**, no network access — SEC responses are mocked from real captured
-  payloads.
-- **201 fault injections.** Every guard above is deliberately broken by an
+- **311 tests**, no network access — SEC responses are mocked. Most fixtures
+  are shaped after captured payloads; some values are constructed to force a
+  specific case, and the newer ones are marked as such.
+- **223 fault injections.** Every guard above is deliberately broken by an
   automated harness, and the test that should catch it must turn red. A guard
   that nothing catches is reported as `KORUMASIZ` — unprotected — and the run
   fails. This has caught guards that looked protected and were not, including
@@ -230,9 +236,10 @@ read every figure as carrying about ±2 points.
 - **A 22-question evaluation set**, every answer produced by running the tools
   against live SEC data with the exact calls recorded, so any answer can be
   re-measured rather than trusted.
-- **[`PATTERNS.md`](../PATTERNS.md)** — 40 failures that actually shipped in
+- **[`PATTERNS.md`](../PATTERNS.md)** — 42 failures that actually shipped in
   this repository, each with symptom, root cause, how it is detected now, and
-  the test that guards it. A separate test suite keeps that document from
+  its guard: a test for 37 of them, a stated manual step for the other 5,
+  which no test can reach. A separate test suite keeps that document from
   drifting: every test it names must exist.
 - CI on Ubuntu and Windows, Python 3.11 through 3.14, plus a Docker job that
   queries the container from outside.

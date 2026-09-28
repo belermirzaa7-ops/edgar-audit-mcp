@@ -1,7 +1,9 @@
 # Failure Patterns
 
-Every entry here is a bug that actually shipped in this repository, was
-measured, and is now guarded. Nothing speculative goes in this file.
+Every entry here is a bug that actually shipped in this repository and was
+measured. Each names its guard: a test for most, a stated manual step for the
+five that no test can reach (listed under the table). Nothing speculative goes
+in this file.
 
 **If you are an agent working on this repo:** read the checklist below before
 declaring work finished. Each pattern names the guard that enforces it, so you
@@ -53,6 +55,8 @@ can verify rather than remember.
 | [P-38](#p-38) | Is the tree I am working in the tree that is committed — or an older one that is internally consistent? | **none — manual step** |
 | [P-39](#p-39) | Does this mirroring command verify its SOURCE, or only its destination — and what does it do when the source is empty? | **none — manual step** |
 | [P-40](#p-40) | When a second entry point was added, did the guard move with it — or did it stay on the first one? | `test_konteyner_giris_noktasi_da_user_agent_olmadan_baslamiyor`, `test_hiz_sinirlayici_her_http_yolunda_gercekten_cagriliyor` |
+| [P-41](#p-41) | Does the field return the quantity its name and description promise — or a neighbouring one, and did a test pin the neighbour? | `test_donem_uzunlugu_iki_ucu_da_sayiyor` |
+| [P-42](#p-42) | Am I comparing against the running winner inside a reduction loop, and reporting that intermediate state as the result? | `test_celiski_son_kazanana_gore_ve_bir_kez_bildiriliyor` |
 
 Five of these — **P-1**, **P-9**, **P-18**, **P-38** and **P-39** — have no automated guard
 and are marked `none` in the table and `Guard: none` in the entry. Each is
@@ -1306,6 +1310,78 @@ red instead of infinite. A hanging test is an unmeasured test.
 reproduced before being fixed. The `SEC_USER_AGENT` gap was first found and
 "fixed" on 15 Aug 2026 (KK-32 §7); the fix covered one transport, and the second
 transport was added the same week.
+
+---
+
+<a id="p-41"></a>
+### P-41 · The field is one day short, and the test agreed with it
+
+**Symptom.** A field described as "Period length in days" returns 363 for a
+52-week fiscal year and 370 for a 53-week one. Right type, plausible value,
+HTTP 200 — and wrong by one on every period the server has ever returned. A
+chat model reading the output repeated "370-day years" to its user; the error
+travelled one layer further before anyone looked.
+
+**Root cause.** SEC's `start` and `end` are the first and the last day of a
+period; both belong to it. The code computed `end - start`, which is the
+distance between two dates, not the length of a span that includes both. The
+same helper served both purposes — anchor distances in the fiscal calendar,
+where a difference is right, and period lengths, where it is not — so nothing
+in its name said which one a caller was getting.
+
+Worse, an existing test asserted the wrong values: `{90, 279}` for a quarter
+and a year-to-date span. The test had been written by reading the code's output
+and pinning it, so it guarded the bug instead of the behaviour.
+
+**Detection.** Assert a property that comes from outside the code. Apple and
+US Foods run 52/53-week calendars, so every correct annual and quarterly length
+is a multiple of seven — 364, 371, 91, 280. A one-day-short count can never
+satisfy that on any period, whatever the fixture. A test that copies the value
+the code printed measures nothing; a test whose expected value you can derive
+without running the code does. Separately, two helpers now exist with names
+that say what they return: a distance and a length.
+
+**Incident.** 28 Sep 2026. Seen in a live US Foods response on 30 Aug and
+misattributed at the time to the chat model's narration; confirmed a month
+later from the raw tool output. The field changed no decision for any period a
+real filer reports — the classification thresholds (300–400 days annual,
+60–120 quarterly) and the month buckets are wide — which is exactly why nothing
+had caught it. The fix does move every edge by one day, and that was measured
+rather than assumed: a 121-day span is no longer quarterly, a 300-day span is
+now annual, and a 24-week year-to-date span moves from the five-month bucket to
+the six-month one, with no same-day partner it could now collide with.
+
+---
+
+<a id="p-42"></a>
+### P-42 · The report describes a winner that did not win
+
+**Symptom.** `tag_conflicts` listed the same conflict twice for one period, and
+in another shape named a tag as `chosen_tag` whose value is nowhere in the
+series. The field's own description says "the series carries one of them" —
+that entry contradicted it.
+
+**Root cause.** The conflict was recorded inside the de-duplication loop, at
+the moment of each comparison, against whatever held the slot *then*. Two
+things follow. When the eventual winner is processed first and the losing tag
+appears in several filings (every 10-K repeats two prior years as comparatives),
+each filing writes the same conflict again. And when a later row displaces an
+earlier winner, the entry written against that earlier winner stays in the
+list, naming a tag the series does not use — while the real conflict between the
+final winner and the first tag is never written at all.
+
+**Detection.** Report on final state, not on intermediate state: finish the
+reduction, then compare each slot's final winner with everything it beat, once
+per distinct loser. The test asserts the invariant the field promises — every
+`chosen_tag`/`chosen_value` is literally the point the series returns for that
+period — and builds the two shapes that break it: winner first with the loser
+repeated across filings (the live US Foods shape), and a three-tag sequence in
+which the lead changes twice.
+
+**Incident.** 28 Sep 2026, from the same live US Foods response as P-41:
+2016-12-31 listed twice. Recorded as a known cosmetic issue on 30 Aug; the
+second shape, which is a false statement rather than a duplicate, was found only
+when the cause was traced.
 
 ---
 

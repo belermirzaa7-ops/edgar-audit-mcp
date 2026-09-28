@@ -805,3 +805,32 @@ def test_enjeksiyon_beklenen_testleri_gercekten_var():
                 eksik.append(f"{ad!r} -> {t}")
     assert not eksik, (
         "enjeksiyon var olmayan bir teste atif yapiyor:\n  " + "\n  ".join(eksik))
+
+
+def test_ci_kod_degismeden_de_haftalik_kosuyor():
+    """28 Eyl 2026: CI 19 Agustos'tan beri bir kez bile kosmamisti, cunku
+    yalnizca push'ta tetikleniyordu. Son yesil kosu yalnizca o gunun
+    bagimliliklari hakkinda bir sey soyler; `httpx`, `pydantic` ve Python
+    kendi araliklarinda kayiyor. Bugunun durumunu ogrenmenin tek yolu elle
+    yeniden kurmakti (KK-55)."""
+    import yaml
+    ci = yaml.safe_load((KOK / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+    tetik = ci.get("on", ci.get(True))       # PyYAML `on:` anahtarini True okur
+    zamanlar = [z["cron"] for z in (tetik.get("schedule") or [])]
+    assert zamanlar, "CI'da zamanlanmis kosu yok - kayma ancak ilk push'ta gorulur"
+    assert "workflow_dispatch" in tetik, "elle tetikleme yok"
+
+
+def test_dogrulama_araclarinin_ust_siniri_var():
+    """Ruff yeni surumlerde secili kural ailelerine yeni kural ekliyor, mypy
+    yeni hata buluyor: ikisi de koda dokunmadan push'u kirmiziya cevirebilir.
+    Karari degistiren surumu biz secmeliyiz; ust sinir bu yuzden var (KK-55).
+    Calisma zamani bagimliliklari bu teste girmiyor - onlarin kaymasini
+    haftalik kosu izliyor."""
+    import re
+    import tomllib
+    proje = tomllib.loads((KOK / "pyproject.toml").read_text(encoding="utf-8"))
+    dev = proje["project"]["optional-dependencies"]["dev"]
+    for arac in ("ruff", "mypy", "pytest"):
+        [bildirim] = [d for d in dev if re.match(rf"{arac}\b", d)]
+        assert "<" in bildirim, f"{arac} icin ust sinir yok: {bildirim!r}"

@@ -190,6 +190,28 @@ def test_dokumanlardaki_sayilar_gercekle_ayni():
         assert iddia and set(iddia) == {p_sayisi}, (
             f"{ad} {iddia} diyor, PATTERNS.md'de {p_sayisi} girdi var")
 
+    # 2b) "Her biri bir testle korunuyor" 28 Eyl 2026'ya kadar uc belgede de
+    # yaziyordu; PATTERNS.md'nin kendi tablosunda bes girdinin korumasi
+    # "none - manual step". Toplam dogruydu, niteleme yanlisti. Testle
+    # korunan sayi da tablodan olculuyor.
+    tablo = (KOK / "PATTERNS.md").read_text(encoding="utf-8")
+    elle = len(re.findall(r"^\| \[P-\d+\].*\*\*none — manual step\*\*",
+                          tablo, re.MULTILINE))
+    for ad, kalip in (("README.md", r"(\d+) guarded by a test"),
+                      ("README.tr.md", r"(\d+)'si bir testle"),
+                      ("docs/case-study.md", r"a test for (\d+) of them")):
+        metin = (KOK / ad).read_text(encoding="utf-8")
+        iddia = _iddia_edilen_sayilar(metin, kalip)
+        assert iddia == [p_sayisi - elle], (
+            f"{ad} {iddia} girdi testle korunuyor diyor; tabloda "
+            f"{p_sayisi - elle} ({elle} tanesi elle)")
+    for ad, kalip in (("README.md", r"(\d+) by a stated manual step"),
+                      ("README.tr.md", r"(\d+)'i yazılı bir elle kontrol"),
+                      ("docs/case-study.md", r"a stated manual step for the other (\d+)")):
+        metin = (KOK / ad).read_text(encoding="utf-8")
+        iddia = _iddia_edilen_sayilar(metin, kalip)
+        assert iddia == [elle], f"{ad} {iddia} elle korunuyor diyor; tabloda {elle}"
+
     # 3) Test sayisi - pytest'in kendi saydigi sayi, `def test_` sayisi degil:
     # parametreli testler calisma aninda birden fazla teste aciliyor.
     r = subprocess.run(

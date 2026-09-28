@@ -5,6 +5,8 @@ dosyalama metni ve tabloları, sahiplik — her rakam kaynağıyla birlikte.*
 
 *[English README](README.md)*
 
+[![CI](https://github.com/belermirzaa7-ops/edgar-audit-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/belermirzaa7-ops/edgar-audit-mcp/actions/workflows/ci.yml)
+
 Bir dil modelinin finansal veriyi **hafızasından hatırlamak yerine SEC'in resmi
 kayıtlarından okumasını** sağlayan bir [Model Context Protocol](https://modelcontextprotocol.io)
 sunucusu. Bu araçlar üzerinden dönen her rakam, belirli bir SEC dosyalamasına,
@@ -14,7 +16,7 @@ belirli bir US-GAAP etiketine ve belirli bir sunulma tarihine kadar izlenebilir.
 
 **Buradan başlayın:** [başka araçların sessizce yanlış yaptığı şeyler](docs/case-study.md) ·
 [ölçüldü: uzmanların yazdığı 50 soruda sunucu 32 cevabı düzeltti, hiçbirini bozmadı](evaluation/benchmark.md) ·
-[bu depoda gerçekten yaşanmış 40 hata, her biri bir testle korunuyor](PATTERNS.md)
+[bu depoda gerçekten yaşanmış 42 hata: 37'si bir testle, 5'i yazılı bir elle kontrol adımıyla korunuyor](PATTERNS.md)
 
 > **Bağımsız bir proje.** Bu sunucu, bu nişin en büyük projesi olan
 > [`stefanoamorelli/sec-edgar-mcp`](https://github.com/stefanoamorelli/sec-edgar-mcp)
@@ -455,8 +457,10 @@ kural ikisini birden doğru yapamaz.
 O yüzden kural kullanılmıyor. `Takvim`, şirketin kendi 10-K satırlarından
 `(dönem sonu, mali yıl)` çapalarından oluşan bir liste kuruyor — SEC'in `fy`
 alanı bir dosyalamanın *kendi* dönemi için doğru, yalnızca taşıdığı
-karşılaştırma yılları için yanlış — ve bir dönem, kendisinden sonraki ilk
-çapanın mali yılına ait sayılıyor.
+karşılaştırma yılları için yanlış. Bir çapaya on gün yakın biten dönem o
+çapanın yılını alıyor (`reported`). Değilse kendisinden sonraki ilk çapadan
+sayıyor — çapa bir yıldan yakınsa aynı yıl, daha uzaksa her yıl için bir yıl
+geri — ve son çapadan sonraki bir dönem ondan ileri sayıyor.
 
 Önce tek bir global kayma denendi ve 18 Ağustos 2026'da yanlış olduğu ölçüldü:
 US Foods'ta iki ayrı mali yılı 2016 diye etiketliyor, FY2015 ve FY2020'yi
@@ -466,9 +470,9 @@ Haziran'dan Aralık'a) bir rejimin bütün etiketlerini bir yıl kaydırıyordu.
 kural olmadan çözüyor, çünkü her dönem kendi rejimindeki çapaya bakıyor.
 
 Her nokta etiketinin nereden geldiğini söylüyor: `fiscal_year_source`, SEC o
-yılı söylediyse `reported`, bu sunucu saydıysa `derived` ya da `extrapolated`.
-Hiç çapa yoksa yanıt sessizce tahmin etmek yerine `fiscal_year_derived: false`
-döndürüyor.
+yılı söylediyse `reported`, bu sunucu saydıysa `derived` ya da `extrapolated`,
+sayacak hiç çapa yoksa `none`. Bu son durumda yanıt ayrıca sessizce tahmin
+etmek yerine `fiscal_year_derived: false` döndürüyor.
 
 ### 3. Etiket değişimi geçmişi kırpar
 
@@ -522,7 +526,7 @@ değişkeni elle vermek gerekmez.
 ## Çalıştırma
 
 ```bash
-uv run mcp dev src/edgar_mcp/server.py    # MCP Inspector
+uv run mcp dev inspector.py               # MCP Inspector (Node.js gerekir)
 uv run edgar-audit-mcp                      # stdio, Claude Desktop vb. için
 docker build -t edgar-audit-mcp . && docker run --env-file .env -p 8000:8000 edgar-audit-mcp
 ```
@@ -654,6 +658,9 @@ CI'ı kırmızıya çevirir.
 ```
 src/edgar_mcp/server.py   MCP araçları ve şemalar
 src/edgar_mcp/client.py   SEC HTTP istemcisi, hız sınırlayıcı, önbellek
+src/edgar_mcp/belge.py    dosyalama HTML/metninden metin ve tablo satırları
+src/edgar_mcp/xbrl.py     XBRL instance ve etiket linkbase ayrıştırma
+src/edgar_mcp/sahiplik.py Form 4 ve 13F ayrıştırma
 tests/                    mock'lu birim testleri
 tests/dil.py              dışa bakan yüzey için dil kontrolü
 tests/test_http_tasima.py belgelenen HTTP ve stdio taşımalarını çalıştırır
@@ -661,6 +668,8 @@ evaluation/questions.xml  ölçülmüş yirmi iki soru ve hangi çağrılarla ö
 arac/enjeksiyon.py        hata enjeksiyonu harness'ı
 arac/sir_tarama.py        sır tarayıcı
 arac/tani.py              tek bir SEC yanıtını ham haliyle ölçen tanı aracı
+arac/ortam.py             scriptlerin ortak .env yükleyicisi
+inspector.py              `mcp dev` giriş noktası (MCP Inspector)
 dogrula.py                canlı SEC doğrulaması
 CLAUDE.md                 karar kayıtları - neden böyle yapıldı
 PATTERNS.md               hata patternleri - neye dikkat edilecek

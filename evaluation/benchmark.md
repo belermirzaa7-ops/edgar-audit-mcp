@@ -258,8 +258,12 @@ published here:
    contradiction rubric. This run used a single judge, not told which arm was which, with
    four grades.
    Two graders on the same answers do not have to agree.
-3. **Different tools.** Their agents had general web search; this run had ten
-   SEC tools and nothing else. That cuts both ways — web search reaches
+3. **Different tools.** Their agents had general web search; this run had only
+   this server's SEC tools and nothing else. How many is inferred from the code,
+   not recorded — the run records do not list the tools offered: ten at the
+   first run's commit, twelve at the second's, and in the second run the agents
+   were told to avoid `sec_edgar_compare_companies` (see above), which leaves
+   eleven in practice. That cuts both ways — web search reaches
    material this server cannot, and this server reaches filing structure a
    search box does not.
 4. **Different model generation.** Their evaluation ran on 2025 models (o3,

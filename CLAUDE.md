@@ -11,9 +11,9 @@ arac cagrilariyla sunan Python MCP sunucusu.
 
 ## Komutlar
 ```bash
-uv sync                        # bagimliliklar
+uv sync --extra dev            # bagimliliklar (pytest/ruff/mypy dahil)
 uv run pytest -q               # testler (SEC'e canli cikmaz, HTTP mock'lanir)
-uv run mcp dev src/edgar_mcp/server.py   # MCP Inspector ile elle test
+uv run mcp dev inspector.py    # MCP Inspector ile elle test (Node.js gerekir)
 uv run ruff check . && uv run mypy src
 docker build -t edgar-audit-mcp . && docker run --env-file .env -p 8000:8000 edgar-audit-mcp
 ```
@@ -119,7 +119,10 @@ korunur, yani koruma kaldirilmadi.
 
 
 ### KK-7: Mali yil ADI heuristikle degil, SEC verisinden turetilir
-**Tarih:** 12 Agustos 2026 · **Durum:** yururlukte · **Standart:** §1, §12
+**Tarih:** 12 Agustos 2026 · **Durum:** ILKE yururlukte; asagidaki
+`_fy_kaymasi()` ALGORITMASI 18 Agu 2026'da yanlis olculdu ve yerini `Takvim`
+aldi (KK-47). Fonksiyon repoda artik yok; bu kayit neden oyle baslandigini
+anlatiyor (durum satiri 28 Eyl 2026'da duzeltildi, KK-55) · **Standart:** §1, §12
 
 KK-1'de gecici olarak `_mali_yil()` heuristigi kullanildi: "Ocak-Haziran'da
 biten donem onceki yila sayilir". Kor nokta olarak isaretlenmisti; canli
@@ -362,7 +365,7 @@ denetlenmiyordu, (b) dizgedeki hicbir kelime listede yoktu.
 property'leri + output semasindaki `$defs` ve ust duzey property'ler. Sezici
 kelime siniri (`\b`) ile calisan bir Turkce islev-kelimesi kumesi ARTI Turkceye
 ozgu harfler (ışğçöü). Sezicinin kendisi de olculur:
-`test_turkce_sezici_bilinen_ornekleri_ayirt_ediyor` bilinen Turkce ve bilinen
+`test_dil_kontrolu_bilinen_ornekleri_ayirt_ediyor` bilinen Turkce ve bilinen
 Ingilizce dizgilerle sinanir; ilk fixture 13 Agustos'ta bulunan gercek kacagin
 ta kendisidir.
 
@@ -2011,3 +2014,220 @@ uretildi, hicbiri yanlis cevap vermiyor - hepsi OLCULMEYEN koruma):
 
 Bunlar bir sonraki turun listesi. Yazili olmayan bilinen kusur, bilinen kusur
 degildir.
+
+### KK-53: `days` alani donem UZUNLUGU - iki uc da dahil
+
+28 Eyl 2026. `FactPoint.days` ve `FactRevision.days` alanlarinin aciklamasi
+"Period length in days" idi, degeri ise `bitis - baslangic`. SEC'in `start` ve
+`end` alanlari donemin ILK ve SON gunudur; ikisi de doneme aittir. Sonuc: her
+donem bir gun kisa. 52 haftalik yil 364 yerine 363, 53 haftalik yil 371 yerine
+370, 13 haftalik ceyrek 91 yerine 90.
+
+**Nasil fark edildi, ve benim hatam.** 30 Agustos'ta US Foods dogrulamasinda
+sohbet modeli kullaniciya "FY2015 ve FY2020 370 gunluk uzun yillar" dedi. Ben
+bunu dogru saydim (371) ama hatayi **modelin anlatimina** yukledim; ham arac
+ciktisina bakmadim. 28 Eylul'de ham cikti canli cekildi: 370'i sunucu
+uretiyordu. Bir ay boyunca sunucuda duran bir hatayi, sunucunun tuketicisine
+atfetmis oldum. Ders P-41'de: bir sayinin nereden geldigini sormadan kimin
+hatasi oldugunu soyleme.
+
+**Neden bu kadar dayandi.** Sinif esikleri (yillik 300-400, ceyrek 60-120) ve
+ay kovalari (`round(gun/30.4)`) bir gunluk farki yutacak kadar genis; alan
+hicbir karari degistirmiyordu, yalnizca yanlisti. Ustelik mevcut bir test
+(`test_ayni_gun_biten_farkli_uzunluktaki_donemler_birbirini_dusurmuyor`)
+`{90, 279}` bekliyordu - kodun ciktisindan kopyalanmis, yani hatayi koruyordu.
+
+**Karar:** iki ayri yardimci. `_gun_farki` bir MESAFE (capa ile donem sonu
+arasi - Takvim bunu kullaniyor ve orada fark dogru olan), `_donem_gunu` bir
+UZUNLUK (`fark + 1`). Donem uzunlugu olculen dort yer (`Takvim` capa filtresi,
+seri, revizyon, boyutlu olgu anahtari) `_donem_gunu`'na gecti. Hicbir
+fixture'in sonucu degismedi (tam paket yesil).
+
+**Ama sinirlar BIR GUN kaydi - ilk yazimda "etkilenmedi" demistim, bagimsiz
+denetim duzeltti.** Esikler artik uzunluk uzerinden: 300 gunluk bir donem
+yillik sayiliyor (eskiden degil), 401 sayilmiyor; 60 gunluk ceyreklik
+sayiliyor, 121 gunluk (ornegin 1 Ocak-30 Nisan) artik sayilmiyor. Ay kovasi
+`round(L/30.4)` 16, 46, 77, 107, 137, 168, 198, 228, 259, 289, 320, 350, 381,
+411 gunde bir ust kovaya geciyor. Gercekci takvimlerden (13/14/16/17/26/36/39/
+40/52/53 hafta; takvim ceyregi, yarisi, 9 ayi, yili) yalnizca 24 haftalik
+yil-basindan-beri etkileniyor (168: 5 -> 6); ayni gun biten bir esi yok, yani
+dedup ayrimi bozulmuyor. Hesap bu kaydin yaninda; olculmemis bir iddia degil.
+
+**Neden esikler +1 kaydirilmadi:** 300-400 ve 60-120 yuvarlak sayilar, bir
+olcumden turetilmediler; eski davranisi bire bir korumak icin 301-401 yazmak,
+yanlis birimdeki bir kararin izini korumak olurdu. 121 gunluk bir aralik zaten
+ceyrek degil.
+
+**Test neyi olcuyor:** degeri koddan kopyalamiyor. Apple'in takvimi 52/53
+haftalik oldugu icin her dogru uzunluk 7'nin kati olmak ZORUNDA - 364, 371,
+91, 280. Bir gun eksik sayan kod bu ozelligi hicbir donemde tutturamaz.
+Enjeksiyon `V: donem uzunlugunu bitis-eksi-baslangic say`.
+
+**Istemciye etkisi:** alan degeri 1 artti. Yayinlanmis bir surum yok (0
+kullanici, PyPI'da yok), bu yuzden surum numarasi degismedi.
+
+### KK-54: `tag_conflicts` son kazanana gore ve her celiski bir kez
+
+28 Eyl 2026. Ayni canli US Foods cevabinda 2016-12-31 celiskisi listede IKI
+kez duruyordu (30 Agu'da "kozmetik" diye kayda gecmisti). Sebep izlenince
+kozmetik olmayan ikinci bir yanlis cikti.
+
+Celiski, dedup dongusunun ICINDE, her karsilastirma aninda o an slotta duran
+kazanana gore yaziliyordu:
+
+1. **Tekrar:** kazanan etiket once islenip kaybeden etiket birden fazla
+   dosyalamada gecince (her 10-K iki onceki yili karsilastirma olarak tasir),
+   her dosyalama ayni celiskiyi yeniden yaziyordu. US Foods'un sekli tam bu.
+2. **Yanlis beyan:** sonradan yerinden edilen bir ARA kazanan `chosen_tag`
+   diye raporlaniyordu. Alanin tanimi "the series carries one of them"; seride
+   o etiketin degeri yokken "secilen bu" demek yanlis bir beyandi. Ayni sebeple
+   son kazananla ILK etiket arasindaki gercek celiski hic yazilmiyordu.
+   Eski kodda uretildi: `2016-09-24 chosen Revenues ... | seride mi: False`.
+
+**Karar:** once indirgeme bitiyor, sonra her slotun SON kazanani yendigi her
+seyle, farkli (etiket, deger) basina bir kez karsilastiriliyor. Liste donem
+sonuna gore sirali. `TagConflict`'e `period_start` eklendi: `period="all"`
+ile ayni gun biten ceyrek ve yil-basindan-beri rakamlari, baslangic olmadan
+birbirinin tekrari gibi gorunurdu - duzeltmeye calistigimiz karisikligin
+aynisi.
+
+Test degismezi dogrudan olcuyor: her celiskinin secilen tarafi, seride o donem
+icin GERCEKTEN duran nokta. Iki enjeksiyon (`V:`) iki yanlisi ayri ayri
+geri getiriyor; ikisi de yakalaniyor.
+
+### KK-55: 28 Eylul bakim turu - KK-52'nin acik listesi kapandi
+
+28 Eyl 2026. 19 Agustos'tan bu yana repoda hicbir degisiklik yoktu. Kullanici
+yeni makinede (ASUS, `Griffith`) calisiyor; calisma kopyasi GitHub HEAD
+(`1ac7982`) ile BIREBIR ayni olculdu (izlenen 55 dosya karsilastirildi, izlenmeyen
+kaynak dosya yok, enjeksiyon artigi yok). Temiz bir ortamda bugunun
+bagimliliklariyla (httpx 0.28.1, pydantic 2.13.5, ruff 0.16.9, mypy 2.3.1,
+pytest 9.1.1) paket yesil kuruldu - yani kayma YOKTU, ama bunu ogrenmenin tek
+yolu elle kurmakti.
+
+**KK-52'de kayda gecen bes olculmeyen koruma - bes testi ve 15 enjeksiyonu
+var (`W:` onekli):**
+- Dort modul onbellegi (`_BELGE_METNI`, `_CERCEVE`, `_INSTANCE`, `_ETIKET`):
+  sinir ve hangi kaydin kaldigi (en yeni kalmali).
+- `EdgarClient.__init__`: istemcinin KENDI kurdugu baglanti olculuyor -
+  User-Agent, `follow_redirects`, 30 sn zaman asimi. Fixture'lar `_http`'yi
+  degistirdigi icin bu yol daha once hic gorulmuyordu.
+- 13F ad alani yedegi: ad alani bildirmeyen bir bilgi tablosu. Fixture ELLE
+  yazildi; boyle bir dosyalamayi canli gormedim, kodun kendi yorumuna
+  dayaniyor. Olculen sey yedegin calistigi, ne kadar sik gerektigi degil.
+- Bozuk Form 4 / 13F / kapak XML'i: ilk ikisi eyleme donusturulebilir
+  `ValueError`, kapak BILEREK bos doner.
+- `.txt` dosyalama: eski gecmisin onemli bir kismi yalnizca bu yoldan
+  okunuyor (Apple'in 2000'e kadarki 10-K'lari). "2001 oncesinin tamami" DEGIL:
+  MSFT'nin 2000 tarihli DEF 14A'si `.htm` (canli olculdu). Fixture ELLE
+  yazildi, sekli canli okunan Apple 2000 10-K'si ile karsilastirildi.
+- `max_characters`: sema sinirlari VE SDK'nin sinir disi degeri araca
+  ulasmadan reddetmesi.
+
+**Belgelenen gelistirme komutu hic calismamisti.** `uv run mcp dev
+src/edgar_mcp/server.py` - iki README ve CLAUDE.md. SDK dosyayi paket disinda
+yukluyor, goreli import `ImportError` veriyor; uretildi. `inspector.py`
+eklendi (mutlak import) ve test, belgelerde yazan HER `mcp dev` hedefini SDK'nin
+kendi yukleyicisiyle yukluyor. Eski komutla kirmiziya dondugu goruldu.
+Inspector `npx` ile aciliyor; belgeler artik Node.js gerektigini soyluyor.
+
+**Dokuman denetimi (bagimsiz salt-okunur ajan, her bulgu tekrar uretildi):**
+- "40 hata, her biri bir testle korunuyor" (README, README.tr, vaka calismasi,
+  PATTERNS basligi) YANLISTI: PATTERNS'in kendi tablosunda bes girdi "none -
+  manual step". Toplam dogru, niteleme yanlis. Artik "37'si testle, 5'i elle"
+  ve test bu ikinci sayiyi da tablodan olcuyor.
+- Vaka calismasi 18 Agu'da elenen "sirket basina tek kayma" tasarimini
+  anlatiyordu (KK-52 README'lerde duzeltmis, vaka calismasini atlamisti -
+  P-40'in belge versiyonu).
+- Benchmark "bu kosuda on arac vardi" diyordu; ilk kosuda 10, ikinci
+  (manset) kosunun commit'inde 12 arac var ve kosu kayitlari hangi araclarin
+  sunuldugunu TUTMUYOR. Metin artik 12'nin koddan cikarildigini, kayittan
+  olmadigini soyluyor.
+- PUBLISHING: enjeksiyon dagilimi (191/10 -> 210/9), yer tutucu adlar
+  (`<candidate-name>`), "isim karari her seyi bloke ediyor" maddesi.
+- KK-50'deki "199 enjeksiyon `src/` altindaki yollara bagli" o gun de yanlisti
+  (199 toplamdi; `src/` altinda 189). Tarihsel kayit oldugu icin yerinde
+  birakildi, duzeltmesi burada.
+- KK-7 "yururlukte" diyordu ama anlattigi `_fy_kaymasi()` yok; durum satiri
+  duzeltildi. KK-21 var olmayan bir test adini (`test_turkce_sezici_...`)
+  anlatiyordu. `git log -S` ile olculdu: o adda bir test HICBIR commit'te
+  olmadi; kayit ve dogru adli test ayni commit'te (6734707) geldi. Ilk
+  duzeltmemde "sonradan yeniden adlandirildi" diye bir tarihce UYDURMUSTUM -
+  bagimsiz denetim yakaladi; kayit artik yalnizca dogru adi tasiyor.
+- `fiscal_year_source`'un dorduncu degeri (`none`) README'lerde yoktu;
+  TR README capa kuralini EN'den farkli ("sonraki" vs "at or after")
+  anlatiyordu; alan adi `returned` diye geciyordu (`returned_characters`);
+  dizin yapisi uc modulu atliyordu; TR README'de CI rozeti yoktu; paket
+  siniflandiricilari 3.14'u (CI'da test edilen) listelemiyordu.
+- Sunucunun el sikismada bildirdigi ad hala `sec-edgar` idi. KK-50 arac onekini
+  ve import paketini BILEREK eski birakmisti; bu ikisinin disindaydi ve
+  atlanmisti. `edgar-audit-mcp` oldu. Claude Desktop yapilandirmasindaki
+  anahtar kullanicinin etiketi, sunucunun kimligi degil; ona dokunulmadi.
+
+**CI: haftalik zamanlanmis kosu + dogrulama araclarina ust sinir.** Iki ayri
+kayma, iki ayri cevap:
+- Calisma zamani (`httpx`, `pydantic`, Python): bildirilen araliklarinda
+  serbest; haftalik kosu (Pazartesi 04:17 UTC) onlarin kanaryasi. GitHub,
+  herkese acik bir depoda 60 gun etkinlik olmazsa zamanlanmis is akislarini
+  kapatiyor - sessiz bir depo yine de ara sira bir push istiyor.
+- Dogrulama araclari (`ruff`, `mypy`, `pytest`): ust sinir. Yeni ruff
+  surumleri secili kural ailelerine yeni kural ekliyor; bunlar koda dokunmadan
+  bir push'u kirmiziya ceviriyor. Karari degistiren surumu biz secmeliyiz.
+Ikisi de testle sabitlendi.
+
+**Yeni, KAPATILMAYAN bulgu - eski sabit genislikli tablolar.** Eski
+`.txt` dosyalamalarda tablolar bosluklarla hizalanmis duz metin. Metin
+cevirici bosluklari sadelestiriyor ve tablo tanimiyor (`tables: []`). Canli
+olculdu (Apple 2000 10-K, `0000912057-00-053623`):
+`Restructuring costs........................... $ 8 $ 27 $ --`. Degerler
+sirasini koruyor ve bu ornekte her hucre dolu (`$ --` bos hucreyi isaretliyor),
+yani YANLIS bir cevap URETILDIGI gosterilmedi. Risk: tamamen bos bir hucre
+sutun kaydirir ve bunu metinden ayirt etmenin yolu kalmaz. Duzeltme metin
+cekirdeginde bir davranis degisikligi (sayfalama ofsetleri dahil) ve gercek
+eski `.txt` dosyalamalarla olculmeden yapilmamali. Bir sonraki turun listesi.
+
+**Ikinci gecis - bagimsiz, dusmanca bir inceleme (28 Eyl 2026).** Yukaridaki
+her sey yazildiktan ve 219 enjeksiyonun tamami dogrulandiktan SONRA, diff'i
+salt-okunur bir ajan inceledi. Bulgular, her biri yeniden uretilerek:
+- **`inspector.py` UCUNCU bir giris noktasiydi ve User-Agent korumasi
+  onunla gelmemisti** - az once duzelttigim P-40'in aynisi, ayni turda.
+  Inspector sunucuyu `mcp run inspector.py` ile baslatiyor, `main()`
+  cagrilmiyor. `_c()` artik dosyanin icinde; test ve enjeksiyon var.
+- **Onbellek testi iddia ettigini olcmuyordu.** "En yeni kalmali" diye
+  numarayi anahtarda ariyordu; "5" her cerceve anahtarinda `CY2025` icinden
+  geciyordu ve en YENIYI atan bir politika da yesil kaliyordu. Test artik
+  anahtarlarin kendisini sirasiyla karsilastiriyor; ters politika icin
+  enjeksiyon eklendi.
+- **Celiski kirpmasi en ESKI yirmiyi tutuyordu** (benim ekledigim siralama
+  bunu kesinlestirdi), seri en YENI donemleri donduruyor, ve toplam hicbir
+  yerde yazmiyordu - README'nin "her liste ne kadarini dondurmedigini soyler"
+  vaadine aykiri. Artik en yeni yirmi ve `total_tag_conflicts`.
+- **Kaybedenin baslangici dusuyordu.** Ayni kovada farkli baslangicli iki
+  deger bir etiket celiskisi degil donem farki olabilir;
+  `other_period_start` eklendi.
+- **Ust sinirlar iddia ettigimden gevsekti.** `mypy<3`, `pytest<10` ara
+  surumlere izin veriyordu; mypy ara surumleri yeni hata buluyor, pytest'in
+  kaldirma uyarilari CI'da hataya donuyor. Ucu de bugunku ara surumunde
+  (`ruff<0.17`, `mypy<2.4`, `pytest<9.2`); yukseltmek bilincli bir adim.
+- **"Kova sinirlari etkilenmedi" yanlisti** - bkz. KK-53'teki duzeltme.
+- **KK-21 duzeltmemde bir tarihce uydurmustum** (yukarida).
+- **Benchmark cumlesinde "ilk kosuda on" da koddan cikarimdi**, kayittan
+  degil; ve ikinci kosuda ajanlara `compare_companies`'ten kacinmalari
+  soylenmisti, yani fiilen on bir. Metin ucunu de soyluyor.
+- **Capa kurali README'lerde basitlestirilmisti** ("sonraki ilk capanin
+  yili"): kod +-10 gun icindeki capayi "reported" sayiyor, bir yildan uzak
+  capadan yil sayarak geri gidiyor, son capanin otesine ileri sayiyor. Metin
+  artik boyle anlatiyor.
+- `mcp dev` testi karar kayitlarindaki tarihce alintisini da tarayabilirdi;
+  artik yalnizca kod bloklari. SDK yukleyicisinin `sys.path`'e ekledigi yol
+  test sonunda geri aliniyor.
+- El sikisma adi ve "5 elle" sayisi testsizdi; ikisi de baglandi.
+- Vaka calismasi "elle yazilan fixture'lar bunu tanimlandiklari yerde
+  soyler" diyordu; birkaci soylemiyordu. Cumle olculebilir olana indirildi,
+  yeni degerler isaretlendi.
+
+Bu gecisten sonra tam enjeksiyon taramasi yeniden kosturuldu (sonuc KK-55'in
+sonunda degil, commit mesajinda ve proje durum belgesinde).
+
+**Bu turda YAPILMAYAN:** Windows'ta kosu (CI'ya birakildi - kullanicinin
+makinesinde kabuk erisimi yok).
